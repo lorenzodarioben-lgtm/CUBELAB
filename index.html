@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0a0b10" />
+    <meta name="description" content="CUBELAB — the interactive cubing studio. Turn, scramble, time and auto-solve a 3×3×3 cube in your browser." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>CUBELAB — The interactive cubing studio</title>
+    <style>
+      html, body { margin: 0; background: #0a0b10; }
+      #boot { position: fixed; inset: 0; display: grid; place-items: center; color: #8d90a4;
+        font: 500 11px/1.4 ui-sans-serif, system-ui, sans-serif; letter-spacing: .18em; text-transform: uppercase; }
+      #boot svg { display: block; margin: 0 auto 18px; opacity: .9; animation: boot-pulse 1.6s ease-in-out infinite; }
+      @keyframes boot-pulse { 50% { opacity: .45; } }
+      @media (prefers-reduced-motion: reduce) { #boot svg { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div id="boot" role="status" aria-live="polite">
+        <div>
+          <svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M32 6 54 18.5v27L32 58 10 45.5v-27Z" fill="none" stroke="#c9c3ff" stroke-width="2.5" stroke-linejoin="round"/>
+            <path d="M10 18.5 32 31l22-12.5M32 31v27" fill="none" stroke="#c9c3ff" stroke-width="2.5" stroke-linejoin="round"/>
+          </svg>
+          Loading CUBELAB
+        </div>
+      </div>
+    </div>
+    <noscript><p style="color:#ddd;font-family:sans-serif;padding:24px">CUBELAB needs JavaScript to run the cube.</p></noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

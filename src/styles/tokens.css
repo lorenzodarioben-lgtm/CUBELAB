@@ -1,0 +1,87 @@
+:root {
+  color-scheme: dark;
+
+  /* Ink */
+  --ink-0: #06070b;
+  --ink-1: #0a0b11;
+  --ink-2: #10121a;
+  --ink-3: #171a24;
+  --ink-4: #20242f;
+
+  /* Surfaces */
+  --surface: rgba(17, 19, 27, 0.66);
+  --surface-strong: rgba(19, 21, 30, 0.9);
+  --surface-raised: rgba(28, 31, 42, 0.72);
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --line-bright: rgba(255, 255, 255, 0.2);
+
+  /* Text */
+  --text: #eeecf6;
+  --text-2: #aeacc0;
+  --text-3: #75768c;
+  --text-4: #555669;
+
+  /* Accents */
+  --accent: #bdb2ff;
+  --accent-strong: #d6cfff;
+  --accent-ink: #1a1638;
+  --accent-soft: rgba(189, 178, 255, 0.12);
+  --accent-line: rgba(189, 178, 255, 0.3);
+  --cyan: #86e7f5;
+  --cyan-soft: rgba(134, 231, 245, 0.12);
+  --ok: #6fe3a8;
+  --ok-soft: rgba(111, 227, 168, 0.14);
+  --warn: #ffc76a;
+  --warn-soft: rgba(255, 199, 106, 0.14);
+  --danger: #ff7b88;
+  --danger-soft: rgba(255, 123, 136, 0.13);
+
+  /* Type */
+  --font-ui: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* Numerals: Instrument Sans tabular figures, slightly condensed. */
+  --font-num: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
+
+  /* Shape */
+  --radius-xl: 24px;
+  --radius-lg: 18px;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-xs: 7px;
+
+  /* Elevation */
+  --shadow-panel: 0 30px 60px -36px rgba(0, 0, 0, 0.85), 0 1px 0 rgba(255, 255, 255, 0.035) inset;
+  --shadow-float: 0 24px 48px -20px rgba(0, 0, 0, 0.75), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  --blur: blur(22px) saturate(140%);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.32, 0.5, 1);
+  --dur-fast: 140ms;
+  --dur: 220ms;
+  --dur-slow: 420ms;
+
+  /* Layout */
+  --topbar-h: 68px;
+  --rail-w: clamp(296px, 23vw, 352px);
+  --gutter: clamp(16px, 2vw, 28px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+@media (max-width: 1099px) {
+  :root {
+    --topbar-h: 58px;
+    --gutter: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+    --dur-slow: 0ms;
+  }
+}
