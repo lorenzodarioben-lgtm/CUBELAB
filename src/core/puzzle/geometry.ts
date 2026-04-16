@@ -14,8 +14,11 @@
  * face clockwise (viewed from outside that face) is therefore a *negative*
  * rotation for R/U/F (outward normal = +axis) and a *positive* rotation for
  * L/D/B (outward normal = −axis).
+ *
+ * Slices live at layer 0 and borrow the direction of their reference face:
+ * M turns like L (+), E like D (+), S like F (−).
  */
-import type { Face, Move } from './notation';
+import type { Face, Move, MoveFamily } from './notation';
 
 export type Axis = 0 | 1 | 2;
 export type Layer = -1 | 0 | 1;
@@ -25,13 +28,34 @@ export type Mat3 = readonly [number, number, number, number, number, number, num
 
 export const IDENTITY: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
-export const FACE_AXIS: Readonly<Record<Face, { axis: Axis; layer: -1 | 1 }>> = {
+/** Rotation axis and lattice layer turned by each move family. */
+export const MOVE_AXIS: Readonly<Record<MoveFamily, { axis: Axis; layer: Layer }>> = {
   R: { axis: 0, layer: 1 },
+  M: { axis: 0, layer: 0 },
   L: { axis: 0, layer: -1 },
   U: { axis: 1, layer: 1 },
+  E: { axis: 1, layer: 0 },
   D: { axis: 1, layer: -1 },
   F: { axis: 2, layer: 1 },
+  S: { axis: 2, layer: 0 },
   B: { axis: 2, layer: -1 },
+};
+
+/**
+ * Signed quarter turns about +axis produced by one clockwise turn of each
+ * family. Faces: −1 on the positive side, +1 on the negative side. Slices
+ * follow their reference face (M→L, E→D, S→F).
+ */
+const CLOCKWISE_SIGN: Readonly<Record<MoveFamily, -1 | 1>> = {
+  R: -1,
+  U: -1,
+  F: -1,
+  L: 1,
+  D: 1,
+  B: 1,
+  M: 1,
+  E: 1,
+  S: -1,
 };
 
 export const FACE_NORMAL: Readonly<Record<Face, Vec3>> = {
@@ -43,10 +67,11 @@ export const FACE_NORMAL: Readonly<Record<Face, Vec3>> = {
   B: [0, 0, -1],
 };
 
-export function faceForAxisLayer(axis: Axis, layer: -1 | 1): Face {
-  if (axis === 0) return layer === 1 ? 'R' : 'L';
-  if (axis === 1) return layer === 1 ? 'U' : 'D';
-  return layer === 1 ? 'F' : 'B';
+/** The move family that turns `layer` about `axis` (layer 0 is the slice). */
+export function familyForAxisLayer(axis: Axis, layer: Layer): MoveFamily {
+  if (axis === 0) return layer === 1 ? 'R' : layer === -1 ? 'L' : 'M';
+  if (axis === 1) return layer === 1 ? 'U' : layer === -1 ? 'D' : 'E';
+  return layer === 1 ? 'F' : layer === -1 ? 'B' : 'S';
 }
 
 /** Face whose outward normal is the given axis-aligned unit vector. */
@@ -60,18 +85,18 @@ export function faceFromNormal(normal: Vec3): Face {
   return z > 0 ? 'F' : 'B';
 }
 
-/** Signed quarter turns about +axis produced by one clockwise turn of `face`. */
-export function clockwiseQuarterSign(face: Face): -1 | 1 {
-  return FACE_AXIS[face].layer === 1 ? -1 : 1;
+/** Signed quarter turns about +axis produced by one clockwise turn of `family`. */
+export function clockwiseQuarterSign(family: MoveFamily): -1 | 1 {
+  return CLOCKWISE_SIGN[family];
 }
 
 /**
- * Signed quarter turns about the move's +axis. Double turns are reported as +2
- * for faces on the positive side and −2 on the negative side, purely so the
- * default animation direction matches the face's clockwise sense.
+ * Signed quarter turns about the move's +axis. Double turns keep the sign of
+ * the family's clockwise sense, purely so the default animation direction of
+ * a half turn matches its clockwise direction.
  */
 export function moveQuarterTurns(move: Move): number {
-  const cw = clockwiseQuarterSign(move.face);
+  const cw = clockwiseQuarterSign(move.family);
   if (move.turns === 1) return cw;
   if (move.turns === 3) return -cw;
   return 2 * cw;

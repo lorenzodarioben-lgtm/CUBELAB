@@ -12,14 +12,18 @@
  *  3. Pushing stickers along t rotates the slab about a = n × t containing p.
  *     A positive rotation about a moves face-n points along +t, so the drag
  *     distance d (world units) maps to angle d / 1.5 about a.
- *  4. Only outer slabs are puzzle moves. A drag that would turn a middle slice
- *     is refused with a hint instead of turning the wrong layer.
+ *  4. The slab is the lattice layer of p along a: ±1 is an outer face, 0 is the
+ *     middle slice (M, E or S by axis). On the front face, a vertical drag on
+ *     the middle column is M/M′ and a horizontal drag on the middle row is
+ *     E/E′; S is reached from the middle strip of U, D, L or R. The centre
+ *     sticker belongs to both middle strips, so the locked drag direction
+ *     decides which.
  *  5. On release the angle snaps to the nearest quarter (with a small flick
  *     threshold); below it the layer settles back and nothing is committed.
  */
-import { clockwiseQuarterSign, faceForAxisLayer } from '../../core/puzzle/geometry';
-import type { Axis, Vec3 } from '../../core/puzzle/geometry';
-import { mv } from '../../core/puzzle/notation';
+import { clockwiseQuarterSign, familyForAxisLayer } from '../../core/puzzle/geometry';
+import type { Axis, Layer, Vec3 } from '../../core/puzzle/geometry';
+import { formatMove, mv } from '../../core/puzzle/notation';
 import type { Move } from '../../core/puzzle/notation';
 
 export const HALF_EXTENT = 1.5;
@@ -86,11 +90,11 @@ function cross(a: Vec3, b: Vec3): Vec3 {
 export type TwistResolution =
   | { readonly kind: 'pending' }
   | { readonly kind: 'ambiguous' }
-  | { readonly kind: 'slice'; readonly axis: Axis }
   | {
       readonly kind: 'twist';
       readonly axis: Axis;
-      readonly layer: -1 | 1;
+      /** −1 / +1 outer face, 0 middle slice. */
+      readonly layer: Layer;
       /** +1 if (n × t) points along +axis, −1 otherwise. */
       readonly axisSign: 1 | -1;
       /** Unit screen direction of +t. */
@@ -102,9 +106,16 @@ export type TwistResolution =
 export interface ResolveOptions {
   /** Minimum drag in px before deciding. */
   readonly threshold: number;
-  /** Required |cos| advantage of the chosen tangent over the other. */
+  /**
+   * Required angular advantage (radians) of the chosen tangent's screen line
+   * over the other's. Angles, not cosines: near-parallel lines differ little in
+   * cosine even when clearly distinguishable, e.g. at grazing camera angles.
+   */
   readonly margin?: number;
 }
+
+/** Default angular margin: ~12°. */
+export const AMBIGUITY_MARGIN = (12 * Math.PI) / 180;
 
 /** Decides which slab a drag means. Pure and deterministic. */
 export function resolveTwist(hit: CubeHit, drag: ScreenPoint, project: Project, options: ResolveOptions): TwistResolution {
@@ -130,15 +141,15 @@ export function resolveTwist(hit: CubeHit, drag: ScreenPoint, project: Project, 
   candidates.sort((a, b) => Math.abs(b.cos) - Math.abs(a.cos));
   const best = candidates[0]!;
   const other = candidates[1];
-  if (other && Math.abs(best.cos) - Math.abs(other.cos) < (options.margin ?? 0.2)) return { kind: 'ambiguous' };
+  const lineAngle = (cos: number) => Math.acos(Math.min(1, Math.abs(cos)));
+  if (other && lineAngle(other.cos) - lineAngle(best.cos) < (options.margin ?? AMBIGUITY_MARGIN)) return { kind: 'ambiguous' };
 
   const a = cross(n, best.t);
   const axis = axisOf(a);
   const axisSign = (a[axis]! > 0 ? 1 : -1) as 1 | -1;
   const coordinate = hit.point[axis]!;
-  const layer = Math.max(-1, Math.min(1, Math.round(coordinate)));
-  if (layer === 0) return { kind: 'slice', axis };
-  return { kind: 'twist', axis, layer: layer as -1 | 1, axisSign, screenDir: best.dir, pixelsPerUnit: best.ppu };
+  const layer = Math.max(-1, Math.min(1, Math.round(coordinate))) as Layer;
+  return { kind: 'twist', axis, layer, axisSign, screenDir: best.dir, pixelsPerUnit: best.ppu };
 }
 
 /** Drag gain: 1 world unit of push ≈ (gain / 1.5) rad of layer rotation. */
@@ -162,21 +173,24 @@ export interface SnapResult {
   readonly targetAngle: number;
 }
 
-export function snapTwist(axis: Axis, layer: -1 | 1, angle: number, angularVelocity = 0): SnapResult | null {
+export function snapTwist(axis: Axis, layer: Layer, angle: number, angularVelocity = 0): SnapResult | null {
   const magnitude = Math.abs(angle);
   const flick = magnitude >= FLICK_ANGLE && Math.sign(angularVelocity) === Math.sign(angle) && Math.abs(angularVelocity) >= FLICK_VELOCITY;
   if (magnitude < COMMIT_ANGLE && !flick) return null;
   const quarters = Math.min(2, Math.max(1, Math.round(magnitude / (Math.PI / 2))));
   const direction = Math.sign(angle) as 1 | -1;
-  const face = faceForAxisLayer(axis, layer);
-  const turns = quarters === 2 ? 2 : direction === clockwiseQuarterSign(face) ? 1 : 3;
-  return { move: mv(face, turns), targetAngle: (direction * quarters * Math.PI) / 2 };
+  const family = familyForAxisLayer(axis, layer);
+  const turns = quarters === 2 ? 2 : direction === clockwiseQuarterSign(family) ? 1 : 3;
+  return { move: mv(family, turns), targetAngle: (direction * quarters * Math.PI) / 2 };
 }
 
 /** Notation label for the move the current drag would commit (for the live preview). */
-export function previewLabel(axis: Axis, layer: -1 | 1, angle: number): string | null {
+export function previewLabel(axis: Axis, layer: Layer, angle: number): string | null {
   const snap = snapTwist(axis, layer, angle);
-  if (!snap) return null;
-  const { move } = snap;
-  return move.turns === 1 ? move.face : move.turns === 2 ? `${move.face}2` : `${move.face}'`;
+  return snap ? formatMove(snap.move) : null;
+}
+
+/** The move family a resolved drag is turning (shown before the commit angle is reached). */
+export function previewFamily(axis: Axis, layer: Layer): string {
+  return familyForAxisLayer(axis, layer);
 }

@@ -56,8 +56,8 @@ function guidance(timer: TimerState, scrambling: boolean, solved: boolean): stri
     case 'solved': {
       const last = timer.last;
       if (!last) return 'Solved.';
-      const tps = formatTps(last.turnsHTM, last.durationMs);
-      return `${last.turnsHTM} turns${tps ? ` · ${tps} tps` : ''}${last.assisted ? ' · undo used, saved as practice' : ''}`;
+      const tps = formatTps(last.turnsSTM, last.durationMs);
+      return `${last.turnsSTM} turns${tps ? ` · ${tps} tps` : ''}${last.assisted ? ' · undo used, saved as practice' : ''}`;
     }
     case 'interrupted':
       return timer.last?.note === 'inspection-timeout' ? 'Inspection passed 17 s — recorded as DNF.' : 'Stopped before solved — recorded as DNF.';

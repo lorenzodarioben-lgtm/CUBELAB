@@ -9,6 +9,7 @@ export type Finish = 'gloss' | 'matte';
 export type MotionPreference = 'system' | 'reduce' | 'full';
 export type KeyMap = 'faces' | 'speed';
 export type TouchMode = 'twist' | 'orbit';
+export type PadLayers = 'faces' | 'slices';
 
 export interface Settings {
   readonly turnSpeed: TurnSpeed;
@@ -25,6 +26,8 @@ export interface Settings {
   readonly keyMap: KeyMap;
   readonly touchMode: TouchMode;
   readonly movePadOpen: boolean;
+  /** Which bank the Move Pad shows: the six faces or the three slices. */
+  readonly padLayers: PadLayers;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -42,6 +45,7 @@ export const DEFAULT_SETTINGS: Settings = {
   keyMap: 'faces',
   touchMode: 'twist',
   movePadOpen: true,
+  padLayers: 'faces',
 };
 
 /** Quarter-turn animation length for manual turns. */
@@ -93,5 +97,6 @@ export function sanitizeSettings(raw: unknown): Settings {
     keyMap: pick(r.keyMap, ['faces', 'speed'], d.keyMap),
     touchMode: pick(r.touchMode, ['twist', 'orbit'], d.touchMode),
     movePadOpen: bool(r.movePadOpen, d.movePadOpen),
+    padLayers: pick(r.padLayers, ['faces', 'slices'], d.padLayers),
   };
 }

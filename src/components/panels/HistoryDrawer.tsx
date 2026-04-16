@@ -16,7 +16,7 @@ function csvEscape(value: string | number | null): string {
 }
 
 function exportCsv(records: readonly SolveRecord[]): void {
-  const header = ['index', 'date', 'raw_ms', 'penalty', 'effective_ms', 'assisted', 'mode', 'inspection_ms', 'turns_htm', 'turns_qtm', 'scramble', 'note'];
+  const header = ['index', 'date', 'raw_ms', 'penalty', 'effective_ms', 'assisted', 'mode', 'inspection_ms', 'turns_stm', 'turns_htm', 'turns_qtm', 'scramble', 'note'];
   const rows = records.map((r, i) => {
     const eff = effectiveMs(r);
     return [
@@ -28,6 +28,7 @@ function exportCsv(records: readonly SolveRecord[]): void {
       r.assisted ? 'yes' : 'no',
       r.mode,
       r.inspectionMs === null ? null : r.inspectionMs.toFixed(0),
+      r.turnsSTM,
       r.turnsHTM,
       r.turnsQTM,
       r.scramble,
@@ -50,7 +51,7 @@ function SolveRow({ record, index }: { record: SolveRecord; index: number }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const eff = effectiveMs(record);
-  const tps = formatTps(record.turnsHTM, record.durationMs);
+  const tps = formatTps(record.turnsSTM, record.durationMs);
 
   return (
     <li className={cx('solve', open && 'is-open', record.assisted && 'is-practice')}>
@@ -82,7 +83,7 @@ function SolveRow({ record, index }: { record: SolveRecord; index: number }) {
             <div>
               <dt>Turns</dt>
               <dd>
-                {record.turnsHTM} HTM · {record.turnsQTM} QTM
+                {record.turnsSTM} STM · {record.turnsHTM} HTM · {record.turnsQTM} QTM
               </dd>
             </div>
             <div>

@@ -33,7 +33,13 @@ export const STORAGE_KEYS = {
 } as const;
 
 export const SETTINGS_VERSION = 1;
-export const HISTORY_VERSION = 1;
+/**
+ * History schema.
+ *  v1 — turnsHTM / turnsQTM (outer faces only).
+ *  v2 — adds turnsSTM once slices exist. v1 records migrate with
+ *       turnsSTM = turnsHTM, which is exact because v1 had no slice turns.
+ */
+export const HISTORY_VERSION = 2;
 export const CUBE_VERSION = 1;
 export const HISTORY_LIMIT = 1000;
 
@@ -45,9 +51,11 @@ export interface SolveRecord {
   readonly durationMs: number;
   readonly penalty: Penalty;
   readonly scramble: string;
-  /** Face/half-turn metric: each U, U' or U2 counts 1. */
+  /** Slice turn metric: every layer turn (outer or M/E/S, any angle) counts 1. */
+  readonly turnsSTM: number;
+  /** Half-turn metric: each outer U, U' or U2 counts 1; a slice counts 2. */
   readonly turnsHTM: number;
-  /** Quarter-turn metric: U2 counts 2. */
+  /** Quarter-turn metric: U2 counts 2; slices count twice their outer equivalent. */
   readonly turnsQTM: number;
   readonly mode: TimerMode;
   readonly inspectionMs: number | null;
@@ -153,6 +161,9 @@ export function sanitizeRecord(raw: unknown): SolveRecord | null {
     }
   }
   if (!isCount(r.turnsHTM) || !isCount(r.turnsQTM)) return null;
+  // v1 → v2 migration: records written before slices existed have no STM count.
+  const turnsSTM = r.turnsSTM === undefined ? r.turnsHTM : r.turnsSTM;
+  if (!isCount(turnsSTM)) return null;
   if (r.mode !== 'casual' && r.mode !== 'spacebar') return null;
   const inspectionMs =
     typeof r.inspectionMs === 'number' && Number.isFinite(r.inspectionMs) && r.inspectionMs >= 0 ? r.inspectionMs : null;
@@ -163,6 +174,7 @@ export function sanitizeRecord(raw: unknown): SolveRecord | null {
     durationMs: r.durationMs,
     penalty: r.penalty as Penalty,
     scramble: r.scramble,
+    turnsSTM: turnsSTM as number,
     turnsHTM: r.turnsHTM as number,
     turnsQTM: r.turnsQTM as number,
     mode: r.mode,
@@ -188,6 +200,8 @@ export function loadHistory(store: KeyValueStore): LoadedHistory {
     backup(store, STORAGE_KEYS.history, raw);
     return { records: [], dropped: Array.isArray(envelope.data) ? envelope.data.length : 1 };
   }
+  // Keep the pre-migration payload once, so an older schema is never lost silently.
+  if (envelope.v < HISTORY_VERSION && raw !== null) backup(store, STORAGE_KEYS.history, raw);
   const records: SolveRecord[] = [];
   const seen = new Set<string>();
   let dropped = 0;

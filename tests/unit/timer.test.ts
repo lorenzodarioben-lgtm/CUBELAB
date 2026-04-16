@@ -20,7 +20,13 @@ function play(state: TimerState, events: TimerEvent[]): { state: TimerState; com
   return { state: s, completed };
 }
 
-const turn = (at: number, solved = false, quarterTurns = 1): TimerEvent => ({ type: 'manualTurn', at, quarterTurns, solved });
+const turn = (at: number, solved = false, quarterTurns = 1): TimerEvent => ({
+  type: 'manualTurn',
+  at,
+  metrics: { stm: 1, htm: 1, qtm: quarterTurns },
+  solved,
+});
+const sliceTurn = (at: number, solved = false): TimerEvent => ({ type: 'manualTurn', at, metrics: { stm: 1, htm: 2, qtm: 2 }, solved });
 const scrambled = (): TimerEvent[] => [{ type: 'scrambleStarted' }, { type: 'scrambleApplied', scramble: "R U F'" }];
 
 describe('casual mode', () => {
@@ -29,10 +35,18 @@ describe('casual mode', () => {
     expect(state.phase).toBe('solved');
     expect(completed).toHaveLength(1);
     expect(completed[0]!.durationMs).toBe(3321.5);
+    expect(completed[0]!.turnsSTM).toBe(3);
     expect(completed[0]!.turnsHTM).toBe(3);
     expect(completed[0]!.turnsQTM).toBe(4);
     expect(completed[0]!.assisted).toBe(false);
     expect(completed[0]!.scramble).toBe("R U F'");
+  });
+
+  it('counts a slice turn as 1 STM but 2 HTM / QTM', () => {
+    const { completed } = play(createTimerState('casual'), [...scrambled(), turn(1000), sliceTurn(1500), sliceTurn(2000, true)]);
+    expect(completed[0]!.turnsSTM).toBe(3);
+    expect(completed[0]!.turnsHTM).toBe(5);
+    expect(completed[0]!.turnsQTM).toBe(5);
   });
 
   it('does not start without a scramble (free play) and never records', () => {

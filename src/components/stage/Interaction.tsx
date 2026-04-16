@@ -17,7 +17,7 @@ import * as THREE from 'three';
 import type { Studio } from '../../app/studio';
 import type { TouchMode } from '../../core/persistence/settings';
 import type { Vec3 } from '../../core/puzzle/geometry';
-import { intersectCube, previewLabel, resolveTwist, snapTwist, twistAngle } from '../cube/gestures';
+import { intersectCube, previewFamily, previewLabel, resolveTwist, snapTwist, twistAngle } from '../cube/gestures';
 import type { CubeHit, ScreenPoint, TwistResolution } from '../cube/gestures';
 import type { OrbitRig } from './orbitRig';
 
@@ -36,8 +36,14 @@ type Gesture =
   | { kind: 'dead'; id: number };
 
 export interface PreviewSink {
-  show(label: string | null, x: number, y: number): void;
+  /** `committed` is true once releasing would commit the shown move. */
+  show(label: string, committed: boolean, x: number, y: number): void;
   hide(): void;
+}
+
+function showPreview(sink: PreviewSink, info: TwistInfo, angle: number, p: ScreenPoint): void {
+  const label = previewLabel(info.axis, info.layer, angle);
+  sink.show(label ?? previewFamily(info.axis, info.layer), label !== null, p.x, p.y);
 }
 
 interface InteractionProps {
@@ -158,11 +164,6 @@ export function Interaction({ studio, rig, touchMode, preview, onFirstGesture }:
           }
           return;
         }
-        if (res.kind === 'slice') {
-          studio.hint('Middle layers stay put — drag an outer row or column');
-          gesture = { kind: 'dead', id: gesture.id };
-          return;
-        }
         if (!studio.beginTwist()) {
           gesture = { kind: 'dead', id: gesture.id };
           return;
@@ -170,7 +171,7 @@ export function Interaction({ studio, rig, touchMode, preview, onFirstGesture }:
         const angle = twistAngle(res, drag);
         gesture = { kind: 'twist', id: gesture.id, start: gesture.start, info: res, angle, samples: [{ t: e.timeStamp, a: angle }] };
         engine.updateDrag({ axis: res.axis, layer: res.layer, angle });
-        preview.show(previewLabel(res.axis, res.layer, angle), p.x, p.y);
+        showPreview(preview, res, angle, p);
         onFirstGesture();
         return;
       }
@@ -181,7 +182,7 @@ export function Interaction({ studio, rig, touchMode, preview, onFirstGesture }:
         gesture.samples.push({ t: e.timeStamp, a: angle });
         if (gesture.samples.length > 8) gesture.samples.shift();
         engine.updateDrag({ axis: gesture.info.axis, layer: gesture.info.layer, angle });
-        preview.show(previewLabel(gesture.info.axis, gesture.info.layer, angle), p.x, p.y);
+        showPreview(preview, gesture.info, angle, p);
       }
     };
 

@@ -27,6 +27,7 @@ const record = (over: Partial<SolveRecord> = {}): SolveRecord => ({
   durationMs: 12_345.6,
   penalty: 'none',
   scramble: "R U F'",
+  turnsSTM: 40,
   turnsHTM: 40,
   turnsQTM: 46,
   mode: 'casual',
@@ -84,7 +85,7 @@ describe('history', () => {
     const store = createMemoryStore({
       [STORAGE_KEYS.history]: JSON.stringify({
         v: 1,
-        data: [record(), record(), { id: 'x', durationMs: -5 }, record({ id: 'c3', scramble: 'M E S' }), 'junk', record({ id: 'd4' })],
+        data: [record(), record(), { id: 'x', durationMs: -5 }, record({ id: 'c3', scramble: 'x y z' }), 'junk', record({ id: 'd4' })],
       }),
     });
     const { records, dropped } = loadHistory(store);

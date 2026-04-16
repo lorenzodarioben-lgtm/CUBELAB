@@ -77,11 +77,11 @@ export function Stage() {
 
   const preview = useMemo<PreviewSink>(
     () => ({
-      show(label, x, y) {
+      show(label, committed, x, y) {
         const el = labelRef.current;
         if (!el) return;
-        el.textContent = label ?? '·';
-        el.dataset.ready = label ? 'true' : 'false';
+        el.textContent = label;
+        el.dataset.ready = committed ? 'true' : 'false';
         el.style.transform = `translate(${Math.round(x + 18)}px, ${Math.round(y - 42)}px)`;
         el.style.opacity = '1';
       },

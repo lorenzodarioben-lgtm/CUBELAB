@@ -1,18 +1,20 @@
 /**
  * Keyboard layouts for turning.
  *
- * faces (default): the face letter turns clockwise, Shift + letter turns
- *   counter-clockwise. Uses `KeyboardEvent.code`, so it works on any layout.
+ * faces (default): the letter turns clockwise, Shift + letter counter-
+ *   clockwise, for all nine families U D L R F B M E S. Uses
+ *   `KeyboardEvent.code`, so it works on any keyboard layout.
  * speed: the classic two-hand speedcubing layout used by qqTimer, csTimer and
  *   cubing.js's twisty player (I/K = R/R', J/F = U/U', H/G = F/F', D/E = L/L',
- *   S/L = D/D', W/O = B/B').
+ *   S/L = D/D', W/O = B/B'), with slices on the number row:
+ *   5/6 = M/M', 2/3 = E/E', 8/9 = S/S'.
  *
- * Action shortcuts deliberately avoid every letter used by either layout:
+ * Action shortcuts deliberately avoid every key used by either layout:
  * N new scramble, A auto solve, P play/pause, , and . step, C camera, Z zen,
- * M move pad, ? help.
+ * ? help.
  */
 import { mv } from '../core/puzzle/notation';
-import type { Face, Move } from '../core/puzzle/notation';
+import type { Move, MoveFamily } from '../core/puzzle/notation';
 import type { KeyMap } from '../core/persistence/settings';
 
 export const SPEED_KEYS: Readonly<Record<string, Move>> = {
@@ -28,22 +30,31 @@ export const SPEED_KEYS: Readonly<Record<string, Move>> = {
   l: mv('D', 3),
   w: mv('B', 1),
   o: mv('B', 3),
+  '5': mv('M', 1),
+  '6': mv('M', 3),
+  '2': mv('E', 1),
+  '3': mv('E', 3),
+  '8': mv('S', 1),
+  '9': mv('S', 3),
 };
 
-const FACE_CODES: Readonly<Record<string, Face>> = {
+const FAMILY_CODES: Readonly<Record<string, MoveFamily>> = {
   KeyU: 'U',
   KeyD: 'D',
   KeyL: 'L',
   KeyR: 'R',
   KeyF: 'F',
   KeyB: 'B',
+  KeyM: 'M',
+  KeyE: 'E',
+  KeyS: 'S',
 };
 
 export function moveForKey(event: Pick<KeyboardEvent, 'code' | 'key' | 'shiftKey'>, keyMap: KeyMap): Move | null {
   if (keyMap === 'faces') {
-    const face = FACE_CODES[event.code];
-    return face ? mv(face, event.shiftKey ? 3 : 1) : null;
+    const family = FAMILY_CODES[event.code];
+    return family ? mv(family, event.shiftKey ? 3 : 1) : null;
   }
-  const letter = event.code.startsWith('Key') ? event.code.slice(3).toLowerCase() : '';
-  return SPEED_KEYS[letter] ?? null;
+  const key = event.code.startsWith('Key') ? event.code.slice(3).toLowerCase() : event.code.startsWith('Digit') ? event.code.slice(5) : '';
+  return SPEED_KEYS[key] ?? null;
 }

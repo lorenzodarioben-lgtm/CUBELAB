@@ -18,7 +18,7 @@
 import { applyMove, isSolved } from '../puzzle/cubeState';
 import type { CubeState } from '../puzzle/cubeState';
 import { cubiesInLayer } from '../puzzle/cubies';
-import { FACE_AXIS, moveAngle } from '../puzzle/geometry';
+import { MOVE_AXIS, moveAngle } from '../puzzle/geometry';
 import type { Axis, Layer } from '../puzzle/geometry';
 import { invertMove } from '../puzzle/notation';
 import type { Move } from '../puzzle/notation';
@@ -510,7 +510,7 @@ export class CubeEngine {
           this.#commit(move, op.source, op.tag, now);
           continue;
         }
-        const { axis, layer } = FACE_AXIS[move.face];
+        const { axis, layer } = MOVE_AXIS[move.family];
         this.#active = {
           move,
           source: op.source,

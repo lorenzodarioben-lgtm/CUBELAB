@@ -58,6 +58,7 @@ export const debug = {
   historyCount: (page: Page) => page.evaluate(() => window.__CUBELAB__.historyCount()),
   scramble: (page: Page) => page.evaluate(() => window.__CUBELAB__.scramble()),
   solver: (page: Page) => page.evaluate(() => window.__CUBELAB__.solver()),
+  moveLog: (page: Page) => page.evaluate(() => window.__CUBELAB__.moveLog()),
   project: (page: Page, p: Point3) => page.evaluate((point) => window.__CUBELAB__.project!(point), p),
 };
 

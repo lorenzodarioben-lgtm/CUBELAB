@@ -65,9 +65,7 @@ describe('twist resolution', () => {
     expect(formatMove(snapTwist(res2.axis, res2.layer, twistAngle(res2, { x: 160, y: 0 }))!.move)).toBe('D');
   });
 
-  it('refuses middle slices and diagonal ambiguity', () => {
-    const centre = { normal: [0, 0, 1] as const, point: [0, 0, 1.5] as const };
-    expect(resolveTwist(centre, { x: 0, y: -40 }, frontView, { threshold: 6 }).kind).toBe('slice');
+  it('refuses diagonal ambiguity', () => {
     expect(resolveTwist(frontRight, { x: 30, y: -30 }, frontView, { threshold: 6 }).kind).toBe('ambiguous');
   });
 

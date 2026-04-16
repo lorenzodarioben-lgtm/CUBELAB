@@ -51,7 +51,7 @@ test.describe('CUBELAB studio (desktop, production build)', () => {
     expect(await expectRenderMatchesModel(page)).toBe(SOLVED);
   });
 
-  test('dragging stickers performs real face turns; middle slices are refused', async ({ page }) => {
+  test('dragging stickers performs real face turns, including the middle slice', async ({ page }) => {
     await openStudio(page);
     // Push the front-right column up: R.
     await dragCube(page, [1, 0, 1.5], [1, 1.35, 1.5]);
@@ -60,13 +60,12 @@ test.describe('CUBELAB studio (desktop, production build)', () => {
     await dragCube(page, [0, 1, 1.5], [-1.35, 1, 1.5]);
     const afterRU = await expectRenderMatchesModel(page);
     expect(afterRU).not.toBe(SOLVED);
-    const version = await debug.version(page);
-    // Centre sticker drag would be a slice move: nothing happens, a hint explains why.
-    await dragCube(page, [0, 0, 1.5], [0, 1.3, 1.5]);
-    await expect(page.locator('.stage-hint')).toContainText('Middle layers');
-    await waitIdle(page);
-    expect(await debug.version(page)).toBe(version);
-    // Keyboard: U' then R' undoes both.
+    // Centre sticker pushed up turns the middle column: M'.
+    await dragCube(page, [0, 0, 1.5], [0, 1.35, 1.5]);
+    await expectRenderMatchesModel(page);
+    expect(await debug.moveLog(page)).toBe("R U M'");
+    // Keyboard: M, U', R' undo all three.
+    await page.keyboard.press('m');
     await page.keyboard.press('Shift+U');
     await page.keyboard.press('Shift+R');
     expect(await expectRenderMatchesModel(page)).toBe(SOLVED);

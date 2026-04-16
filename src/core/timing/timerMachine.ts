@@ -38,6 +38,13 @@ export type TimerPhase =
   | 'assisted';
 export type Penalty = 'none' | '+2' | 'DNF';
 
+/** Per-turn metric increments (see `moveMetrics` in notation.ts). */
+export interface TurnMetrics {
+  readonly stm: number;
+  readonly htm: number;
+  readonly qtm: number;
+}
+
 export const HOLD_TO_ARM_MS = 300;
 export const INSPECTION_LIMIT_MS = 15_000;
 export const INSPECTION_DNF_MS = 17_000;
@@ -46,6 +53,8 @@ export interface CompletedAttempt {
   readonly durationMs: number;
   readonly penalty: Penalty;
   readonly scramble: string;
+  /** Slice turn metric: every layer turn counts 1 (the UI's "turns"). */
+  readonly turnsSTM: number;
   readonly turnsHTM: number;
   readonly turnsQTM: number;
   readonly mode: TimerMode;
@@ -68,6 +77,7 @@ export interface TimerState {
   readonly armingFrom: 'ready' | 'inspecting' | null;
   /** Swallow the key-up that belongs to the press which started inspection. */
   readonly swallowRelease: boolean;
+  readonly turnsSTM: number;
   readonly turnsHTM: number;
   readonly turnsQTM: number;
   readonly assisted: boolean;
@@ -79,7 +89,7 @@ export type TimerEvent =
   | { readonly type: 'scrambleStarted' }
   | { readonly type: 'scrambleApplied'; readonly scramble: string }
   | { readonly type: 'scrambleFailed' }
-  | { readonly type: 'manualTurn'; readonly at: number; readonly quarterTurns: number; readonly solved: boolean }
+  | { readonly type: 'manualTurn'; readonly at: number; readonly metrics: TurnMetrics; readonly solved: boolean }
   | { readonly type: 'assist'; readonly kind: 'undo' | 'redo' | 'solver' }
   | { readonly type: 'spaceDown'; readonly at: number }
   | { readonly type: 'spaceUp'; readonly at: number }
@@ -105,6 +115,7 @@ export function createTimerState(mode: TimerMode = 'casual', inspection = false)
     holdStartedAt: null,
     armingFrom: null,
     swallowRelease: false,
+    turnsSTM: 0,
     turnsHTM: 0,
     turnsQTM: 0,
     assisted: false,
@@ -131,6 +142,7 @@ function cleared(state: TimerState, phase: TimerPhase): TimerState {
     holdStartedAt: null,
     armingFrom: null,
     swallowRelease: false,
+    turnsSTM: 0,
     turnsHTM: 0,
     turnsQTM: 0,
     assisted: false,
@@ -179,6 +191,7 @@ function finish(state: TimerState, at: number, phase: 'solved' | 'interrupted', 
     durationMs,
     penalty,
     scramble: state.scramble ?? '',
+    turnsSTM: state.turnsSTM,
     turnsHTM: state.turnsHTM,
     turnsQTM: state.turnsQTM,
     mode: state.mode,
@@ -217,8 +230,14 @@ export function timerTransition(state: TimerState, event: TimerEvent): TimerOutp
       return same({ ...cleared(state, 'idle'), scramble: null });
 
     case 'manualTurn': {
+      const m = event.metrics;
       if (state.phase === 'running') {
-        const next = { ...state, turnsHTM: state.turnsHTM + 1, turnsQTM: state.turnsQTM + event.quarterTurns };
+        const next = {
+          ...state,
+          turnsSTM: state.turnsSTM + m.stm,
+          turnsHTM: state.turnsHTM + m.htm,
+          turnsQTM: state.turnsQTM + m.qtm,
+        };
         return event.solved ? finish(next, event.at, 'solved', null) : same(next);
       }
       if (state.phase === 'ready' && state.mode === 'casual') {
@@ -226,8 +245,9 @@ export function timerTransition(state: TimerState, event: TimerEvent): TimerOutp
           ...state,
           phase: 'running',
           startedAt: event.at,
-          turnsHTM: 1,
-          turnsQTM: event.quarterTurns,
+          turnsSTM: m.stm,
+          turnsHTM: m.htm,
+          turnsQTM: m.qtm,
         };
         return event.solved ? finish(started, event.at, 'solved', null) : same(started);
       }
@@ -286,6 +306,7 @@ export function timerTransition(state: TimerState, event: TimerEvent): TimerOutp
         penalty,
         holdStartedAt: null,
         armingFrom: null,
+        turnsSTM: 0,
         turnsHTM: 0,
         turnsQTM: 0,
       };

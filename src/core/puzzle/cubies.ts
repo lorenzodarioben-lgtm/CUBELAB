@@ -13,7 +13,7 @@
  * `O · homeNormal`. Colours therefore travel with their piece — nothing is ever
  * recoloured by screen or world position.
  */
-import { FACE_AXIS, IDENTITY, faceFromNormal, moveQuarterTurns, mulMat, mulVec, quarterRotation } from './geometry';
+import { IDENTITY, MOVE_AXIS, faceFromNormal, moveQuarterTurns, mulMat, mulVec, quarterRotation } from './geometry';
 import type { Axis, Mat3, Vec3 } from './geometry';
 import { faceletIndex } from './facelets';
 import type { Face, Move } from './notation';
@@ -79,9 +79,13 @@ export function cubiesInLayer(orientations: CubieOrientations, axis: Axis, layer
   return ids;
 }
 
-/** Applies one face turn. Untouched cubies keep their matrix by reference. */
+/**
+ * Applies one layer turn — an outer face (9 cubies) or a middle slice (8
+ * visible cubies: four edges and four centres; the core is implicit). Untouched
+ * cubies keep their matrix by reference.
+ */
 export function applyMoveToCubies(orientations: CubieOrientations, move: Move): CubieOrientations {
-  const { axis, layer } = FACE_AXIS[move.face];
+  const { axis, layer } = MOVE_AXIS[move.family];
   const rotation = quarterRotation(axis, moveQuarterTurns(move));
   return orientations.map((o, id) => {
     const pos = mulVec(o, CUBIE_DEFS[id]!.home);

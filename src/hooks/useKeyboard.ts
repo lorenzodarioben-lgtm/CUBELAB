@@ -115,9 +115,6 @@ export function useKeyboard(services: AppServices): void {
         case 'KeyZ':
           toggleZen(services);
           break;
-        case 'KeyM':
-          studio.updateSettings({ movePadOpen: !studio.state.settings.movePadOpen });
-          break;
         default:
           return;
       }

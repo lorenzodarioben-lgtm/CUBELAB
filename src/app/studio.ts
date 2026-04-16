@@ -17,7 +17,7 @@ import { CubeEngine } from '../core/engine/cubeEngine';
 import type { CommitEvent, EngineEvent, MoveSource } from '../core/engine/cubeEngine';
 import { createSolvedState, isSolved, stateFacelets } from '../core/puzzle/cubeState';
 import type { CubeState } from '../core/puzzle/cubeState';
-import { formatAlg, invertMove, parseAlg, quarterTurnCost } from '../core/puzzle/notation';
+import { formatAlg, invertMove, moveMetrics, parseAlg } from '../core/puzzle/notation';
 import type { Move } from '../core/puzzle/notation';
 import { generateScramble } from '../core/scramble/scrambler';
 import type { ScrambleSource } from '../core/scramble/scrambler';
@@ -76,6 +76,13 @@ export interface StudioState {
   readonly canUndo: boolean;
   readonly canRedo: boolean;
   readonly lastMove: { readonly move: Move; readonly source: MoveSource; readonly id: number } | null;
+  /**
+   * The user's own turns since the last scramble/reset (newest last, capped).
+   * Undo pops, redo pushes back, so the list always reflects the cube.
+   */
+  readonly moveLog: readonly Move[];
+  /** Total user turns in the current log (STM), including any beyond the cap. */
+  readonly moveCount: number;
   readonly timer: TimerState;
   readonly scramble: ScrambleInfo;
   readonly solver: SolverInfo;
@@ -115,6 +122,8 @@ interface PlaybackSession {
   expectedVersion: number;
   inFlight: 'forward' | 'back' | null;
 }
+
+const MOVE_LOG_LIMIT = 400;
 
 const IDLE_SOLVER: SolverInfo = { status: 'idle', moves: [], cursor: 0, error: null, stepping: false, warm: false };
 const IDLE_SCRAMBLE: ScrambleInfo = { status: 'idle', text: null, moves: [], applied: 0, origin: null, error: null };
@@ -175,6 +184,8 @@ export class Studio {
       canUndo: false,
       canRedo: false,
       lastMove: null,
+      moveLog: [],
+      moveCount: 0,
       timer: createTimerState(settings.timerMode, settings.inspection),
       scramble,
       solver: IDLE_SOLVER,
@@ -681,8 +692,20 @@ export class Studio {
 
   #onEngineEvent(event: EngineEvent): void {
     if (event.type === 'commit') this.#onCommit(event);
-    else if (event.type === 'replace') this.#syncCube(false);
-    else this.#syncFlags();
+    else if (event.type === 'replace') {
+      this.#set({ moveLog: [], moveCount: 0 });
+      this.#syncCube(false);
+    } else this.#syncFlags();
+  }
+
+  #logUserMove(move: Move, source: MoveSource): void {
+    const { moveLog, moveCount } = this.state;
+    if (source === 'undo') {
+      this.#set({ moveLog: moveLog.slice(0, -1), moveCount: Math.max(0, moveCount - 1) });
+      return;
+    }
+    const next = [...moveLog, move];
+    this.#set({ moveLog: next.length > MOVE_LOG_LIMIT ? next.slice(-MOVE_LOG_LIMIT) : next, moveCount: moveCount + 1 });
   }
 
   #syncFlags(): void {
@@ -724,7 +747,8 @@ export class Studio {
         this.#sound.turn('manual');
         if (event.source !== 'manual') this.#timer({ type: 'assist', kind: event.source });
         const phaseBefore = this.state.timer.phase;
-        this.#timer({ type: 'manualTurn', at: event.at, quarterTurns: quarterTurnCost(event.move), solved: event.solved });
+        this.#logUserMove(event.move, event.source);
+        this.#timer({ type: 'manualTurn', at: event.at, metrics: moveMetrics(event.move), solved: event.solved });
         const timedSolve = phaseBefore === 'running' && this.state.timer.phase === 'solved';
         if (timedSolve) {
           const last = this.state.timer.last;
@@ -773,6 +797,8 @@ export class Studio {
 
       case 'solver': {
         this.#sound.turn('auto');
+        // Automated moves reset the user's log (the engine clears undo history the same way).
+        if (this.state.moveCount > 0) this.#set({ moveLog: [], moveCount: 0 });
         const session = this.#session;
         if (!session || event.tag !== `solve:${session.id}` || !session.inFlight) break;
         session.cursor += session.inFlight === 'forward' ? 1 : -1;
