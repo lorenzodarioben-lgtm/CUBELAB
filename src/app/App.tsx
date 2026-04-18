@@ -6,6 +6,7 @@ import { useEnvironmentSync } from '../hooks/useEnvironment';
 import { Header } from '../components/Header';
 import { Stage } from '../components/stage/Stage';
 import { TimerPanel } from '../components/panels/TimerPanel';
+import { MoveLog } from '../components/panels/MoveLog';
 import { ScramblePanel } from '../components/panels/ScramblePanel';
 import { StatsPanel } from '../components/panels/StatsPanel';
 import { HistoryDrawer } from '../components/panels/HistoryDrawer';
@@ -35,6 +36,7 @@ export function App() {
         </section>
         <div className="rail rail--left">
           <TimerPanel />
+          <MoveLog />
           <ScramblePanel />
           <StatsPanel />
         </div>

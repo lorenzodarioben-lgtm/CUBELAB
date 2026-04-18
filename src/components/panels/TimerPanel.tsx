@@ -181,7 +181,13 @@ export function TimerPanel() {
       <p className="panel-timer__hint" aria-live="off">
         {guidance(timer, scrambling, solved)}
       </p>
-      {gestureHint && <p className="panel-timer__gesture">Drag a sticker to twist · drag outside the cube to orbit</p>}
+      {gestureHint && (
+        <p className="panel-timer__gesture">
+          Drag stickers to twist — middle rows turn slices
+          <br />
+          Drag outside the cube to orbit
+        </p>
+      )}
     </section>
   );
 }

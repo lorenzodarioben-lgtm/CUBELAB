@@ -14,7 +14,7 @@ import { CUBIE_DEFS } from '../../core/puzzle/cubies';
 import { mulVec } from '../../core/puzzle/geometry';
 import type { Face } from '../../core/puzzle/notation';
 import type { Finish } from '../../core/persistence/settings';
-import { SPACING, STICKER_OFFSET, createCubeResources } from './cubeResources';
+import { SPACING, STICKER_OFFSET, TILE_TOP, createCubeResources } from './cubeResources';
 
 const AXES = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)] as const;
 const Z = new THREE.Vector3(0, 0, 1);
@@ -91,8 +91,10 @@ export function CubeModel({ engine, quality, finish, faceLabels, registry }: Cub
         def.stickers.map((s) => ({
           color: s.color,
           position: new THREE.Vector3(s.normal[0], s.normal[1], s.normal[2]).multiplyScalar(STICKER_OFFSET),
-          labelPosition: new THREE.Vector3(s.normal[0], s.normal[1], s.normal[2]).multiplyScalar(STICKER_OFFSET + 0.0175),
+          labelPosition: new THREE.Vector3(s.normal[0], s.normal[1], s.normal[2]).multiplyScalar(STICKER_OFFSET + TILE_TOP + 0.0006),
           quaternion: stickerQuaternion(s.normal),
+          // The white centre cap carries the pad-printed CUBELAB mark.
+          mark: def.kind === 'center' && s.color === 'U',
         })),
       ),
     [],
@@ -112,8 +114,11 @@ export function CubeModel({ engine, quality, finish, faceLabels, registry }: Cub
     [registry],
   );
 
+  const shadows = resources.shadows;
   return (
     <group name="cube">
+      {/* The mechanism's dark core: only ever glimpsed through seams mid-turn. */}
+      <mesh geometry={resources.core} material={resources.coreMaterial} />
       {CUBIE_DEFS.map((def) => (
         <group
           key={def.id}
@@ -123,7 +128,7 @@ export function CubeModel({ engine, quality, finish, faceLabels, registry }: Cub
           }}
           userData={{ cubie: def.id }}
         >
-          <mesh geometry={resources.body} material={resources.bodyMaterial} />
+          <mesh geometry={resources.body} material={resources.bodyMaterial} castShadow={shadows} receiveShadow={shadows} />
           {stickers[def.id]!.map((s, i) => (
             <group key={i}>
               <mesh
@@ -133,7 +138,12 @@ export function CubeModel({ engine, quality, finish, faceLabels, registry }: Cub
                 position={s.position}
                 quaternion={s.quaternion}
                 userData={{ color: s.color, cubie: def.id }}
+                castShadow={shadows}
+                receiveShadow={shadows}
               />
+              {s.mark && !faceLabels && (
+                <mesh geometry={resources.mark} material={resources.markMaterial} position={s.labelPosition} quaternion={s.quaternion} renderOrder={2} />
+              )}
               {faceLabels && (
                 <mesh
                   geometry={resources.label}

@@ -205,8 +205,12 @@ test.describe('CUBELAB studio (desktop, production build)', () => {
       found = await page.evaluate(() => document.activeElement?.textContent?.includes('New Scramble') ?? false);
     }
     expect(found).toBe(true);
-    const focusRing = await page.evaluate(() => getComputedStyle(document.activeElement!).outlineStyle);
-    expect(focusRing).not.toBe('none');
+    // Visible focus: either an outline or the design system's focus ring (box-shadow).
+    const ring = await page.evaluate(() => {
+      const style = getComputedStyle(document.activeElement!);
+      return { outline: style.outlineStyle, shadow: style.boxShadow };
+    });
+    expect(ring.outline !== 'none' || ring.shadow !== 'none').toBe(true);
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => window.__CUBELAB__.timer().phase === 'ready', null, { timeout: 30_000 });
     await page.keyboard.press('?');

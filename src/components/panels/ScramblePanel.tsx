@@ -96,7 +96,7 @@ export function ScramblePanel() {
             { value: 'instant', label: 'Instant' },
           ]}
         />
-        <span className="panel__meta">{scramble.moves.length > 0 ? `${scramble.moves.length} moves · HTM` : 'WCA notation'}</span>
+        <span className="panel__meta">{scramble.moves.length > 0 ? `${scramble.moves.length} moves` : 'WCA notation'}</span>
       </footer>
     </section>
   );

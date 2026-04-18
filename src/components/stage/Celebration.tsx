@@ -1,7 +1,7 @@
 /**
- * Solved-state celebration: two thin luminous halos expand gently around the
- * cube and fade out. No confetti, no flashing. With reduced motion the halo
- * simply fades in and out in place.
+ * Solved-state celebration: a soft ripple of light runs out across the floor
+ * from the cube's base and fades — like a reflection on a studio table. No
+ * confetti, no flashing. With reduced motion it simply fades in place.
  */
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -16,10 +16,10 @@ export function Celebration({ reduced }: { reduced: boolean; zen: boolean }) {
   const start = useRef<number | null>(null);
   const rings = useRef<Array<THREE.Mesh | null>>([]);
 
-  const geometry = useMemo(() => new THREE.RingGeometry(2.55, 2.585, 160), []);
+  const geometry = useMemo(() => new THREE.RingGeometry(1.9, 1.93, 192), []);
   const materials = useMemo(
     () =>
-      ['#c9c0ff', '#8fe8f5'].map(
+      ['#fff6e6', '#ffffff'].map(
         (color) =>
           new THREE.MeshBasicMaterial({
             color,
@@ -61,15 +61,15 @@ export function Celebration({ reduced }: { reduced: boolean; zen: boolean }) {
       }
       ring.visible = true;
       const eased = 1 - (1 - local) ** 3;
-      ring.scale.setScalar(reduced ? 1.05 : 0.92 + eased * 0.55);
-      material.opacity = (reduced ? Math.sin(local * Math.PI) * 0.5 : (1 - local) ** 1.6 * 0.85) * (i === 0 ? 1 : 0.7);
+      ring.scale.setScalar(reduced ? 1.1 : 1 + eased * 0.6);
+      material.opacity = (reduced ? Math.sin(local * Math.PI) * 0.3 : (1 - local) ** 1.8 * 0.5) * (i === 0 ? 1 : 0.55);
     });
     if (t < DURATION + 0.3) invalidate();
     else start.current = null;
   });
 
   return (
-    <group rotation-x={-Math.PI / 2} position={[0, -0.05, 0]}>
+    <group rotation-x={-Math.PI / 2} position={[0, -2.08, 0]}>
       {materials.map((material, i) => (
         <mesh
           key={i}

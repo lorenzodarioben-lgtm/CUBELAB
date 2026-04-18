@@ -11,12 +11,12 @@ export interface FaceColor {
 }
 
 export const FACE_COLORS: Readonly<Record<Face, FaceColor>> = {
-  U: { name: 'white', hex: '#fafaf6' },
-  D: { name: 'yellow', hex: '#ffd83d' },
-  F: { name: 'green', hex: '#14b866' },
-  B: { name: 'blue', hex: '#2563eb' },
-  R: { name: 'red', hex: '#e2313f' },
-  L: { name: 'orange', hex: '#ff7a1c' },
+  U: { name: 'white', hex: '#f3f3ef' },
+  D: { name: 'yellow', hex: '#ffd31a' },
+  F: { name: 'green', hex: '#0fa958' },
+  B: { name: 'blue', hex: '#1d5ad6' },
+  R: { name: 'red', hex: '#d42a36' },
+  L: { name: 'orange', hex: '#ff6a17' },
 };
 
 export const OPPOSITE_FACE: Readonly<Record<Face, Face>> = {

@@ -14,7 +14,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:all": "npm run typecheck && npm run lint && npm test && npm run build && npm run test:e2e",
-    "screenshots": "node scripts/capture-screenshots.mjs artifacts"
+    "screenshots": "node scripts/capture-screenshots.mjs artifacts/after"
   },
   "dependencies": {
     "@fontsource-variable/geist-mono": "5.3.0",

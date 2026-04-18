@@ -35,24 +35,48 @@ export function ActionPanel() {
           busy={scrambleStatus === 'generating'}
           onClick={() => requestNewScramble(services)}
           title="Reset to solved and apply a new random-state scramble"
+          aria-label="New Scramble"
         >
-          {scrambleStatus === 'generating' ? 'Generating…' : 'New Scramble'}
+          {scrambleStatus === 'generating' ? (
+            'Generating…'
+          ) : (
+            <>
+              <span className="narrow-hide">New </span>Scramble
+            </>
+          )}
         </Button>
-        <Button
-          variant="accent"
-          size="lg"
-          icon={solving ? <Spinner /> : <Sparkles size={17} />}
-          kbd="A"
-          busy={solving}
-          disabled={solved || scrambling || solving}
-          title={solveTitle}
-          onClick={() => requestAutoSolve(services)}
-        >
-          {solveLabel}
-        </Button>
-        <Button variant="ghost" size="lg" icon={<RotateCcw size={16} />} onClick={() => requestReset(services)} title="Restore the solved cube">
-          Reset
-        </Button>
+        <div className="panel-actions__row">
+          <Button
+            variant="accent"
+            size="lg"
+            icon={solving ? <Spinner /> : <Sparkles size={17} />}
+            kbd="A"
+            busy={solving}
+            disabled={solved || scrambling || solving}
+            title={solveTitle}
+            aria-label={solveLabel}
+            onClick={() => requestAutoSolve(services)}
+          >
+            {solving ? (
+              solveLabel
+            ) : (
+              <>
+                <span className="narrow-hide">Auto </span>Solve
+              </>
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="lg"
+            icon={<RotateCcw size={16} />}
+            onClick={() => requestReset(services)}
+            title="Restore the solved cube"
+            aria-label="Reset"
+            className="action-reset"
+          >
+            Reset
+          </Button>
+        </div>
       </div>
       <div className="panel-actions__secondary" role="group" aria-label="History and camera">
         <IconButton label="Undo (Ctrl+Z)" disabled={!canUndo || turnsBlocked} onClick={() => studio.undo()}>

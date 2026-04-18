@@ -13,18 +13,20 @@ export function HelpDialog() {
           <h3 className="eyebrow">Gestures</h3>
           <ul className="help-list">
             <li>
-              <strong>Twist</strong> — press on a sticker and push it along its row or column. The outer layer under your finger follows; release past
-              ~25° (or flick) to commit, otherwise it springs back. The move you are about to make is shown beside the pointer.
+              <strong>Twist</strong> — press a sticker and push it along its row or column. The layer under your finger follows; release past
+              ~25° (or flick) to commit, otherwise it springs back. The move you are making is shown beside the pointer.
             </li>
             <li>
-              <strong>Orbit</strong> — drag the empty background. Right-drag or Shift-drag also orbits from anywhere, including over the cube.
+              <strong>Slices</strong> — the middle row or column turns the middle layer. On the front face, push the middle column up or down for{' '}
+              <strong>M</strong>, the middle row sideways for <strong>E</strong>; push the middle strip of the top or a side face for{' '}
+              <strong>S</strong>. The centre sticker belongs to both strips, so its drag direction decides.
             </li>
             <li>
-              <strong>Zoom</strong> — scroll, or pinch with two fingers (two fingers also orbit).
+              <strong>Orbit</strong> — drag the empty background. Right-drag or Shift-drag orbits from anywhere, including over the cube.
             </li>
             <li>
-              Middle layers are not turnable: CUBELAB only produces the six outer-face moves, so every turn is notation the timer and solver
-              understand. On phones, the Twist / Orbit switch makes single-finger drags unambiguous.
+              <strong>Zoom</strong> — scroll, or pinch with two fingers (two fingers also orbit). On phones, the Twist / Orbit switch makes
+              single-finger drags unambiguous.
             </li>
           </ul>
         </section>
@@ -33,10 +35,15 @@ export function HelpDialog() {
           <h3 className="eyebrow">Notation</h3>
           <p>
             <strong>U D L R F B</strong> turn the Up, Down, Left, Right, Front and Back faces clockwise <em>as seen looking at that face</em>.
-            <strong> '</strong> is counter-clockwise, <strong>2</strong> a half turn. Orbiting the camera never changes what a letter means: white is U,
-            green is F.
+            <strong> '</strong> is counter-clockwise, <strong>2</strong> a half turn.
           </p>
-          <p className="muted">Turn counts use HTM (each U, U' or U2 = 1) and QTM (U2 = 2).</p>
+          <p>
+            <strong>M</strong> is the middle layer between L and R, turning like L. <strong>E</strong> sits between U and D and turns like D.{' '}
+            <strong>S</strong> sits between F and B and turns like F. Orbiting the camera never changes a letter: white is U, green is F.
+          </p>
+          <p className="muted">
+            Turns count in STM (any layer, any angle = 1). History also records HTM (a slice = 2) and QTM (a double = 2 quarters).
+          </p>
         </section>
 
         <section>
@@ -59,32 +66,46 @@ export function HelpDialog() {
           <table className="key-table">
             <tbody>
               {keyMap === 'faces' ? (
-                <tr>
-                  <td>
-                    <Kbd>U</Kbd> <Kbd>D</Kbd> <Kbd>L</Kbd> <Kbd>R</Kbd> <Kbd>F</Kbd> <Kbd>B</Kbd>
-                  </td>
-                  <td>Turn clockwise · with <Kbd>Shift</Kbd> counter-clockwise</td>
-                </tr>
+                <>
+                  <tr>
+                    <td>
+                      <Kbd>U</Kbd> <Kbd>D</Kbd> <Kbd>L</Kbd> <Kbd>R</Kbd> <Kbd>F</Kbd> <Kbd>B</Kbd>
+                    </td>
+                    <td>
+                      Faces clockwise · with <Kbd>Shift</Kbd> counter-clockwise
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <Kbd>M</Kbd> <Kbd>E</Kbd> <Kbd>S</Kbd>
+                    </td>
+                    <td>
+                      Slices · with <Kbd>Shift</Kbd> counter-clockwise
+                    </td>
+                  </tr>
+                </>
               ) : (
-                <tr>
-                  <td>
-                    <Kbd>I</Kbd>/<Kbd>K</Kbd> R · <Kbd>J</Kbd>/<Kbd>F</Kbd> U · <Kbd>H</Kbd>/<Kbd>G</Kbd> F · <Kbd>D</Kbd>/<Kbd>E</Kbd> L ·{' '}
-                    <Kbd>S</Kbd>/<Kbd>L</Kbd> D · <Kbd>W</Kbd>/<Kbd>O</Kbd> B
-                  </td>
-                  <td>Speed layout (clockwise / counter-clockwise)</td>
-                </tr>
+                <>
+                  <tr>
+                    <td>
+                      <Kbd>I</Kbd>/<Kbd>K</Kbd> R · <Kbd>J</Kbd>/<Kbd>F</Kbd> U · <Kbd>H</Kbd>/<Kbd>G</Kbd> F · <Kbd>D</Kbd>/<Kbd>E</Kbd> L ·{' '}
+                      <Kbd>S</Kbd>/<Kbd>L</Kbd> D · <Kbd>W</Kbd>/<Kbd>O</Kbd> B
+                    </td>
+                    <td>Speed layout (clockwise / counter-clockwise)</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <Kbd>5</Kbd>/<Kbd>6</Kbd> M · <Kbd>2</Kbd>/<Kbd>3</Kbd> E · <Kbd>8</Kbd>/<Kbd>9</Kbd> S
+                    </td>
+                    <td>Slices (clockwise / counter-clockwise)</td>
+                  </tr>
+                </>
               )}
               <tr>
                 <td>
-                  <Kbd>N</Kbd>
+                  <Kbd>N</Kbd> · <Kbd>A</Kbd>
                 </td>
-                <td>New Scramble</td>
-              </tr>
-              <tr>
-                <td>
-                  <Kbd>A</Kbd>
-                </td>
-                <td>Auto Solve</td>
+                <td>New Scramble · Auto Solve</td>
               </tr>
               <tr>
                 <td>
@@ -112,17 +133,18 @@ export function HelpDialog() {
               </tr>
               <tr>
                 <td>
-                  <Kbd>Z</Kbd> · <Kbd>M</Kbd> · <Kbd>?</Kbd> · <Kbd>Esc</Kbd>
+                  <Kbd>Z</Kbd> · <Kbd>?</Kbd> · <Kbd>Esc</Kbd>
                 </td>
-                <td>Zen mode · move pad · this guide · close / cancel</td>
+                <td>Zen mode · this guide · close / cancel</td>
               </tr>
             </tbody>
           </table>
         </section>
       </div>
       <p className="help-footnote muted">
-        Scrambles are random-state (uniformly random legal positions) and Auto Solve computes a two-phase solution for whatever state the cube is
-        in, verifying it before playing. Everything runs locally; nothing is sent anywhere.
+        Scrambles are random-state (uniformly random legal positions). Auto Solve reads whatever state the cube is in — slices included — returns
+        any displaced centres with the fewest slice turns, then solves the rest with a two-phase solver, verifying every solution before it plays.
+        Everything runs locally; nothing is sent anywhere.
       </p>
     </Dialog>
   );

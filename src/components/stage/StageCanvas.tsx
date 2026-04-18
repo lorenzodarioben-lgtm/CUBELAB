@@ -17,7 +17,7 @@ import type { PreviewSink } from './Interaction';
 import type { OrbitRig } from './orbitRig';
 import { Celebration } from './Celebration';
 
-const FOV = 30;
+const FOV = 27;
 /** Bounding-sphere radius of the cube (half its space diagonal, in world units). */
 const CUBE_RADIUS = 2.6;
 
@@ -103,20 +103,42 @@ function CameraRig({ rig, reduced, transportOpen, zen }: { rig: OrbitRig; reduce
   return null;
 }
 
+/**
+ * Neutral product-photography lighting. All sources are white-balanced (no
+ * coloured tints): a broad overhead softbox, a tall key strip front-left, a
+ * narrow rim strip behind-right that draws the bevel highlights, and a low
+ * front fill. A warm key light casts soft shadows on the high tier so turning
+ * layers and seams shade each other.
+ */
 function Lighting({ high }: { high: boolean }) {
   return (
     <>
-      <ambientLight intensity={0.34} />
-      <directionalLight position={[3.5, 8, 6.5]} intensity={1.55} color="#fff8f0" />
-      <directionalLight position={[8, 1.5, 3]} intensity={0.85} color="#f4f1ff" />
-      <directionalLight position={[-7, 2.5, -3]} intensity={0.55} color="#b8adff" />
-      <directionalLight position={[5, -4, -6]} intensity={0.32} color="#86e6f4" />
+      <hemisphereLight args={['#ffffff', '#18181a', 0.42]} />
+      <directionalLight
+        position={[-4.5, 8, 5.5]}
+        intensity={1.6}
+        color="#fff6ec"
+        castShadow={high}
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.00025}
+        shadow-normalBias={0.02}
+        shadow-camera-left={-3.4}
+        shadow-camera-right={3.4}
+        shadow-camera-top={3.4}
+        shadow-camera-bottom={-3.4}
+        shadow-camera-near={2}
+        shadow-camera-far={22}
+      />
+      <directionalLight position={[7, 2.5, 4]} intensity={0.95} color="#f1f4ff" />
+      <directionalLight position={[-1, 4, -8]} intensity={0.85} color="#ffffff" />
       <Environment resolution={high ? 256 : 128} frames={1}>
-        <Lightformer form="rect" intensity={2.4} color="#ffffff" position={[0, 7, 3]} scale={[10, 3, 1]} target={[0, 0, 0]} />
-        <Lightformer form="rect" intensity={1.4} color="#d9d3ff" position={[-7, 1.5, 3]} scale={[2.5, 8, 1]} target={[0, 0, 0]} />
-        <Lightformer form="rect" intensity={1.1} color="#d2f4ff" position={[7, 0.5, 1]} scale={[2, 7, 1]} target={[0, 0, 0]} />
-        <Lightformer form="ring" intensity={0.7} color="#ffffff" position={[0, 1, -9]} scale={5} target={[0, 0, 0]} />
-        <Lightformer form="rect" intensity={0.25} color="#8b84b8" position={[0, -6, 0]} scale={[12, 12, 1]} target={[0, 0, 0]} />
+        <Lightformer form="rect" intensity={2.4} color="#ffffff" position={[0, 8, 2]} scale={[12, 5, 1]} target={[0, 0, 0]} />
+        <Lightformer form="rect" intensity={1.7} color="#fffaf3" position={[-7, 2.5, 5]} scale={[3, 9, 1]} target={[0, 0, 0]} />
+        <Lightformer form="rect" intensity={1.7} color="#ffffff" position={[7, 3, -4]} scale={[2.4, 9, 1]} target={[0, 0, 0]} />
+        <Lightformer form="rect" intensity={0.9} color="#fffaf2" position={[0.5, 1.5, 9]} scale={[6, 3, 1]} target={[0, 0, 0]} />
+        <Lightformer form="rect" intensity={0.55} color="#f4f6ff" position={[3, -1, 8]} scale={[8, 2, 1]} target={[0, 0, 0]} />
+        <Lightformer form="rect" intensity={1.1} color="#ffffff" position={[8, 1, 3]} scale={[2.5, 6, 1]} target={[0, 0, 0]} />
+        <Lightformer form="circle" intensity={0.3} color="#ffffff" position={[0, -7, 0]} scale={6} target={[0, 0, 0]} />
       </Environment>
     </>
   );
@@ -212,12 +234,13 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
       dpr={dpr}
       gl={{ antialias: true, alpha: true, powerPreference: 'high-performance', preserveDrawingBuffer: false }}
       camera={{ fov: FOV, near: 0.5, far: 80, position: [6, 5, 8] }}
+      shadows={quality === 'high' ? 'soft' : false}
       onCreated={({ gl }) => {
         // Only three's built-in shaders are used; their info-log check stalls compilation and
         // merely echoes driver notes (e.g. ANGLE/D3D precision remarks) as console warnings.
         gl.debug.checkShaderErrors = false;
         gl.toneMapping = THREE.NeutralToneMapping;
-        gl.toneMappingExposure = 1.14;
+        gl.toneMappingExposure = 1.1;
         gl.setClearColor(0x000000, 0);
       }}
       aria-hidden
@@ -227,7 +250,7 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
       <Lighting high={quality === 'high'} />
       <CubeModel engine={studio.engine} quality={quality} finish={settings.finish} faceLabels={settings.faceLabels} registry={registry} />
       {quality === 'high' ? (
-        <ContactShadows position={[0, -2.15, 0]} scale={8} blur={2.6} far={3.2} opacity={0.62} resolution={384} color="#000000" />
+        <ContactShadows position={[0, -2.1, 0]} scale={8.5} blur={2.4} far={3.4} opacity={0.82} resolution={512} color="#000000" />
       ) : (
         <BlobShadow />
       )}

@@ -10,7 +10,9 @@ test.describe('reduced motion', () => {
     // Committed synchronously: no animation frames needed.
     expect(await page.evaluate(() => window.__CUBELAB__.version())).toBe(1);
     expect(await page.evaluate(() => window.__CUBELAB__.idle())).toBe(true);
-    const animation = await page.locator('.stage__orbits .dashed').evaluate((el) => getComputedStyle(el).animationName);
-    expect(animation).toBe('none');
+    // The pressed key's flash is suppressed, and UI transition tokens collapse to zero.
+    const flash = await page.locator('.keycap.is-flash').evaluate((el) => getComputedStyle(el).animationName);
+    expect(flash).toBe('none');
+    expect(['0ms', '0s']).toContain(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dur-2').trim()));
   });
 });

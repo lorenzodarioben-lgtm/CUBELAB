@@ -1,4 +1,14 @@
-/* ───────────────────────── App frame ───────────────────────── */
+/*
+ * Composition.
+ *
+ * Wide screens: an editorial three-column stage. The cube owns the centre;
+ * the left column is a frameless "instrument" readout (clock, turns, scramble,
+ * session); the right column is one solid control deck (actions + Move Pad);
+ * solution playback floats bottom-centre and the camera re-frames around it.
+ *
+ * Below 1100px: a stacked layout — header, cube stage with the clock overlaid,
+ * then frameless sections; primary actions live in a thumb-reach bottom bar.
+ */
 
 .app {
   position: relative;
@@ -7,30 +17,33 @@
   isolation: isolate;
 }
 
+/* Seamless studio backdrop: a soft light pool behind the cube, darker edges. */
 .backdrop {
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
+  /* A studio sweep: soft light behind the cube, a faint floor glow where the
+     contact shadow lands, and a gentle top-to-bottom falloff. */
   background:
-    radial-gradient(52% 50% at 50% 50%, rgba(118, 104, 228, 0.15), transparent 72%),
-    radial-gradient(38% 42% at 8% 4%, rgba(134, 231, 245, 0.07), transparent 70%),
-    radial-gradient(42% 46% at 96% 100%, rgba(189, 178, 255, 0.09), transparent 72%),
-    linear-gradient(180deg, #0c0d15 0%, #08090e 62%, #07080c 100%);
+    radial-gradient(34% 44% at 50% 49%, rgba(255, 246, 230, 0.105), rgba(255, 246, 230, 0.045) 52%, transparent 78%),
+    radial-gradient(42% 16% at 50% 80%, rgba(255, 246, 230, 0.06), transparent 72%),
+    linear-gradient(180deg, #09090a 0%, #121213 54%, #0b0b0c 100%);
 }
 
 .backdrop::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+  background: radial-gradient(125% 95% at 50% 46%, transparent 58%, rgba(0, 0, 0, 0.6) 100%);
 }
 
+/* Faint grain prevents gradient banding on 8-bit displays. */
 .backdrop::after {
   content: '';
   position: absolute;
   inset: 0;
-  opacity: 0.05;
+  opacity: 0.035;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
@@ -56,59 +69,59 @@
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 11px;
   text-decoration: none;
   flex-shrink: 0;
 }
 
 .brand__word {
-  font-weight: 640;
-  font-size: 13.5px;
-  letter-spacing: 0.32em;
+  font-weight: 650;
+  font-size: 13px;
+  letter-spacing: 0.34em;
   color: var(--text);
-  margin-right: -0.32em;
+  margin-right: -0.34em;
 }
 
 .brand__rule {
   width: 1px;
-  height: 18px;
-  background: var(--line-strong);
-  margin: 0 2px 0 4px;
+  height: 16px;
+  background: var(--line-3);
+  margin: 0 3px 0 6px;
 }
 
 .brand__meta {
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-3);
 }
 
 .brand__meta span {
   color: var(--text-4);
-  margin: 0 2px;
+  margin: 0 3px;
 }
 
 .topbar__tagline {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   font-family: var(--font-display);
   font-style: italic;
-  font-size: 16px;
+  font-size: 15px;
   color: var(--text-3);
   white-space: nowrap;
-  margin-left: auto;
-  margin-right: auto;
-  padding-left: 120px;
 }
 
 .topbar__actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   margin-left: auto;
 }
 
 .topbar__mode {
-  margin-right: 8px;
+  margin-right: 10px;
 }
 
 @media (max-width: 1319px) {
@@ -117,7 +130,7 @@
   }
 }
 
-/* ───────────────────────── Studio (desktop) ───────────────────────── */
+/* ───────────────────────── Studio (wide) ───────────────────────── */
 
 .studio {
   position: fixed;
@@ -132,18 +145,15 @@
 
 .rail {
   position: absolute;
-  top: calc(var(--topbar-h) + var(--safe-top) + 6px);
-  bottom: var(--gutter);
+  top: calc(var(--topbar-h) + var(--safe-top) + 8px);
   width: var(--rail-w);
   display: flex;
   flex-direction: column;
-  gap: 12px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
   pointer-events: none;
   z-index: 3;
-  padding-bottom: 4px;
 }
 
 .rail::-webkit-scrollbar {
@@ -155,12 +165,22 @@
   flex-shrink: 0;
 }
 
+/* Left: frameless instrument column, sections ruled by hairlines. */
 .rail--left {
   left: var(--gutter);
+  bottom: var(--gutter);
 }
 
+/* Right: one solid control deck that hugs its content. */
 .rail--right {
   right: var(--gutter);
+  max-height: calc(100% - var(--topbar-h) - var(--safe-top) - 8px - var(--gutter));
+  padding: 4px 16px 6px;
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-deck);
+  pointer-events: auto;
 }
 
 .studio__playback {
@@ -168,7 +188,7 @@
   left: 50%;
   bottom: var(--gutter);
   transform: translateX(-50%);
-  width: min(620px, calc(100vw - 2 * var(--rail-w) - 4 * var(--gutter)));
+  width: min(600px, calc(100vw - 2 * var(--rail-w) - 4 * var(--gutter)));
   z-index: 4;
 }
 
@@ -181,6 +201,7 @@
 .is-zen .topbar,
 .is-zen .studio__playback,
 .is-zen .rail--right,
+.is-zen .panel-moves,
 .is-zen .panel-scramble,
 .is-zen .panel-stats,
 .is-zen .stage__tools,
@@ -213,9 +234,7 @@
   .topbar {
     position: sticky;
     top: 0;
-    background: rgba(10, 11, 17, 0.78);
-    -webkit-backdrop-filter: var(--blur);
-    backdrop-filter: var(--blur);
+    background: rgba(12, 12, 13, 0.94);
     border-bottom: 1px solid var(--line);
     pointer-events: auto;
     gap: 12px;
@@ -227,18 +246,18 @@
   }
 
   .topbar__actions {
-    gap: 2px;
+    gap: 0;
     margin-right: -6px;
   }
 
   .studio {
-    --stage-h: clamp(380px, 64svh, 680px);
+    --stage-h: clamp(380px, 62svh, 680px);
     position: relative;
     inset: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-bottom: calc(96px + var(--safe-bottom));
+    padding-bottom: calc(100px + var(--safe-bottom));
   }
 
   .studio__stage {
@@ -249,7 +268,8 @@
     flex-shrink: 0;
   }
 
-  .rail {
+  .rail,
+  .rail--right {
     display: contents;
   }
 
@@ -264,22 +284,20 @@
     width: calc(100% - 2 * var(--gutter));
     max-width: 720px;
     order: 1;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
-  .panel-scramble {
+  .panel-moves {
     order: 2;
   }
-  .panel-movepad {
+  .panel-scramble {
     order: 3;
   }
-  .panel-stats {
+  .panel-movepad {
     order: 4;
   }
-
-  .rail > .panel + .panel,
-  .rail > .panel {
-    margin-bottom: 12px;
+  .panel-stats {
+    order: 5;
   }
 
   .is-zen .studio {
@@ -291,13 +309,59 @@
   }
 
   .is-zen .panel-actions,
-  .is-zen .studio__playback,
   .is-zen .panel-movepad {
     display: none;
   }
+}
 
-  .is-zen .rail--left {
-    transform: none;
+/* Tablet: a deliberate two-column arrangement under the stage — the turn tape
+   and scramble beside the Move Pad, the session spanning the full width. */
+@media (min-width: 700px) and (max-width: 1099px) {
+  .studio {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 36px;
+    align-items: start;
+    padding-left: var(--gutter);
+    padding-right: var(--gutter);
+  }
+
+  .studio__stage {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: calc(100% + 2 * var(--gutter));
+    margin: 0 calc(-1 * var(--gutter));
+  }
+
+  .rail > *,
+  .studio__playback {
+    width: 100%;
+    max-width: none;
+  }
+
+  .studio__playback {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .panel-moves {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .panel-scramble {
+    grid-column: 1;
+    grid-row: 4;
+  }
+
+  .panel-movepad {
+    grid-column: 2;
+    grid-row: 3 / span 2;
+  }
+
+  .panel-stats {
+    grid-column: 1 / -1;
+    grid-row: 5;
   }
 }
 
@@ -307,15 +371,15 @@
     display: none;
   }
   .brand__word {
-    letter-spacing: 0.26em;
-    font-size: 13px;
+    letter-spacing: 0.28em;
+    font-size: 12.5px;
   }
   .topbar__actions .icon-btn {
-    width: 38px;
+    width: 40px;
   }
 }
 
-@media (max-width: 380px) {
+@media (max-width: 360px) {
   .topbar__sound {
     display: none;
   }

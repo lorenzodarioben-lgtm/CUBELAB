@@ -96,15 +96,6 @@ export function Stage() {
 
   return (
     <div className={cx('stage', `stage--${status}`)}>
-      <div className="stage__orbits" aria-hidden>
-        <svg viewBox="0 0 800 800">
-          <circle cx="400" cy="400" r="300" />
-          <circle cx="400" cy="400" r="372" className="dashed" />
-          <circle cx="400" cy="400" r="232" className="faint" />
-          <path d="M400 18v26M400 756v26M18 400h26M756 400h26" />
-        </svg>
-      </div>
-
       {status === 'unsupported' ? (
         <Fallback reason="unsupported" />
       ) : status === 'error' ? (
@@ -126,7 +117,7 @@ export function Stage() {
       {status === 'ready' && gestureHint && (
         <p className="gesture-hint">
           <span>
-            <Hand size={13} aria-hidden /> Drag a sticker to twist
+            <Hand size={13} aria-hidden /> Drag a sticker to twist — middle rows turn slices
           </span>
           <span>
             <Rotate3d size={13} aria-hidden /> Drag background to orbit

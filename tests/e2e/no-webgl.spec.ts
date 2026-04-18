@@ -17,7 +17,7 @@ test.describe('without WebGL', () => {
     await page.waitForFunction(() => window.__CUBELAB__.idle() && window.__CUBELAB__.version() === 1);
     expect(await debug.facelets(page)).toBe('UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB');
     // The net mirrors the model sticker for sticker (U face right column turned green).
-    await expect(page.locator('.face-net__face').first().locator('.face-net__sticker').nth(2)).toHaveCSS('background-color', 'rgb(20, 184, 102)');
+    await expect(page.locator('.face-net__face').first().locator('.face-net__sticker').nth(2)).toHaveCSS('background-color', 'rgb(15, 169, 88)');
 
     await page.getByRole('button', { name: /New Scramble/ }).click();
     await page.waitForFunction(() => window.__CUBELAB__.timer().phase === 'ready', null, { timeout: 30_000 });
