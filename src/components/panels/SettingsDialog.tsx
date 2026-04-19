@@ -124,7 +124,7 @@ export function SettingsDialog() {
       </Group>
 
       <Group title="Display & sound">
-        <Row title="Render quality" description="Auto lowers resolution and effects if frames drop.">
+        <Row title="Render quality" description="Auto: soft shadows on desktop, lighter shading on touch devices, and steps down if frames drop.">
           <Segmented
             label="Render quality"
             size="sm"

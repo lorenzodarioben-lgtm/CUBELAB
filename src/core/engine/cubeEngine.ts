@@ -97,6 +97,15 @@ export interface EngineOptions {
 
 type Easing = (t: number) => number;
 const easeOutCubic: Easing = (t) => 1 - (1 - t) ** 3;
+/**
+ * User turns: a quick settle with a ~1.5 % overshoot — the small mechanical
+ * "snap" of a layer clicking into place. Ends exactly at 1 (the commit angle).
+ */
+const easeSnap: Easing = (t) => {
+  const s = 0.42;
+  const u = t - 1;
+  return 1 + (s + 1) * u * u * u + s * u * u;
+};
 const easeInOutCubic: Easing = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
 interface Op {
@@ -522,7 +531,7 @@ export class CubeEngine {
           to: op.targetAngle ?? moveAngle(move),
           startedAt: now,
           duration,
-          easing: isUserSource(op.source) ? easeOutCubic : easeInOutCubic,
+          easing: isUserSource(op.source) ? easeSnap : easeInOutCubic,
         };
         this.#requestFrame();
       }

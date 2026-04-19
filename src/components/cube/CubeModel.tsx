@@ -15,6 +15,7 @@ import { mulVec } from '../../core/puzzle/geometry';
 import type { Face } from '../../core/puzzle/notation';
 import type { Finish } from '../../core/persistence/settings';
 import { SPACING, STICKER_OFFSET, TILE_TOP, createCubeResources } from './cubeResources';
+import type { RenderTier } from './cubeResources';
 
 const AXES = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)] as const;
 const Z = new THREE.Vector3(0, 0, 1);
@@ -29,7 +30,7 @@ export interface StickerRegistry {
 
 interface CubeModelProps {
   readonly engine: CubeEngine;
-  readonly quality: 'high' | 'low';
+  readonly quality: RenderTier;
   readonly finish: Finish;
   readonly faceLabels: boolean;
   readonly registry: StickerRegistry;

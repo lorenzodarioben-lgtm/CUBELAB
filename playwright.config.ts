@@ -29,6 +29,17 @@ export default defineConfig({
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } }, testIgnore: /mobile\.spec/ },
     { name: 'mobile', use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } }, testMatch: /mobile\.spec/ },
+    // Cross-browser smoke (Firefox / WebKit run only the smoke spec, without Chromium GPU flags).
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'], viewport: { width: 1440, height: 900 }, launchOptions: { args: [] } },
+      testMatch: /browsers\.spec/,
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'], viewport: { width: 1440, height: 900 }, launchOptions: { args: [] } },
+      testMatch: /browsers\.spec/,
+    },
   ],
   webServer: {
     // Always exercise the real production bundle.

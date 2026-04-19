@@ -10,7 +10,7 @@ import type { StudioDeps } from '../../src/app/studio';
 import { applyMoves, createSolvedState, isSolved } from '../../src/core/puzzle/cubeState';
 import type { CubeState } from '../../src/core/puzzle/cubeState';
 import { loadKPuzzle } from '../../src/core/puzzle/kpattern';
-import { invertAlg, mv, parseAlg } from '../../src/core/puzzle/notation';
+import { formatAlg, invertAlg, mv, parseAlg } from '../../src/core/puzzle/notation';
 import type { Move } from '../../src/core/puzzle/notation';
 import { createMemoryStore } from '../../src/core/persistence/storage';
 import type { KeyValueStore } from '../../src/core/persistence/storage';
@@ -280,5 +280,77 @@ describe('persistence', () => {
     expect(second.studio.state.settings.finish).toBe('matte');
     expect(second.studio.state.timer.mode).toBe('spacebar');
     expect(second.studio.engine.state.pattern.isIdentical(createSolvedState(kpuzzle).pattern.applyAlg('R'))).toBe(true);
+  });
+});
+
+describe('slices through the whole controller', () => {
+  it('slice turns start, count (STM/HTM/QTM) and finish a timed attempt; the log follows undo', async () => {
+    const { studio, run, settle, turnAll } = setup({ scrambleSource: async () => "M E' S2 R" });
+    await studio.newScramble();
+    await settle();
+    turnAll(parseAlg("R' S2 E"));
+    expect(studio.state.timer.phase).toBe('running');
+    expect(formatAlg(studio.state.moveLog)).toBe("R' S2 E");
+    studio.undo();
+    run();
+    expect(formatAlg(studio.state.moveLog)).toBe("R' S2");
+    turnAll(parseAlg("E M'"));
+    expect(studio.state.solved).toBe(true);
+    const record = studio.state.history[0]!;
+    expect(record.assisted).toBe(true); // undo was used
+    expect(record.turnsSTM).toBe(6); // R', S2, E, the undo turn E', E, M'
+    expect(record.turnsHTM).toBe(1 + 2 + 2 + 2 + 2 + 2);
+  });
+
+  it('reset abandons an in-flight slice turn without committing it', () => {
+    const { studio, frames } = setup();
+    studio.turn(mv('M', 1));
+    frames(3);
+    expect(studio.engine.getVisualTurn()?.cubies).toHaveLength(8);
+    expect(studio.reset()).toBe('done');
+    frames(40);
+    expect(studio.state.solved).toBe(true);
+    expect(studio.engine.version).toBe(1);
+    expect(studio.state.moveCount).toBe(0);
+  });
+
+  it('a cancelled slice drag preview commits nothing; the next drag still works', () => {
+    const { studio, run } = setup();
+    expect(studio.beginTwist()).toBe(true);
+    studio.engine.updateDrag({ axis: 0, layer: 0, angle: 0.3 });
+    expect(studio.engine.getVisualTurn()?.cubies).toHaveLength(8);
+    studio.engine.endDrag(null);
+    run();
+    expect(studio.state.solved).toBe(true);
+    expect(studio.engine.version).toBe(0);
+    expect(studio.beginTwist()).toBe(true);
+    studio.engine.updateDrag({ axis: 2, layer: 0, angle: -1.4 });
+    studio.engine.endDrag({ move: mv('S', 1), fromAngle: -1.4, targetAngle: -Math.PI / 2, quarterDurationMs: 120 });
+    run();
+    expect(formatAlg(studio.state.moveLog)).toBe('S');
+  });
+
+  it('rapid mixed face/slice input is serialised in order and never double-commits', () => {
+    const { studio, run } = setup();
+    const moves = parseAlg("M R E' U S2 L'");
+    for (const m of moves) expect(studio.turn(m)).toBe(true);
+    run();
+    expect(formatAlg(studio.state.moveLog)).toBe("M R E' U S2 L'");
+    expect(studio.engine.version).toBe(moves.length);
+    expect(studio.engine.state.pattern.isIdentical(applyMoves(createSolvedState(kpuzzle), moves).pattern)).toBe(true);
+  });
+
+  it('auto-solves a slice-scrambled cube after the history is wiped by a reload', async () => {
+    const storage = createMemoryStore();
+    const first = setup({}, storage);
+    first.turnAll(parseAlg("M E S M' R U"));
+    first.studio.flushPersistence();
+    const second = setup({}, storage);
+    expect(second.studio.engine.canUndo()).toBe(false);
+    await second.studio.autoSolve();
+    await second.settle();
+    second.run();
+    expect(second.studio.state.solver.status).toBe('done');
+    expect(second.studio.state.facelets).toBe('UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB');
   });
 });

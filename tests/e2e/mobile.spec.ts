@@ -27,6 +27,16 @@ test.describe('CUBELAB on a phone (390×844, touch)', () => {
     await touchDrag(cdp, from, to);
     expect(await expectRenderMatchesModel(page)).toBe('UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB');
 
+    // A finger on the centre sticker, pushed up, turns the middle slice: M'.
+    await absorbEmulatedTap(page);
+    await touchDrag(cdp, await debug.project(page, [0, 0, 1.5]), await debug.project(page, [0, 1.35, 1.5]));
+    await expectRenderMatchesModel(page);
+    expect(await debug.moveLog(page)).toBe("R M'");
+    await absorbEmulatedTap(page);
+    await touchDrag(cdp, await debug.project(page, [0, 1.35, 1.5]), await debug.project(page, [0, 0, 1.5]));
+    await expectRenderMatchesModel(page);
+    expect(await debug.moveLog(page)).toBe("R M' M");
+
     // Touch on the background orbits instead (stage edge, away from the cube).
     const camera = await debug.camera(page);
     const stage = (await page.locator('.studio__stage').boundingBox())!;

@@ -10,6 +10,9 @@ import * as THREE from 'three';
 import { useServices, useStudio, useUi } from '../../app/context';
 import { markGestureHintSeen } from '../../app/uiStore';
 import { CubeModel } from '../cube/CubeModel';
+import type { RenderTier } from '../cube/cubeResources';
+import { HoverIndicator } from '../cube/HoverIndicator';
+import { HoverState } from '../cube/hoverState';
 import type { StickerRegistry } from '../cube/CubeModel';
 import { readVisualFacelets } from '../cube/visualFacelets';
 import { Interaction } from './Interaction';
@@ -110,7 +113,7 @@ function CameraRig({ rig, reduced, transportOpen, zen }: { rig: OrbitRig; reduce
  * front fill. A warm key light casts soft shadows on the high tier so turning
  * layers and seams shade each other.
  */
-function Lighting({ high }: { high: boolean }) {
+function Lighting({ high, shadows }: { high: boolean; shadows: boolean }) {
   return (
     <>
       <hemisphereLight args={['#ffffff', '#18181a', 0.42]} />
@@ -118,7 +121,7 @@ function Lighting({ high }: { high: boolean }) {
         position={[-4.5, 8, 5.5]}
         intensity={1.6}
         color="#fff6ec"
-        castShadow={high}
+        castShadow={shadows}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.00025}
         shadow-normalBias={0.02}
@@ -181,9 +184,15 @@ function DebugBridge({ registry }: { registry: StickerRegistry }) {
       const r = gl.domElement.getBoundingClientRect();
       return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
     };
+    api.renderInfo = () => ({
+      geometries: gl.info.memory.geometries,
+      textures: gl.info.memory.textures,
+      programs: gl.info.programs?.length ?? 0,
+    });
     return () => {
       delete api.visualFacelets;
       delete api.project;
+      delete api.renderInfo;
     };
   }, [camera, gl, registry]);
   return null;
@@ -213,7 +222,16 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
   const transportOpen = useStudio((s) => s.solver.status !== 'idle');
   const reduced = settings.motion === 'reduce' || (settings.motion === 'system' && systemReduced);
   const [autoDegraded, setAutoDegraded] = useState(false);
-  const quality: 'high' | 'low' = settings.quality === 'low' || (settings.quality === 'auto' && autoDegraded) ? 'low' : 'high';
+  // Auto: full shadows on fine pointers (desktop); touch devices get the medium
+  // tier — identical materials, no extra shadow passes. Sustained frame drops
+  // step either down to low.
+  const coarse = useMemo(() => window.matchMedia('(pointer: coarse)').matches, []);
+  const quality: RenderTier =
+    settings.quality === 'low' || (settings.quality === 'auto' && autoDegraded)
+      ? 'low'
+      : settings.quality === 'auto' && coarse
+        ? 'medium'
+        : 'high';
   const dpr: [number, number] = quality === 'low' ? [1, 1.25] : settings.quality === 'high' ? [1, 2] : [1, 1.75];
 
   useEffect(() => rig.setSensitivity(settings.orbitSensitivity), [rig, settings.orbitSensitivity]);
@@ -226,6 +244,7 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
   }, [ui]);
 
   const onReady = useCallback(() => ui.setState({ renderer: 'ready' }), [ui]);
+  const hover = useMemo(() => new HoverState(), []);
 
   return (
     <Canvas
@@ -247,7 +266,7 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
     >
       {settings.quality === 'auto' && <PerformanceMonitor onDecline={() => setAutoDegraded(true)} flipflops={2} />}
       <CameraRig rig={rig} reduced={reduced} transportOpen={transportOpen} zen={zen} />
-      <Lighting high={quality === 'high'} />
+      <Lighting high={quality !== 'low'} shadows={quality === 'high'} />
       <CubeModel engine={studio.engine} quality={quality} finish={settings.finish} faceLabels={settings.faceLabels} registry={registry} />
       {quality === 'high' ? (
         <ContactShadows position={[0, -2.1, 0]} scale={8.5} blur={2.4} far={3.4} opacity={0.82} resolution={512} color="#000000" />
@@ -255,7 +274,8 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
         <BlobShadow />
       )}
       <Celebration reduced={reduced} zen={zen} />
-      <Interaction studio={studio} rig={rig} touchMode={settings.touchMode} preview={preview} onFirstGesture={onFirstGesture} />
+      <HoverIndicator hover={hover} engine={studio.engine} />
+      <Interaction studio={studio} rig={rig} touchMode={settings.touchMode} preview={preview} hover={hover} onFirstGesture={onFirstGesture} />
       <DebugBridge registry={registry} />
       <ReadySignal onReady={onReady} />
     </Canvas>

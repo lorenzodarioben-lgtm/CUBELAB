@@ -719,9 +719,10 @@ export class Studio {
     }
   }
 
-  #syncCube(schedulePersist = true): void {
+  /** `solved` may be supplied by the caller (a commit event already computed it). */
+  #syncCube(schedulePersist = true, solved?: boolean): void {
     const state = this.engine.state;
-    this.#set({ version: this.engine.version, facelets: stateFacelets(state), solved: isSolved(state) });
+    this.#set({ version: this.engine.version, facelets: stateFacelets(state), solved: solved ?? isSolved(state) });
     this.#syncFlags();
     this.#schedulePersist(schedulePersist);
   }
@@ -736,8 +737,9 @@ export class Studio {
   }
 
   #onCommit(event: CommitEvent): void {
-    const wasSolved = isSolved(event.before);
-    this.#syncCube();
+    // The store still holds the pre-commit flag; the engine computed the new one.
+    const wasSolved = this.state.solved;
+    this.#syncCube(true, event.solved);
     this.#set({ lastMove: { move: event.move, source: event.source, id: ++this.#moveId } });
 
     switch (event.source) {

@@ -1,13 +1,18 @@
 # CUBELAB
 
-**The interactive cubing studio.** A 3×3×3 cube you can turn with your fingers, mouse or keyboard,
-scramble with real random-state WCA scrambles, time against an accurate clock, and auto-solve from
-whatever state it is in — with the solution played back move by move.
+**The interactive cubing studio.** A photoreal 3×3×3 you can turn with your fingers, mouse or
+keyboard — all six faces *and* the M / E / S middle slices — scramble with real random-state WCA
+scrambles, time against an accurate clock, and auto-solve from whatever state it is in, with the
+solution played back move by move.
 
 Everything runs locally in the browser. There are no accounts, no servers, no analytics; solves and
 settings live in this browser's `localStorage` only.
 
-![Desktop studio](artifacts/desktop-1440-scrambled.png)
+![Desktop studio](artifacts/after/desktop-1440-scrambled.png)
+
+| Close-up | Mid-turn M slice | Phone |
+| --- | --- | --- |
+| ![Macro](artifacts/after/cube-macro.png) | ![M slice mid-turn](artifacts/after/cube-midturn-M.png) | ![Phone](artifacts/after/mobile-390-scrambled.png) |
 
 ## Quick start
 
@@ -30,168 +35,180 @@ npm run preview      # serves dist/ at http://localhost:4317
 ```
 
 ```bash
-npm test             # Vitest unit/integration suite (real cubing.js solver, nothing mocked)
+npm test             # Vitest suite (real cubing.js scrambler and solver, nothing mocked)
 ```
 
 ```bash
 npm run test:e2e     # Playwright against the production build (builds + previews automatically)
 ```
 
-| Script               | Purpose                                                              |
-| -------------------- | -------------------------------------------------------------------- |
-| `npm run dev`        | Vite dev server on port 5317                                         |
-| `npm run build`      | `tsc -b` then `vite build`                                           |
-| `npm run preview`    | Serve the production build on port 4317                              |
-| `npm run typecheck`  | Strict TypeScript project build                                      |
-| `npm run lint`       | ESLint (typescript-eslint + React Compiler hook rules)               |
-| `npm test`           | Vitest suite                                                         |
-| `npm run test:e2e`   | Playwright suite (desktop 1440×900, phone 390×844 touch, no-WebGL)   |
-| `npm run test:all`   | Everything above, in order                                           |
-| `npm run screenshots`| Re-capture `artifacts/*.png` (needs `npm run preview` running)       |
+| Script                | Purpose                                                                         |
+| --------------------- | ------------------------------------------------------------------------------- |
+| `npm run dev`         | Vite dev server on port 5317                                                    |
+| `npm run build`       | `tsc -b` then `vite build`                                                      |
+| `npm run preview`     | Serve the production build on port 4317                                         |
+| `npm run typecheck`   | Strict TypeScript project build                                                 |
+| `npm run lint`        | ESLint (typescript-eslint + React Compiler hook rules)                          |
+| `npm test`            | Vitest suite                                                                    |
+| `npm run test:e2e`    | Playwright: Chromium desktop 1440×900, Chromium phone 390×844 (touch), Firefox and WebKit smoke |
+| `npm run test:all`    | Everything above, in order                                                      |
+| `npm run screenshots` | Re-capture `artifacts/after/*.png` (needs `npm run preview` running)             |
 
-First Playwright run on a new machine: `npx playwright install chromium`.
+First Playwright run on a new machine: `npx playwright install chromium firefox webkit`.
 
 ## Using the studio
 
-### Gestures
+### Turning the cube
 
-- **Twist** — press on a sticker and push it along its row or column. The outer layer under your
-  finger follows the drag; release past ~25° (or flick) to commit the turn, otherwise it springs back.
-  A small label beside the pointer shows the move you are about to make (`R`, `U'`, `F2`…).
+- **Twist** — press a sticker and push it along its row or column. The layer under your finger follows
+  the drag; release past ~25° (or flick) to commit, otherwise it springs back. A label beside the
+  pointer shows the layer you have grabbed, and turns ivory with the exact move (`R`, `M'`, `S2`…) once
+  releasing would commit it. With a mouse, a faint outline marks the sticker under the pointer.
+- **Middle slices** — the middle row or column turns the middle layer:
+  - on the front (or back) face, push the **middle column** up/down for **M**, the **middle row**
+    sideways for **E**;
+  - on the top, bottom or a side face, push the middle strip that runs between F and B for **S**.
+  The centre sticker belongs to both strips, so the direction you drag decides. This works the same
+  from any camera angle and with touch.
 - **Orbit** — drag the empty background. Right-drag, middle-drag or Shift/Alt/Ctrl-drag orbits from
-  anywhere, including over the cube.
-- **Zoom** — scroll wheel, or pinch. Two fingers also orbit.
-- Middle slices are deliberately not turnable: every move the app can produce is one of the six
-  outer faces, which is exactly the vocabulary of the timer, notation and solver. Dragging a middle
-  row shows a hint instead of turning the wrong layer.
+  anywhere, including over the cube. **Zoom** with the wheel or a pinch (two fingers also orbit).
 - On touch screens a **Twist / Orbit** switch under the cube makes single-finger drags unambiguous.
 
 ### Move Pad and keyboard
 
-The Move Pad has dedicated buttons for all 18 moves (`U D L R F B`, each clockwise, `'` and `2`).
+The Move Pad has a **Faces / Slices** switch: 18 face keys (`U D L R F B`, each clockwise, `'`, `2`) or
+9 slice keys (`M E S`, each clockwise, `'`, `2`), so it stays compact.
 
-| Keys                                    | Action                                            |
-| --------------------------------------- | ------------------------------------------------- |
-| `U D L R F B` (Faces layout, default)   | Turn clockwise; with `Shift` counter-clockwise    |
-| `I K J F H G D E S L W O` (Speed layout)| R R' U U' F F' L L' D D' B B' (qqTimer/csTimer style) |
-| `N`                                     | New Scramble                                      |
-| `A`                                     | Auto Solve                                        |
-| `P` · `,` `.`                           | Play/pause solution · step back/forward           |
-| `Ctrl+Z` · `Ctrl+Shift+Z` / `Ctrl+Y`    | Undo · redo                                       |
-| `Space`                                 | Spacebar timer: inspect / hold to arm / stop (DNF)|
-| Arrow keys · `C`                        | Orbit camera · reset camera                       |
-| `Z` · `M` · `?` · `Esc`                 | Zen mode · Move Pad · help · close / cancel       |
+| Keys                                         | Action                                                       |
+| -------------------------------------------- | ------------------------------------------------------------ |
+| `U D L R F B` · `M E S` (Faces layout)        | Turn clockwise; with `Shift` counter-clockwise               |
+| `I K J F H G D E S L W O` (Speed layout)     | R R' U U' F F' L L' D D' B B' (qqTimer/csTimer style)         |
+| `5/6` · `2/3` · `8/9` (Speed layout)          | M M' · E E' · S S'                                           |
+| `N` · `A`                                    | New Scramble · Auto Solve                                    |
+| `P` · `,` `.`                                | Play/pause solution · step back/forward                      |
+| `Ctrl+Z` · `Ctrl+Shift+Z` / `Ctrl+Y`         | Undo · redo                                                  |
+| `Space`                                      | Spacebar timer: inspect / hold to arm / stop (DNF)           |
+| Arrow keys · `C`                             | Orbit camera · reset camera                                  |
+| `Z` · `?` · `Esc`                            | Zen mode · help · close / cancel                             |
 
 Keys use `KeyboardEvent.code`, so they work on any keyboard layout. Shortcuts are ignored while
-typing in a field or while a dialog is open.
+typing in a field or while a dialog is open. (`M` used to toggle the Move Pad; it is now the M slice.)
+
+### Notation
+
+`U D L R F B` turn the faces clockwise as seen looking at that face. **M** is the middle layer between
+L and R and turns like **L**; **E** sits between U and D and turns like **D**; **S** sits between F and
+B and turns like **F**. `'` is counter-clockwise, `2` a half turn. The camera never changes a letter:
+white is U, green is F.
 
 ### Timer modes
 
 - **Casual (default)** — after **New Scramble** the status reads READY. The clock starts on the
-  commit of your first turn and stops on the commit of the turn that solves the cube (both instants
-  are taken from the same turn pipeline, so animation length cancels out).
+  commit of your first turn (face or slice) and stops on the commit of the turn that solves the cube.
 - **Spacebar** — optional 15 s inspection, then hold `Space` (or press and hold the clock on touch
-  screens) for 300 ms until it turns green, and release to start. Turning is blocked until the clock
-  runs; only a genuine solve stops it, and pressing `Space` while running records a DNF. Inspection
-  thresholds mirror current WCA practice for training purposes (< 15 s clean, ≥ 15 s `+2`,
-  ≥ 17 s DNF) — this is not an official or certified timer.
+  screens) for 300 ms until it turns green, and release to start. Inspection thresholds mirror current
+  WCA practice for training (< 15 s clean, ≥ 15 s `+2`, ≥ 17 s DNF) — not an official timer.
 
 **Integrity:** undo/redo during an attempt saves it as *practice* (kept in history, excluded from PB
 and averages). Auto Solve ends the attempt without recording it. Scramble playback and solver moves
-never reach the timer as turns, and camera movement never touches the puzzle.
+never reach the timer as turns, and camera movement never touches the puzzle. A cube that is solved
+but rotated as a whole (e.g. after `R M' L'`) counts as solved.
 
 ### Statistics
 
-Best single, current ao5 and ao12, best ao5, and session mean, computed only from clean solves:
-effective time includes `+2`; ao*N* drops one best and one worst; one DNF is the dropped worst, two or
-more make the average DNF. Singles are truncated to hundredths and averages rounded, per WCA
-convention. Turn counts are recorded in both HTM (each `U`, `U'`, `U2` = 1) and QTM (`U2` = 2).
-History supports per-solve detail, delete with confirmation, clear-all with confirmation and CSV export.
+Best single, current ao5/ao12, best ao5 and session mean from clean solves only (WCA conventions:
+`+2` applied, one best/one worst dropped, two DNFs make the average DNF). Turns are shown in **STM**
+(any layer, any angle = 1); history also records **HTM** (a slice = 2) and **QTM** (a double = 2
+quarters). The left column also shows a live **turn tape** of your moves since the last scramble.
+History supports details, delete, clear-all and CSV export.
 
 ### Other features
 
-New Scramble (animated or instant, with skip), Auto Solve with Play/Pause, Step back/forward,
-Replay, Stop and Slow/Normal/Fast speed, Undo/Redo, Reset (confirms if it would discard a running
-attempt), camera reset, copy scramble, shareable scramble links (`?scramble=R%20U%20F'`), Zen mode
-(fullscreen when available), sticker letters for colour-vision differences, gloss/matte finish,
-render quality (auto/high/low), reduced motion (system/reduced/full), orbit sensitivity, optional
+Animated or instant scrambles (with skip), solver playback with Play/Pause, Step, Replay, Stop and
+three speeds, Reset (confirms if it would discard a running attempt), camera reset, copy scramble and
+share links (`?scramble=R%20M%27%20U`), Zen mode, sticker letters for colour-vision differences,
+gloss/matte finish, render quality (auto/high/low), reduced motion, orbit sensitivity, optional
 synthesized sound (off by default), and a 2D net fallback when WebGL is unavailable.
 
 ## Architecture
 
 ```
 src/
-  core/                     framework-free, unit-tested
-    puzzle/   notation, integer geometry, 26-cubie model, facelet layout, KPattern bridge, CubeState
-    engine/   CubeEngine: the single serialized move pipeline (queue, animation, drag, undo/redo)
-    scramble/ random-state scrambles via cubing.js (lazy, web worker)
-    solver/   state-based solving via cubing.js + verification
-    timing/   timer state machine (casual / spacebar / inspection)
-    stats/    WCA-style averages and time formatting
-    persistence/ versioned, validated localStorage (settings, history, cube snapshot)
-    audio/    optional Web Audio feedback
-  app/        Studio controller (vanilla Zustand store), UI store, actions, debug hooks
-  components/ stage (R3F canvas, camera rig, pointer arbitration), cube (meshes, gestures),
-              controls, panels, ui primitives
-  hooks/      keyboard, environment (visibility, reduced motion, fullscreen)
+  core/                      framework-free, unit-tested
+    puzzle/      notation (9 families), integer geometry, 26-cubie model, facelets, KPattern bridge, CubeState
+    engine/      CubeEngine: the single serialized move pipeline (queue, animation, drag preview, undo/redo)
+    scramble/    random-state scrambles via cubing.js (lazy, web worker)
+    solver/      centre homing + cubing.js two-phase solve + verification
+    timing/      timer state machine (casual / spacebar / inspection, STM/HTM/QTM)
+    stats/       WCA-style averages and time formatting
+    persistence/ versioned, validated localStorage (settings, history v2, cube snapshot)
+    audio/       optional Web Audio feedback
+  app/           Studio controller (vanilla Zustand store), UI store, actions, debug hooks
+  components/    stage (R3F canvas, lighting, camera rig, pointer arbitration), cube (meshes,
+                 materials, gestures, hover outline), controls, panels, ui primitives
+  hooks/         keyboard, environment (visibility, reduced motion, fullscreen)
+  styles/        tokens · base · layout · components
 tests/
-  unit/       Vitest: puzzle, engine, solver, timer, stats, persistence, gestures, studio flows
-  e2e/        Playwright: desktop, touch phone, no-WebGL, reduced motion
+  unit/          puzzle, slices, engine, solver, timer, stats, persistence, gestures, studio flows
+  e2e/           studio, slices, stress, phone (touch), no-WebGL, reduced motion, cross-browser smoke
 ```
 
 ### One authoritative state
 
 `CubeState` (`src/core/puzzle/cubeState.ts`) is a single immutable value holding two synchronised
-views of the same cube:
+views of the same cube: the cubing.js `KPattern` (canonical for solving, solved detection and scramble
+checks) and one exact integer rotation matrix per cubie (stable ids; what the renderer draws). Both
+advance only through `applyMove`, and `position = orientation · home` holds forever, so nothing drifts.
+Facelets derived independently from each view are compared after every move in the tests.
 
-- `pattern` — the cubing.js `KPattern`, canonical for solving, solved detection and scramble checks;
-- `cubies` — one exact integer rotation matrix per cubie (stable ids), which the renderer draws.
+Coordinates are fixed to the cube, matching three.js: **+X = R, +Y = U, +Z = F**. Each move family has
+an axis, a layer (−1, 0, +1) and a clockwise sign: R/U/F and S turn negatively about +axis; L/D/B, M and
+E positively.
 
-Both are advanced only by `applyMove`. Because every face turn applies the same rotation to a
-cubie's position and orientation, `position = orientation · home` always holds, so position is
-derived, never stored, and long sequences cannot drift. `agrees(state)` compares facelets derived
-independently from each view; the tests run it after every move of thousands of random moves.
+### Slices
 
-Coordinates are fixed to the cube, matching three.js: **+X = R, +Y = U, +Z = F**. A face turn is
-clockwise as seen looking at that face; that is a negative rotation about +axis for R/U/F and a
-positive one for L/D/B. The camera never changes notation.
+A slice turns the lattice layer 0 about its axis: **8 visible cubies** (4 edges and 4 centres; the core
+is implicit). Centres therefore move, exactly as on a physical cube, and the cubing.js `CENTERS` orbit
+permutes with them. A pattern is legal when its centres form one of the 24 whole-cube rotations and
+`parity(edges) ⊕ parity(corners) = parity(centres)`. cubing.js's 3×3 solver ignores centres, so Auto
+Solve first returns any displaced centres home with the shortest slice sequence (breadth-first over the
+24 arrangements, at most three turns), then solves the remaining outer-face state. Every solution is
+real moves, is verified against the captured state before playing, and ends in the canonical
+orientation (white top, green front).
 
 ### The move pipeline
 
 `CubeEngine` (`src/core/engine/cubeEngine.ts`) serializes every change — pointer twists, keys, Move
-Pad, undo/redo, scramble playback and solver playback. A turn commits **exactly once, when its
-animation completes**; until then the logical state is the pre-turn state, so reset/solve/undo never
-see a half-applied move and an aborted animation needs no rollback. Time is injected, so the whole
-pipeline is driven by a fake clock in tests. The renderer reads `getVisualTurn()` each frame and
-rebuilds every cubie transform from the committed integer state plus the in-flight rotation —
-nothing accumulates frame to frame.
+Pad, undo/redo, scramble and solver playback. A turn commits **exactly once, when its animation
+completes**; an aborted animation needs no rollback. User turns ease out with a ~1.5 % mechanical snap;
+playback uses a symmetric ease. The renderer rebuilds every cubie transform each frame from the
+committed integer state plus the in-flight rotation, so nothing accumulates.
 
-### Model ↔ render agreement
+### Rendering
 
-`readVisualFacelets()` reads sticker colours back out of the actual three.js scene graph (world
-transforms of each sticker mesh). The browser tests compare it with the canonical model after
-twists, Move Pad turns, scrambles, undo/redo, playback steps and solves.
+Molded-plastic pieces (0.975 bodies, 0.06 roundover, procedural micro-roughness), bevelled colour tiles
+seated inside each face's flat area, a dark core visible only through seams mid-turn, and a pad-printed
+mark on the white centre cap. Neutral, white-balanced studio lighting (overhead softbox, key strip,
+rim strip, fill) through a procedural environment — no image assets. Render tiers: **high** (desktop:
+physical materials + soft real-time shadows + contact shadow), **medium** (touch devices on Auto: same
+materials, no shadow passes), **low** (standard materials, coarser geometry). Frames are rendered on
+demand only while something moves.
 
-### Solver and scrambles
+### Bundling cubing.js's worker
 
-`randomScrambleForEvent('333')` and `experimentalSolve3x3x3IgnoringCenters(pattern)` from cubing.js
-run in cubing.js's own module worker, loaded lazily and pre-warmed when the browser is idle. Auto
-Solve captures the current `KPattern` (after the queue is idle) and its engine version, solves it,
-verifies the returned algorithm actually solves the captured state, and only plays it if the cube is
-still at that version. Playback re-checks the version before every move, so a stale solution can
-never overwrite a newer user action.
-
-`vite.config.ts` groups cubing.js's shared modules into their own chunk and disables Vite's
-DOM-based module-preload helper, so the worker never imports app code in production builds.
+`vite.config.ts` keeps cubing.js's search worker free of app code: its shared modules form their own
+chunk, Vite's DOM-based module-preload helper is off, and the worker entry keeps the stable name
+`assets/search-worker-entry.js` that cubing.js resolves first (otherwise WebKit reports a script error
+before cubing.js falls back).
 
 ## Debug / verification hooks
 
-`window.__CUBELAB__` exposes read-only inspection (`facelets()`, `patternFacelets()`,
-`visualFacelets()`, `project(point)`, `camera()`, `timer()`, `solver()` …) used by the browser tests.
-Nothing on it can change state.
+`window.__CUBELAB__` exposes read-only inspection (`facelets()`, `patternFacelets()`, `visualFacelets()`
+read from the three.js scene graph, `project(point)`, `moveLog()`, `renderInfo()`, `camera()`,
+`timer()`, `solver()` …) used by the browser tests. Nothing on it can change state.
 
 ## Known limitations
 
-See `CUBELAB_HANDOFF.md` for the full, candid list. In short: only outer-face turns (no slices or
-rotations) are supported by design; the timer is a training tool, not WCA-certified; solve history is
-per-browser; touch gestures were verified with Chromium touch emulation, not on physical devices.
+See `CUBELAB_HANDOFF.md`. In short: wide moves and whole-cube rotations are not part of the notation;
+the timer is a training tool, not WCA-certified; history is per-browser; touch was verified with
+Chromium touch emulation (not physical devices); Firefox/WebKit are covered by a smoke test only.

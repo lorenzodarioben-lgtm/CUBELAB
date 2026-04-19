@@ -25,6 +25,7 @@ export interface DebugApi {
   /** Installed by the 3D stage once it is mounted. */
   visualFacelets?: () => string;
   project?: (point: [number, number, number]) => { x: number; y: number };
+  renderInfo?: () => { geometries: number; textures: number; programs: number };
 }
 
 export function installDebugApi(studio: Studio, rig: OrbitRig): void {

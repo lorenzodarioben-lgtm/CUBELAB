@@ -19,6 +19,7 @@ import type { TouchMode } from '../../core/persistence/settings';
 import type { Vec3 } from '../../core/puzzle/geometry';
 import { intersectCube, previewFamily, previewLabel, resolveTwist, snapTwist, twistAngle } from '../cube/gestures';
 import type { CubeHit, ScreenPoint, TwistResolution } from '../cube/gestures';
+import type { HoverState } from '../cube/hoverState';
 import type { OrbitRig } from './orbitRig';
 
 type TwistInfo = Extract<TwistResolution, { kind: 'twist' }>;
@@ -51,10 +52,11 @@ interface InteractionProps {
   readonly rig: OrbitRig;
   readonly touchMode: TouchMode;
   readonly preview: PreviewSink;
+  readonly hover: HoverState;
   readonly onFirstGesture: () => void;
 }
 
-export function Interaction({ studio, rig, touchMode, preview, onFirstGesture }: InteractionProps) {
+export function Interaction({ studio, rig, touchMode, preview, hover, onFirstGesture }: InteractionProps) {
   const gl = useThree((s) => s.gl);
   const camera = useThree((s) => s.camera);
   const invalidate = useThree((s) => s.invalidate);
@@ -99,6 +101,7 @@ export function Interaction({ studio, rig, touchMode, preview, onFirstGesture }:
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.pointerType === 'mouse' && e.button > 2) return;
+      hover.clear();
       rect = el.getBoundingClientRect();
       const p = local(e);
       pointers.set(e.pointerId, p);
@@ -128,7 +131,11 @@ export function Interaction({ studio, rig, touchMode, preview, onFirstGesture }:
       if (pointers.has(e.pointerId)) pointers.set(e.pointerId, p);
 
       if (gesture.kind === 'idle') {
-        if (e.pointerType === 'mouse') setCursor(el, touchMode === 'twist' && hitTest(p) ? 'pointer' : 'grab');
+        if (e.pointerType !== 'mouse') return;
+        const hit = touchMode === 'twist' ? hitTest(p) : null;
+        setCursor(el, hit ? 'pointer' : 'grab');
+        if (hit) hover.set(hit.normal, hit.point);
+        else hover.clear();
         return;
       }
       if (gesture.kind === 'pinch') {
@@ -238,6 +245,7 @@ export function Interaction({ studio, rig, touchMode, preview, onFirstGesture }:
 
     const onContextMenu = (e: Event) => e.preventDefault();
     const onLeave = () => {
+      hover.clear();
       if (gesture.kind === 'idle') setCursor(el, '');
     };
 
@@ -252,6 +260,7 @@ export function Interaction({ studio, rig, touchMode, preview, onFirstGesture }:
     el.addEventListener('contextmenu', onContextMenu);
     return () => {
       cancelTwist();
+      hover.clear();
       el.removeEventListener('pointerdown', onPointerDown);
       el.removeEventListener('pointermove', onPointerMove);
       el.removeEventListener('pointerup', onPointerUp);
@@ -261,7 +270,7 @@ export function Interaction({ studio, rig, touchMode, preview, onFirstGesture }:
       el.removeEventListener('wheel', onWheel);
       el.removeEventListener('contextmenu', onContextMenu);
     };
-  }, [gl, camera, invalidate, studio, rig, touchMode, preview, onFirstGesture]);
+  }, [gl, camera, invalidate, studio, rig, touchMode, preview, hover, onFirstGesture]);
 
   return null;
 }

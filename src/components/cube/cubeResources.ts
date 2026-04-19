@@ -153,8 +153,16 @@ function markTexture(): THREE.Texture {
   }, 256);
 }
 
-export function createCubeResources(quality: 'high' | 'low', finish: Finish): CubeResources {
-  const high = quality === 'high';
+/**
+ * Render tiers.
+ *  high   — physical materials, full geometry, real-time soft shadows (desktop).
+ *  medium — same materials and geometry, no shadow passes (touch devices).
+ *  low    — standard materials, coarser geometry, no shadows.
+ */
+export type RenderTier = 'high' | 'medium' | 'low';
+
+export function createCubeResources(tier: RenderTier, finish: Finish): CubeResources {
+  const high = tier !== 'low';
   const gloss = finish === 'gloss';
 
   const body = new RoundedBoxGeometry(BODY_SIZE, BODY_SIZE, BODY_SIZE, high ? 6 : 3, BODY_RADIUS);
@@ -249,7 +257,7 @@ export function createCubeResources(quality: 'high' | 'low', finish: Finish): Cu
     markMaterial,
     stickerMaterials,
     labelMaterials,
-    shadows: high,
+    shadows: tier === 'high',
     dispose() {
       body.dispose();
       sticker.dispose();
