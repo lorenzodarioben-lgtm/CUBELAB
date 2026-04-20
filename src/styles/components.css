@@ -698,6 +698,11 @@
   transition: color var(--dur-2) ease;
 }
 
+.moves__item.is-rotation {
+  color: var(--text-3);
+  font-style: italic;
+}
+
 .moves__item.is-slice {
   font-style: italic;
 }

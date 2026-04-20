@@ -108,7 +108,10 @@ test.describe('M / E / S middle slices (desktop, production build)', () => {
     await page.getByRole('button', { name: /Auto Solve/ }).click();
     await page.getByRole('button', { name: 'Solve it for me' }).click();
     await page.waitForFunction(() => window.__CUBELAB__.solver().status === 'done', null, { timeout: 60_000 });
-    expect(await expectRenderMatchesModel(page)).toBe(SOLVED);
+    // Solved in whichever orientation took fewer turns: every face one colour.
+    const end = await expectRenderMatchesModel(page);
+    for (let face = 0; face < 6; face++) expect(new Set(end.slice(face * 9, face * 9 + 9)).size).toBe(1);
+    expect(await debug.solved(page)).toBe(true);
     expect(await debug.historyCount(page)).toBe(0);
   });
 });

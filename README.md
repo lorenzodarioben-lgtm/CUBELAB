@@ -70,36 +70,44 @@ First Playwright run on a new machine: `npx playwright install chromium firefox 
   - on the top, bottom or a side face, push the middle strip that runs between F and B for **S**.
   The centre sticker belongs to both strips, so the direction you drag decides. This works the same
   from any camera angle and with touch.
-- **Orbit** — drag the empty background. Right-drag, middle-drag or Shift/Alt/Ctrl-drag orbits from
-  anywhere, including over the cube. **Zoom** with the wheel or a pinch (two fingers also orbit).
+- **Orbit** — drag the empty background to turn the cube over in any direction, like rolling it in
+  your hand: there are no poles, so keep dragging up or down and white ends up facing the floor.
+  Right-drag, middle-drag or Shift/Alt/Ctrl-drag orbits from anywhere, including over the cube.
+  **Zoom** with the wheel or a pinch (two fingers also orbit). `C` brings the view home.
+- **Re-grip** — `X` `Y` `Z` (or the Move Pad's **Rotate** bank) rotate the whole cube as a real move:
+  after `x2` yellow is on top and `U` turns it. Rotations count 0 turns, never start the clock, and are
+  allowed during inspection.
 - On touch screens a **Twist / Orbit** switch under the cube makes single-finger drags unambiguous.
 
 ### Move Pad and keyboard
 
-The Move Pad has a **Faces / Slices** switch: 18 face keys (`U D L R F B`, each clockwise, `'`, `2`) or
-9 slice keys (`M E S`, each clockwise, `'`, `2`), so it stays compact.
+The Move Pad has a **Faces / Slices / Rotate** switch: 18 face keys (`U D L R F B`, each clockwise,
+`'`, `2`), 9 slice keys (`M E S`) or 9 rotation keys (`x y z`), so it stays compact.
 
 | Keys                                         | Action                                                       |
 | -------------------------------------------- | ------------------------------------------------------------ |
 | `U D L R F B` · `M E S` (Faces layout)        | Turn clockwise; with `Shift` counter-clockwise               |
 | `I K J F H G D E S L W O` (Speed layout)     | R R' U U' F F' L L' D D' B B' (qqTimer/csTimer style)         |
 | `5/6` · `2/3` · `8/9` (Speed layout)          | M M' · E E' · S S'                                           |
+| `X Y Z` (both layouts)                       | Whole-cube rotation; with `Shift` counter-clockwise          |
 | `N` · `A`                                    | New Scramble · Auto Solve                                    |
 | `P` · `,` `.`                                | Play/pause solution · step back/forward                      |
 | `Ctrl+Z` · `Ctrl+Shift+Z` / `Ctrl+Y`         | Undo · redo                                                  |
 | `Space`                                      | Spacebar timer: inspect / hold to arm / stop (DNF)           |
-| Arrow keys · `C`                             | Orbit camera · reset camera                                  |
-| `Z` · `?` · `Esc`                            | Zen mode · help · close / cancel                             |
+| Arrow keys · `C`                             | Turn the view (any direction) · reset the view               |
+| `` ` `` · `?` · `Esc`                        | Zen mode · help · close / cancel                             |
 
 Keys use `KeyboardEvent.code`, so they work on any keyboard layout. Shortcuts are ignored while
-typing in a field or while a dialog is open. (`M` used to toggle the Move Pad; it is now the M slice.)
+typing in a field or while a dialog is open. (`M` used to toggle the Move Pad; it is now the M slice.
+Zen moved from `Z` to `` ` `` when `Z` became the z rotation.)
 
 ### Notation
 
 `U D L R F B` turn the faces clockwise as seen looking at that face. **M** is the middle layer between
 L and R and turns like **L**; **E** sits between U and D and turns like **D**; **S** sits between F and
-B and turns like **F**. `'` is counter-clockwise, `2` a half turn. The camera never changes a letter:
-white is U, green is F.
+B and turns like **F**. **x y z** rotate the whole cube like **R**, **U** and **F**. `'` is
+counter-clockwise, `2` a half turn. Letters always name positions, as on a physical cube: after `x2`
+the top layer is yellow and `U` turns it. Orbiting only changes your view, never a letter.
 
 ### Timer modes
 
@@ -170,11 +178,16 @@ E positively.
 A slice turns the lattice layer 0 about its axis: **8 visible cubies** (4 edges and 4 centres; the core
 is implicit). Centres therefore move, exactly as on a physical cube, and the cubing.js `CENTERS` orbit
 permutes with them. A pattern is legal when its centres form one of the 24 whole-cube rotations and
-`parity(edges) ⊕ parity(corners) = parity(centres)`. cubing.js's 3×3 solver ignores centres, so Auto
-Solve first returns any displaced centres home with the shortest slice sequence (breadth-first over the
-24 arrangements, at most three turns), then solves the remaining outer-face state. Every solution is
-real moves, is verified against the captured state before playing, and ends in the canonical
-orientation (white top, green front).
+`parity(edges) ⊕ parity(corners) = parity(centres)`. Whole-cube rotations turn all 26 cubies and
+reach the same 24 centre arrangements.
+
+cubing.js's 3×3 solver ignores centres and solves relative to the home ones, so when centres are
+displaced Auto Solve builds real-move candidates and plays the shortest: (a) up to three slice turns
+that undo the state outright; (b) home the centres with the shortest slice sequence, then solve —
+ends white-top, green-front; (c) solve in the orientation the cube is held — solve the rotated frame,
+then relabel each face turn back (ρ·m·ρ⁻¹ is again a face turn) — so a cube re-gripped with `x2`
+stays yellow-up. Ties go to the canonical orientation. Every solution is verified against the
+captured state before it plays.
 
 ### The move pipeline
 
@@ -184,15 +197,28 @@ completes**; an aborted animation needs no rollback. User turns ease out with a 
 playback uses a symmetric ease. The renderer rebuilds every cubie transform each frame from the
 committed integer state plus the in-flight rotation, so nothing accumulates.
 
+### The view
+
+`OrbitRig` (`src/components/stage/orbitRig.ts`) is a quaternion trackball with no fixed up, so the view
+can tumble through the poles. Drags rotate about the screen's own axes, so the cube follows the
+pointer. The stage applies the view by turning the **cube** in front of a fixed studio camera, not by
+flying the camera: the lights stay above, the shadow stays on the floor (lowered under a corner-down
+cube), and reflections travel across the tiles as it turns. Hit-testing, projection and the rendered
+facelet read-back all work in cube coordinates, so twists behave identically upside down.
+
 ### Rendering
 
-Molded-plastic pieces (0.975 bodies, 0.06 roundover, procedural micro-roughness), bevelled colour tiles
-seated inside each face's flat area, a dark core visible only through seams mid-turn, and a pad-printed
-mark on the white centre cap. Neutral, white-balanced studio lighting (overhead softbox, key strip,
-rim strip, fill) through a procedural environment — no image assets. Render tiers: **high** (desktop:
-physical materials + soft real-time shadows + contact shadow), **medium** (touch devices on Auto: same
-materials, no shadow passes), **low** (standard materials, coarser geometry). Frames are rendered on
-demand only while something moves.
+Molded-plastic pieces (0.975 bodies, 0.06 roundover, frosted grain + mottled sheen + thin coat) and
+bevelled colour tiles seated inside each face's flat area, with a fine orange-peel surface under a
+smooth coat. Each tile is seated individually — a deterministic hair of tilt (< 0.5°) and offset plus
+one of four moulding variants per colour (tone and sheen) — so neighbouring tiles catch the light
+slightly differently, as on a real cube. No logo. Lighting is image-based: a small photographic studio
+(dark graded cyclorama, overhead softbox, a strip box placed so the top face carries a half reflection,
+key and rim strips, fill and bounce cards) built in code and prefiltered once with PMREM, plus a key
+light for soft shadows — no image assets. Render tiers: **high** (desktop: physical materials + soft
+real-time shadows + contact shadow), **medium** (touch devices on Auto: same materials, no shadow
+passes), **low** (standard materials, coarser geometry). Frames are rendered on demand only while
+something moves.
 
 ### Bundling cubing.js's worker
 
@@ -209,6 +235,6 @@ read from the three.js scene graph, `project(point)`, `moveLog()`, `renderInfo()
 
 ## Known limitations
 
-See `CUBELAB_HANDOFF.md`. In short: wide moves and whole-cube rotations are not part of the notation;
+See `CUBELAB_HANDOFF.md`. In short: wide moves are not part of the notation;
 the timer is a training tool, not WCA-certified; history is per-browser; touch was verified with
 Chromium touch emulation (not physical devices); Firefox/WebKit are covered by a smoke test only.

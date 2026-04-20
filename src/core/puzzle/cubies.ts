@@ -70,26 +70,26 @@ export function cubiePosition(orientations: CubieOrientations, id: number): Vec3
   return mulVec(orientations[id]!, CUBIE_DEFS[id]!.home);
 }
 
-/** Ids of the cubies currently occupying the given layer. */
-export function cubiesInLayer(orientations: CubieOrientations, axis: Axis, layer: number): number[] {
+/** Ids of the cubies currently occupying the given layer (`null` = every cubie). */
+export function cubiesInLayer(orientations: CubieOrientations, axis: Axis, layer: number | null): number[] {
   const ids: number[] = [];
   for (const def of CUBIE_DEFS) {
-    if (cubiePosition(orientations, def.id)[axis] === layer) ids.push(def.id);
+    if (layer === null || cubiePosition(orientations, def.id)[axis] === layer) ids.push(def.id);
   }
   return ids;
 }
 
 /**
- * Applies one layer turn — an outer face (9 cubies) or a middle slice (8
- * visible cubies: four edges and four centres; the core is implicit). Untouched
- * cubies keep their matrix by reference.
+ * Applies one move — an outer face (9 cubies), a middle slice (8 visible
+ * cubies: four edges and four centres; the core is implicit) or a whole-cube
+ * rotation (all 26). Untouched cubies keep their matrix by reference.
  */
 export function applyMoveToCubies(orientations: CubieOrientations, move: Move): CubieOrientations {
   const { axis, layer } = MOVE_AXIS[move.family];
   const rotation = quarterRotation(axis, moveQuarterTurns(move));
   return orientations.map((o, id) => {
     const pos = mulVec(o, CUBIE_DEFS[id]!.home);
-    return pos[axis] === layer ? mulMat(rotation, o) : o;
+    return layer === null || pos[axis] === layer ? mulMat(rotation, o) : o;
   });
 }
 

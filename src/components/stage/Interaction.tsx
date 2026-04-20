@@ -8,10 +8,14 @@
  *     Shift/Alt/Ctrl-drag, or "Orbit" touch mode. A second finger converts any
  *     gesture into pinch-zoom + orbit (cancelling an unfinished twist).
  *
- * Camera gestures go to the OrbitRig only; twists go to the engine's drag API.
+ * View gestures go to the OrbitRig only; twists go to the engine's drag API.
  * All state is cleared on pointerup, pointercancel and lostpointercapture.
+ *
+ * Hit tests and projections work in cube coordinates: rays are carried into
+ * the turned cube frame, and lattice points are carried back out of it.
  */
 import { useEffect } from 'react';
+import type { RefObject } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Studio } from '../../app/studio';
@@ -50,13 +54,15 @@ function showPreview(sink: PreviewSink, info: TwistInfo, angle: number, p: Scree
 interface InteractionProps {
   readonly studio: Studio;
   readonly rig: OrbitRig;
+  /** The turned cube frame (identity when the view is at home). */
+  readonly frame: RefObject<THREE.Group | null>;
   readonly touchMode: TouchMode;
   readonly preview: PreviewSink;
   readonly hover: HoverState;
   readonly onFirstGesture: () => void;
 }
 
-export function Interaction({ studio, rig, touchMode, preview, hover, onFirstGesture }: InteractionProps) {
+export function Interaction({ studio, rig, frame, touchMode, preview, hover, onFirstGesture }: InteractionProps) {
   const gl = useThree((s) => s.gl);
   const camera = useThree((s) => s.camera);
   const invalidate = useThree((s) => s.invalidate);
@@ -68,6 +74,7 @@ export function Interaction({ studio, rig, touchMode, preview, hover, onFirstGes
     const raycaster = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
     const projected = new THREE.Vector3();
+    const toCube = new THREE.Matrix4();
     let gesture: Gesture = { kind: 'idle' };
     let rect = el.getBoundingClientRect();
 
@@ -77,13 +84,20 @@ export function Interaction({ studio, rig, touchMode, preview, hover, onFirstGes
       ndc.set((p.x / rect.width) * 2 - 1, -(p.y / rect.height) * 2 + 1);
       camera.updateMatrixWorld();
       raycaster.setFromCamera(ndc, camera);
+      const cube = frame.current;
+      if (cube) {
+        cube.updateWorldMatrix(true, false);
+        raycaster.ray.applyMatrix4(toCube.copy(cube.matrixWorld).invert());
+      }
       const o = raycaster.ray.origin;
       const d = raycaster.ray.direction;
       return intersectCube([o.x, o.y, o.z], [d.x, d.y, d.z]);
     };
 
-    const project = (world: Vec3): ScreenPoint => {
-      projected.set(world[0], world[1], world[2]).project(camera);
+    const project = (point: Vec3): ScreenPoint => {
+      projected.set(point[0], point[1], point[2]);
+      if (frame.current) projected.applyMatrix4(frame.current.matrixWorld);
+      projected.project(camera);
       return { x: ((projected.x + 1) / 2) * rect.width, y: ((1 - projected.y) / 2) * rect.height };
     };
 
@@ -270,7 +284,7 @@ export function Interaction({ studio, rig, touchMode, preview, hover, onFirstGes
       el.removeEventListener('wheel', onWheel);
       el.removeEventListener('contextmenu', onContextMenu);
     };
-  }, [gl, camera, invalidate, studio, rig, touchMode, preview, hover, onFirstGesture]);
+  }, [gl, camera, invalidate, studio, rig, frame, touchMode, preview, hover, onFirstGesture]);
 
   return null;
 }

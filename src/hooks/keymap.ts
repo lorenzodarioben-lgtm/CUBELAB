@@ -9,9 +9,11 @@
  *   S/L = D/D', W/O = B/B'), with slices on the number row:
  *   5/6 = M/M', 2/3 = E/E', 8/9 = S/S'.
  *
+ * Whole-cube rotations X / Y / Z (Shift = prime) work in both layouts.
+ *
  * Action shortcuts deliberately avoid every key used by either layout:
- * N new scramble, A auto solve, P play/pause, , and . step, C camera, Z zen,
- * ? help.
+ * N new scramble, A auto solve, P play/pause, , and . step, C camera,
+ * backquote zen, ? help.
  */
 import { mv } from '../core/puzzle/notation';
 import type { Move, MoveFamily } from '../core/puzzle/notation';
@@ -50,7 +52,11 @@ const FAMILY_CODES: Readonly<Record<string, MoveFamily>> = {
   KeyS: 'S',
 };
 
+const ROTATION_CODES: Readonly<Record<string, MoveFamily>> = { KeyX: 'x', KeyY: 'y', KeyZ: 'z' };
+
 export function moveForKey(event: Pick<KeyboardEvent, 'code' | 'key' | 'shiftKey'>, keyMap: KeyMap): Move | null {
+  const rotation = ROTATION_CODES[event.code];
+  if (rotation) return mv(rotation, event.shiftKey ? 3 : 1);
   if (keyMap === 'faces') {
     const family = FAMILY_CODES[event.code];
     return family ? mv(family, event.shiftKey ? 3 : 1) : null;

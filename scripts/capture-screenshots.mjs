@@ -79,9 +79,22 @@ const SCRAMBLE = "R U F' L2 D B2 R' U2 F L' D2 B'";
   await page.keyboard.press('c');
   await page.waitForTimeout(900);
 
+  // Free view: one long upward background drag rolls the cube over (white faces the floor).
+  await page.mouse.move(720, 860);
+  await page.mouse.down();
+  for (let i = 1; i <= 26; i++) await page.mouse.move(720, 860 - i * 30);
+  await page.mouse.up();
+  await page.waitForTimeout(1200);
+  await shot(page, 'cube-white-down', { x: 400, y: 120, width: 640, height: 660 });
+  await page.keyboard.press('c');
+  await page.waitForTimeout(900);
+
   await page.getByRole('radio', { name: 'Slices' }).check();
   await page.waitForTimeout(300);
   await shot(page, 'desktop-1440-slice-pad');
+  await page.getByRole('radio', { name: 'Rotate' }).check();
+  await page.waitForTimeout(300);
+  await shot(page, 'desktop-1440-rotate-pad');
   await page.getByRole('radio', { name: 'Faces' }).check();
 
   await page.getByRole('button', { name: /Auto Solve/ }).click();

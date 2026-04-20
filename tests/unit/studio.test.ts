@@ -9,6 +9,7 @@ import { Studio } from '../../src/app/studio';
 import type { StudioDeps } from '../../src/app/studio';
 import { applyMoves, createSolvedState, isSolved } from '../../src/core/puzzle/cubeState';
 import type { CubeState } from '../../src/core/puzzle/cubeState';
+import { isFaceletStringSolved } from '../../src/core/puzzle/facelets';
 import { loadKPuzzle } from '../../src/core/puzzle/kpattern';
 import { formatAlg, invertAlg, mv, parseAlg } from '../../src/core/puzzle/notation';
 import type { Move } from '../../src/core/puzzle/notation';
@@ -351,6 +352,54 @@ describe('slices through the whole controller', () => {
     await second.settle();
     second.run();
     expect(second.studio.state.solver.status).toBe('done');
-    expect(second.studio.state.facelets).toBe('UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB');
+    // Solved in whichever orientation needed fewer turns (centre homing or the current frame).
+    expect(second.studio.state.solved).toBe(true);
+    expect(isFaceletStringSolved(second.studio.state.facelets)).toBe(true);
+  });
+});
+
+describe('whole-cube rotations through the controller', () => {
+  it('re-grip without starting the clock or counting turns; U then turns the new top', async () => {
+    const { studio, run, settle, turnAll } = setup();
+    await studio.newScramble();
+    await settle();
+    turnAll(parseAlg('x2'));
+    expect(studio.state.timer.phase).toBe('ready');
+    expect(studio.state.moveCount).toBe(0);
+    expect(formatAlg(studio.state.moveLog)).toBe('x2');
+    expect(studio.state.facelets.slice(4, 5)).not.toBe('U'); // white centre is no longer on top
+    turnAll(parseAlg('U'));
+    expect(studio.state.timer.phase).toBe('running');
+    expect(studio.state.moveCount).toBe(1);
+    const expected = applyMoves(createSolvedState(kpuzzle), parseAlg(`${SCRAMBLE} x2 U`));
+    expect(studio.engine.state.pattern.isIdentical(expected.pattern)).toBe(true);
+    studio.undo();
+    run();
+    expect(formatAlg(studio.state.moveLog)).toBe('x2');
+  });
+
+  it('are allowed during spacebar inspection, while face turns are not', async () => {
+    const { studio, settle, run } = setup();
+    studio.updateSettings({ timerMode: 'spacebar', inspection: true });
+    await studio.newScramble();
+    await settle();
+    studio.spaceDown(0);
+    studio.spaceUp(50);
+    expect(studio.state.timer.phase).toBe('inspecting');
+    expect(studio.turn(mv('y', 1))).toBe(true);
+    run();
+    expect(studio.state.timer.phase).toBe('inspecting');
+    expect(studio.turn(mv('R', 1))).toBe(false);
+  });
+
+  it('auto solve keeps the chosen orientation after x2', async () => {
+    const { studio, run, settle, turnAll } = setup();
+    turnAll(parseAlg("x2 R U'"));
+    await studio.autoSolve();
+    await settle();
+    run();
+    expect(studio.state.solver.status).toBe('done');
+    expect(studio.state.solved).toBe(true);
+    expect(studio.state.facelets.slice(0, 9)).toBe('DDDDDDDDD'); // yellow stays on top
   });
 });

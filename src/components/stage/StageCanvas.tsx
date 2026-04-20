@@ -4,12 +4,14 @@
  * requested only while something moves — to keep laptops and phones cool.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { ContactShadows, Environment, Lightformer, PerformanceMonitor } from '@react-three/drei';
+import { ContactShadows, PerformanceMonitor } from '@react-three/drei';
 import * as THREE from 'three';
 import { useServices, useStudio, useUi } from '../../app/context';
 import { markGestureHintSeen } from '../../app/uiStore';
 import { CubeModel } from '../cube/CubeModel';
+import { SPACING, STICKER_OFFSET, TILE_TOP } from '../cube/cubeResources';
 import type { RenderTier } from '../cube/cubeResources';
 import { HoverIndicator } from '../cube/HoverIndicator';
 import { HoverState } from '../cube/hoverState';
@@ -19,10 +21,17 @@ import { Interaction } from './Interaction';
 import type { PreviewSink } from './Interaction';
 import type { OrbitRig } from './orbitRig';
 import { Celebration } from './Celebration';
+import { installStudioEnvironment } from './studioEnvironment';
 
 const FOV = 27;
 /** Bounding-sphere radius of the cube (half its space diagonal, in world units). */
 const CUBE_RADIUS = 2.6;
+/** Half the cube's outer width, to the top of the tiles. */
+const CUBE_HALF = SPACING + STICKER_OFFSET + TILE_TOP;
+/** Resting height of the floor the shadow lies on. */
+const FLOOR_Y = -2.1;
+const FLOOR_CLEARANCE = 0.12;
+const rotation = new THREE.Matrix4();
 
 /**
  * Free stage area around the overlays, so the cube is framed in the space the
@@ -62,7 +71,37 @@ function framing(width: number, height: number, { transportOpen, zen }: FramingC
   return { distanceScale: distance, shiftY: (top - bottom) / 2 };
 }
 
-function CameraRig({ rig, reduced, transportOpen, zen }: { rig: OrbitRig; reduced: boolean; transportOpen: boolean; zen: boolean }) {
+/**
+ * Turns the cube to the rig's view and keeps the floor just under the turned
+ * cube's lowest point, so a corner-down cube never sinks into its shadow.
+ */
+function poseCube(rig: OrbitRig, cube: THREE.Object3D | null, floor: THREE.Object3D | null): void {
+  if (!cube) return;
+  rig.cubeQuaternion(cube.quaternion);
+  if (!floor) return;
+  // Lowest point: half-width times the summed |y| of the cube's rotated axes.
+  const e = rotation.makeRotationFromQuaternion(cube.quaternion).elements;
+  const reach = CUBE_HALF * (Math.abs(e[1]!) + Math.abs(e[5]!) + Math.abs(e[9]!));
+  floor.position.y = Math.min(0, -reach - FLOOR_CLEARANCE - FLOOR_Y);
+}
+
+interface CameraRigProps {
+  readonly rig: OrbitRig;
+  readonly reduced: boolean;
+  readonly transportOpen: boolean;
+  readonly zen: boolean;
+  /** The group that turns the cube (and its hover outline) to show the current view. */
+  readonly frame: RefObject<THREE.Group | null>;
+  /** The floor (shadow, celebration ripple), lowered when a tumbled cube reaches further down. */
+  readonly floor: RefObject<THREE.Group | null>;
+}
+
+/**
+ * Fixed studio camera, framed to the free stage area. The view turns the cube
+ * itself in front of the camera, so the studio lights keep coming from above
+ * and the shadow stays on the floor however the cube is held.
+ */
+function CameraRig({ rig, reduced, transportOpen, zen, frame, floor }: CameraRigProps) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const size = useThree((s) => s.size);
   const invalidate = useThree((s) => s.invalidate);
@@ -97,29 +136,42 @@ function CameraRig({ rig, reduced, transportOpen, zen }: { rig: OrbitRig; reduce
       camera.updateProjectionMatrix();
     }
     current.current = next;
-    const [x, y, z] = rig.position(next.distanceScale);
+    const [x, y, z] = rig.cameraPosition(next.distanceScale);
     camera.position.set(x, y, z);
     camera.up.set(0, 1, 0);
     camera.lookAt(0, 0, 0);
+    poseCube(rig, frame.current, floor.current);
     if (moving || framingMoving) invalidate();
   });
   return null;
 }
 
+/** Prefiltered studio reflections (see studioEnvironment.ts), rebuilt only when the tier changes. */
+function StudioEnvironment({ size, intensity }: { size: number; intensity: number }) {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    const restore = installStudioEnvironment(gl, scene, intensity, size);
+    invalidate();
+    return restore;
+  }, [gl, scene, size, intensity, invalidate]);
+  return null;
+}
+
 /**
- * Neutral product-photography lighting. All sources are white-balanced (no
- * coloured tints): a broad overhead softbox, a tall key strip front-left, a
- * narrow rim strip behind-right that draws the bevel highlights, and a low
- * front fill. A warm key light casts soft shadows on the high tier so turning
- * layers and seams shade each other.
+ * Product-photography lighting: image-based light from the studio environment
+ * (softboxes and strips in a dark cyclorama), plus a warm key light from the
+ * overhead box that casts soft shadows on the high tier, so turning layers and
+ * seams shade each other, and a whisper of sky fill for the shadow sides.
  */
 function Lighting({ high, shadows }: { high: boolean; shadows: boolean }) {
   return (
     <>
-      <hemisphereLight args={['#ffffff', '#18181a', 0.42]} />
+      <hemisphereLight args={['#ffffff', '#141416', 0.3]} />
       <directionalLight
         position={[-4.5, 8, 5.5]}
-        intensity={1.6}
+        intensity={1.35}
         color="#fff6ec"
         castShadow={shadows}
         shadow-mapSize={[2048, 2048]}
@@ -132,17 +184,8 @@ function Lighting({ high, shadows }: { high: boolean; shadows: boolean }) {
         shadow-camera-near={2}
         shadow-camera-far={22}
       />
-      <directionalLight position={[7, 2.5, 4]} intensity={0.95} color="#f1f4ff" />
-      <directionalLight position={[-1, 4, -8]} intensity={0.85} color="#ffffff" />
-      <Environment resolution={high ? 256 : 128} frames={1}>
-        <Lightformer form="rect" intensity={2.4} color="#ffffff" position={[0, 8, 2]} scale={[12, 5, 1]} target={[0, 0, 0]} />
-        <Lightformer form="rect" intensity={1.7} color="#fffaf3" position={[-7, 2.5, 5]} scale={[3, 9, 1]} target={[0, 0, 0]} />
-        <Lightformer form="rect" intensity={1.7} color="#ffffff" position={[7, 3, -4]} scale={[2.4, 9, 1]} target={[0, 0, 0]} />
-        <Lightformer form="rect" intensity={0.9} color="#fffaf2" position={[0.5, 1.5, 9]} scale={[6, 3, 1]} target={[0, 0, 0]} />
-        <Lightformer form="rect" intensity={0.55} color="#f4f6ff" position={[3, -1, 8]} scale={[8, 2, 1]} target={[0, 0, 0]} />
-        <Lightformer form="rect" intensity={1.1} color="#ffffff" position={[8, 1, 3]} scale={[2.5, 6, 1]} target={[0, 0, 0]} />
-        <Lightformer form="circle" intensity={0.3} color="#ffffff" position={[0, -7, 0]} scale={6} target={[0, 0, 0]} />
-      </Environment>
+      <directionalLight position={[6.5, 2.5, 4.5]} intensity={0.75} color="#f1f4ff" />
+      <StudioEnvironment size={high ? 256 : 128} intensity={1} />
     </>
   );
 }
@@ -169,18 +212,20 @@ function BlobShadow() {
   );
 }
 
-/** Read-only verification hooks: rendered facelets and world→screen projection. */
-function DebugBridge({ registry }: { registry: StickerRegistry }) {
+/** Read-only verification hooks: rendered facelets and cube→screen projection. */
+function DebugBridge({ registry, frame }: { registry: StickerRegistry; frame: RefObject<THREE.Group | null> }) {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
   useEffect(() => {
     const api = (window as unknown as { __CUBELAB__?: Record<string, unknown> }).__CUBELAB__;
     if (!api) return;
     const v = new THREE.Vector3();
-    api.visualFacelets = () => readVisualFacelets(registry.meshes);
+    api.visualFacelets = () => readVisualFacelets(registry.meshes, frame.current);
     api.project = (p: [number, number, number]) => {
       camera.updateMatrixWorld();
-      v.set(p[0], p[1], p[2]).project(camera);
+      v.set(p[0], p[1], p[2]);
+      if (frame.current) v.applyMatrix4(frame.current.matrixWorld);
+      v.project(camera);
       const r = gl.domElement.getBoundingClientRect();
       return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
     };
@@ -194,7 +239,7 @@ function DebugBridge({ registry }: { registry: StickerRegistry }) {
       delete api.project;
       delete api.renderInfo;
     };
-  }, [camera, gl, registry]);
+  }, [camera, gl, registry, frame]);
   return null;
 }
 
@@ -245,6 +290,8 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
 
   const onReady = useCallback(() => ui.setState({ renderer: 'ready' }), [ui]);
   const hover = useMemo(() => new HoverState(), []);
+  const frameRef = useRef<THREE.Group>(null);
+  const floorRef = useRef<THREE.Group>(null);
 
   return (
     <Canvas
@@ -265,18 +312,39 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
       aria-hidden
     >
       {settings.quality === 'auto' && <PerformanceMonitor onDecline={() => setAutoDegraded(true)} flipflops={2} />}
-      <CameraRig rig={rig} reduced={reduced} transportOpen={transportOpen} zen={zen} />
+      <CameraRig rig={rig} reduced={reduced} transportOpen={transportOpen} zen={zen} frame={frameRef} floor={floorRef} />
       <Lighting high={quality !== 'low'} shadows={quality === 'high'} />
-      <CubeModel engine={studio.engine} quality={quality} finish={settings.finish} faceLabels={settings.faceLabels} registry={registry} />
-      {quality === 'high' ? (
-        <ContactShadows position={[0, -2.1, 0]} scale={8.5} blur={2.4} far={3.4} opacity={0.82} resolution={512} color="#000000" />
-      ) : (
-        <BlobShadow />
-      )}
-      <Celebration reduced={reduced} zen={zen} />
-      <HoverIndicator hover={hover} engine={studio.engine} />
-      <Interaction studio={studio} rig={rig} touchMode={settings.touchMode} preview={preview} hover={hover} onFirstGesture={onFirstGesture} />
-      <DebugBridge registry={registry} />
+      <group ref={frameRef} name="cube-frame">
+        <CubeModel engine={studio.engine} quality={quality} finish={settings.finish} faceLabels={settings.faceLabels} registry={registry} />
+        <HoverIndicator hover={hover} engine={studio.engine} />
+      </group>
+      <group ref={floorRef} name="floor">
+        {/* Mounted once and switched off below the high tier: drei's ContactShadows never frees its
+            render targets or plane, so remounting it on every tier change would leak GPU memory. */}
+        <ContactShadows
+          visible={quality === 'high'}
+          frames={quality === 'high' ? Infinity : 0}
+          position={[0, FLOOR_Y, 0]}
+          scale={8.5}
+          blur={2.4}
+          far={3.4}
+          opacity={0.82}
+          resolution={512}
+          color="#000000"
+        />
+        {quality !== 'high' && <BlobShadow />}
+        <Celebration reduced={reduced} zen={zen} />
+      </group>
+      <Interaction
+        studio={studio}
+        rig={rig}
+        frame={frameRef}
+        touchMode={settings.touchMode}
+        preview={preview}
+        hover={hover}
+        onFirstGesture={onFirstGesture}
+      />
+      <DebugBridge registry={registry} frame={frameRef} />
       <ReadySignal onReady={onReady} />
     </Canvas>
   );

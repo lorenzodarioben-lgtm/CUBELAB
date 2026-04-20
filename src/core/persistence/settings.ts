@@ -9,7 +9,7 @@ export type Finish = 'gloss' | 'matte';
 export type MotionPreference = 'system' | 'reduce' | 'full';
 export type KeyMap = 'faces' | 'speed';
 export type TouchMode = 'twist' | 'orbit';
-export type PadLayers = 'faces' | 'slices';
+export type PadLayers = 'faces' | 'slices' | 'rotations';
 
 export interface Settings {
   readonly turnSpeed: TurnSpeed;
@@ -26,7 +26,7 @@ export interface Settings {
   readonly keyMap: KeyMap;
   readonly touchMode: TouchMode;
   readonly movePadOpen: boolean;
-  /** Which bank the Move Pad shows: the six faces or the three slices. */
+  /** Which bank the Move Pad shows: faces, slices or whole-cube rotations. */
   readonly padLayers: PadLayers;
 }
 
@@ -97,6 +97,6 @@ export function sanitizeSettings(raw: unknown): Settings {
     keyMap: pick(r.keyMap, ['faces', 'speed'], d.keyMap),
     touchMode: pick(r.touchMode, ['twist', 'orbit'], d.touchMode),
     movePadOpen: bool(r.movePadOpen, d.movePadOpen),
-    padLayers: pick(r.padLayers, ['faces', 'slices'], d.padLayers),
+    padLayers: pick(r.padLayers, ['faces', 'slices', 'rotations'], d.padLayers),
   };
 }

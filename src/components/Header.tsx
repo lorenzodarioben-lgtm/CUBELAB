@@ -65,7 +65,7 @@ export function Header() {
         <IconButton label="Settings" onClick={() => ui.setState({ settingsOpen: true })}>
           <Settings2 size={17} />
         </IconButton>
-        <IconButton label={zen ? 'Exit zen mode (Z)' : 'Zen mode (Z)'} active={zen} onClick={() => toggleZen(services)} className="topbar__zen">
+        <IconButton label={zen ? 'Exit zen mode (`)' : 'Zen mode (`)'} active={zen} onClick={() => toggleZen(services)} className="topbar__zen">
           {zen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
         </IconButton>
       </nav>

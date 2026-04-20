@@ -17,7 +17,7 @@ import { CubeEngine } from '../core/engine/cubeEngine';
 import type { CommitEvent, EngineEvent, MoveSource } from '../core/engine/cubeEngine';
 import { createSolvedState, isSolved, stateFacelets } from '../core/puzzle/cubeState';
 import type { CubeState } from '../core/puzzle/cubeState';
-import { formatAlg, invertMove, moveMetrics, parseAlg } from '../core/puzzle/notation';
+import { formatAlg, invertMove, isRotation, moveMetrics, parseAlg } from '../core/puzzle/notation';
 import type { Move } from '../core/puzzle/notation';
 import { generateScramble } from '../core/scramble/scrambler';
 import type { ScrambleSource } from '../core/scramble/scrambler';
@@ -256,8 +256,20 @@ export class Studio {
 
   // ── Manual input ───────────────────────────────────────────────────────
 
+  /**
+   * Whole-cube rotations are allowed whenever the cube is not being driven by a
+   * scramble or the solver — including spacebar inspection, as in WCA rules.
+   */
+  rotationPolicy(): { allowed: boolean; reason: string | null } {
+    const s = this.state;
+    if (s.scramble.status === 'generating' || s.scramble.status === 'applying') return { allowed: false, reason: 'Scrambling…' };
+    if (s.solver.status === 'solving') return { allowed: false, reason: 'Computing a solution…' };
+    if (s.solver.status === 'playing') return { allowed: false, reason: 'Pause or stop the solution to rotate the cube' };
+    return { allowed: true, reason: null };
+  }
+
   turn(move: Move): boolean {
-    const policy = this.manualTurnPolicy();
+    const policy = isRotation(move.family) ? this.rotationPolicy() : this.manualTurnPolicy();
     if (!policy.allowed) {
       this.hint(policy.reason ?? 'Turning is paused right now');
       return false;
@@ -700,12 +712,14 @@ export class Studio {
 
   #logUserMove(move: Move, source: MoveSource): void {
     const { moveLog, moveCount } = this.state;
+    // The count is STM, so rotations appear in the log but add nothing.
+    const stm = moveMetrics(move).stm;
     if (source === 'undo') {
-      this.#set({ moveLog: moveLog.slice(0, -1), moveCount: Math.max(0, moveCount - 1) });
+      this.#set({ moveLog: moveLog.slice(0, -1), moveCount: Math.max(0, moveCount - stm) });
       return;
     }
     const next = [...moveLog, move];
-    this.#set({ moveLog: next.length > MOVE_LOG_LIMIT ? next.slice(-MOVE_LOG_LIMIT) : next, moveCount: moveCount + 1 });
+    this.#set({ moveLog: next.length > MOVE_LOG_LIMIT ? next.slice(-MOVE_LOG_LIMIT) : next, moveCount: moveCount + stm });
   }
 
   #syncFlags(): void {

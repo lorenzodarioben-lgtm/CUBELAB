@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { COMMIT_ANGLE, intersectCube, previewLabel, resolveTwist, snapTwist, twistAngle } from '../../src/components/cube/gestures';
 import type { Project } from '../../src/components/cube/gestures';
+import * as THREE from 'three';
 import { HOME_POSE, OrbitRig } from '../../src/components/stage/orbitRig';
 import { formatMove } from '../../src/core/puzzle/notation';
 
@@ -78,19 +79,71 @@ describe('twist resolution', () => {
   });
 });
 
-describe('orbit rig', () => {
-  it('rotates and zooms only the camera pose, within bounds, and resets home', () => {
+describe('orbit rig (free trackball)', () => {
+  /** Screen x/y (NDC) of a cube-space point, as the stage renders it: fixed camera, turned cube. */
+  function screen(rig: OrbitRig, p: [number, number, number]): THREE.Vector2 {
+    const camera = new THREE.PerspectiveCamera(27, 1, 0.1, 100);
+    camera.position.set(...rig.cameraPosition(14));
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    const v = new THREE.Vector3(...p).applyQuaternion(rig.cubeQuaternion(new THREE.Quaternion())).project(camera);
+    return new THREE.Vector2(v.x, v.y);
+  }
+
+  it('starts at the home view with the cube square to the studio', () => {
+    const rig = new OrbitRig();
+    expect(rig.current.azimuth).toBeCloseTo(HOME_POSE.azimuth);
+    expect(rig.current.polar).toBeCloseTo(HOME_POSE.polar);
+    expect(rig.cubeQuaternion(new THREE.Quaternion()).angleTo(new THREE.Quaternion())).toBeCloseTo(0);
+    expect(rig.up()[1]).toBeGreaterThan(0.5);
+  });
+
+  it('tumbles past the poles: dragging far enough turns white to face the floor', () => {
+    const rig = new OrbitRig();
+    // ~π of rotation in one vertical drag (k = π / 800 × 1.15 per pixel).
+    rig.rotateBy(0, -700, 800);
+    rig.step(0, true);
+    expect(rig.up()[1]).toBeLessThan(-0.5); // U is now at the bottom of the screen
+    expect(screen(rig, [0, 1.5, 0]).y).toBeLessThan(screen(rig, [0, -1.5, 0]).y);
+    // Keep going: another half turn comes back upright.
+    rig.rotateBy(0, -700, 800);
+    rig.step(0, true);
+    expect(rig.up()[1]).toBeGreaterThan(0.5);
+  });
+
+  it('follows the pointer: a rightward drag carries the front of the cube to the right', () => {
+    const rig = new OrbitRig();
+    const before = screen(rig, [0, 0, 1.5]);
+    rig.rotateBy(60, 0, 800);
+    rig.step(0, true);
+    expect(screen(rig, [0, 0, 1.5]).x).toBeGreaterThan(before.x);
+    const top = screen(rig, [0, 1.5, 0]);
+    rig.rotateBy(0, 60, 800);
+    rig.step(0, true);
+    expect(screen(rig, [0, 1.5, 0]).y).toBeLessThan(top.y); // dragging down rolls the top toward the viewer
+  });
+
+  it('bounds zoom, eases to rest and resets home', () => {
     const rig = new OrbitRig();
     rig.rotateBy(400, 10_000, 800);
     rig.zoomBy(100);
-    expect(rig.target.polar).toBeLessThan(Math.PI);
-    expect(rig.target.polar).toBeGreaterThan(0);
     expect(rig.target.zoom).toBeLessThanOrEqual(1.65);
-    for (let i = 0; i < 200; i++) rig.step(1 / 60, false);
+    expect(rig.target.polar).toBeGreaterThanOrEqual(0);
+    expect(rig.target.polar).toBeLessThanOrEqual(Math.PI);
+    for (let i = 0; i < 400; i++) rig.step(1 / 60, false);
     expect(rig.isMoving()).toBe(false);
     rig.reset();
     rig.step(0, true);
     expect(rig.current.polar).toBeCloseTo(HOME_POSE.polar);
+    expect(rig.current.azimuth).toBeCloseTo(HOME_POSE.azimuth);
     expect(rig.current.zoom).toBe(1);
+    expect(rig.up()[1]).toBeGreaterThan(0.5);
+  });
+
+  it('keyboard nudges turn about the screen axes', () => {
+    const rig = new OrbitRig();
+    rig.nudge(0, Math.PI);
+    rig.step(0, true);
+    expect(rig.up()[1]).toBeLessThan(-0.5);
   });
 });

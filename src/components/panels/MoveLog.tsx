@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useStudio } from '../../app/context';
-import { formatMove, isSlice } from '../../core/puzzle/notation';
+import { formatMove, isRotation, isSlice } from '../../core/puzzle/notation';
 import { cx } from '../ui/cx';
 
 const VISIBLE = 24;
@@ -15,12 +15,12 @@ export function MoveLog() {
   const count = useStudio((s) => s.moveCount);
   const tapeRef = useRef<HTMLOListElement>(null);
   const recent = log.slice(-VISIBLE);
-  const offset = count - recent.length;
+  const offset = log.length - recent.length;
 
   useEffect(() => {
     const tape = tapeRef.current;
     if (tape) tape.scrollLeft = tape.scrollWidth;
-  }, [count]);
+  }, [log]);
 
   return (
     <section className="panel panel-moves" aria-labelledby="moves-title">
@@ -33,8 +33,8 @@ export function MoveLog() {
           <span className="moves__unit">STM</span>
         </span>
       </header>
-      {count === 0 ? (
-        <p className="panel__empty panel__empty--inline">Faces and slices you turn appear here.</p>
+      {log.length === 0 ? (
+        <p className="panel__empty panel__empty--inline">Faces, slices and rotations you make appear here.</p>
       ) : (
         <ol ref={tapeRef} className="moves" aria-label={`Last ${recent.length} turns`}>
           {offset > 0 && (
@@ -45,7 +45,12 @@ export function MoveLog() {
           {recent.map((move, i) => (
             <li
               key={offset + i}
-              className={cx('moves__item', i === recent.length - 1 && 'is-latest', isSlice(move.family) && 'is-slice')}
+              className={cx(
+                'moves__item',
+                i === recent.length - 1 && 'is-latest',
+                isSlice(move.family) && 'is-slice',
+                isRotation(move.family) && 'is-rotation',
+              )}
             >
               {formatMove(move)}
             </li>

@@ -15,7 +15,8 @@ export interface DebugApi {
   patternFacelets(): string;
   solved(): boolean;
   idle(): boolean;
-  camera(): { azimuth: number; polar: number; zoom: number };
+  /** The view relative to the cube; `up[1] < 0` means U is at the bottom of the screen. */
+  camera(): { azimuth: number; polar: number; zoom: number; up: [number, number, number] };
   timer(): { phase: string; mode: string; startedAt: number | null; turns: number };
   historyCount(): number;
   scramble(): string | null;
@@ -24,6 +25,7 @@ export interface DebugApi {
   moveLog(): string;
   /** Installed by the 3D stage once it is mounted. */
   visualFacelets?: () => string;
+  /** Screen position of a point given in cube coordinates (follows the view). */
   project?: (point: [number, number, number]) => { x: number; y: number };
   renderInfo?: () => { geometries: number; textures: number; programs: number };
 }
@@ -35,7 +37,7 @@ export function installDebugApi(studio: Studio, rig: OrbitRig): void {
     patternFacelets: () => patternFacelets(studio.engine.state.pattern),
     solved: () => isSolved(studio.engine.state),
     idle: () => !studio.engine.isBusy(),
-    camera: () => ({ ...rig.current }),
+    camera: () => ({ ...rig.current, up: rig.up() }),
     timer: () => {
       const t = studio.state.timer;
       return { phase: t.phase, mode: t.mode, startedAt: t.startedAt, turns: t.turnsSTM };

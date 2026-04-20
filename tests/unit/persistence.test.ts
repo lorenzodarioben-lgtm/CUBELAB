@@ -85,7 +85,7 @@ describe('history', () => {
     const store = createMemoryStore({
       [STORAGE_KEYS.history]: JSON.stringify({
         v: 1,
-        data: [record(), record(), { id: 'x', durationMs: -5 }, record({ id: 'c3', scramble: 'x y z' }), 'junk', record({ id: 'd4' })],
+        data: [record(), record(), { id: 'x', durationMs: -5 }, record({ id: 'c3', scramble: 'Rw r' }), 'junk', record({ id: 'd4' })],
       }),
     });
     const { records, dropped } = loadHistory(store);

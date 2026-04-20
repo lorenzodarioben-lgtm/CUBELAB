@@ -231,6 +231,9 @@ export function timerTransition(state: TimerState, event: TimerEvent): TimerOutp
 
     case 'manualTurn': {
       const m = event.metrics;
+      // Whole-cube rotations (0 in every metric) re-grip the cube: they never
+      // start the clock, never count, and cannot change whether it is solved.
+      if (m.stm === 0) return same(state);
       if (state.phase === 'running') {
         const next = {
           ...state,

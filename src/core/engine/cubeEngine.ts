@@ -58,7 +58,8 @@ export type EngineEvent = CommitEvent | ReplaceEvent | ActivityEvent;
 
 export interface VisualTurn {
   readonly axis: Axis;
-  readonly layer: Layer;
+  /** `null` while the whole cube rotates (x / y / z). */
+  readonly layer: Layer | null;
   /** Radians about the +axis (right-hand rule). */
   readonly angle: number;
   readonly cubies: readonly number[];
@@ -123,7 +124,7 @@ interface ActiveTurn {
   readonly source: MoveSource;
   readonly tag: string | undefined;
   readonly axis: Axis;
-  readonly layer: Layer;
+  readonly layer: Layer | null;
   readonly cubies: readonly number[];
   readonly from: number;
   readonly to: number;

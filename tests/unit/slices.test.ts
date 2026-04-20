@@ -23,7 +23,7 @@ import { centerFixSequence, solveState } from '../../src/core/solver/solver';
 import { createMemoryStore, loadCube, saveCube } from '../../src/core/persistence/storage';
 import { resolveTwist, snapTwist, twistAngle } from '../../src/components/cube/gestures';
 import type { Project } from '../../src/components/cube/gestures';
-import { HOME_POSE, OrbitRig } from '../../src/components/stage/orbitRig';
+import { HOME_POSE, OrbitRig, sphericalPosition } from '../../src/components/stage/orbitRig';
 import { fakeClock, seededRandom } from './helpers';
 
 let kpuzzle: KPuzzle;
@@ -260,14 +260,15 @@ describe('auto solve with slices (real cubing.js solver)', () => {
     }
   });
 
-  it('solves many seeded states containing M/E/S, with no history, ending in the canonical orientation', async () => {
+  it('solves many seeded states containing M/E/S, with no history', async () => {
     for (let seed = 500; seed < 530; seed++) {
       const rand = seededRandom(seed);
       const state = applyMoves(solved, randomAllMoves(rand, 4 + Math.floor(rand() * 50)));
       const solution = await solveState(state);
       const end = applyMoves(state, solution);
       expect(isSolved(end), `seed ${seed}: ${formatAlg(solution)}`).toBe(true);
-      expect(stateFacelets(end)).toBe(SOLVED_FACELETS); // white top, green front
+      expect(isFaceletStringSolved(stateFacelets(end))).toBe(true);
+      expect(solution.every((m) => moveMetrics(m).stm === 1)).toBe(true); // layer turns only, no rotations
     }
   });
 
@@ -275,8 +276,12 @@ describe('auto solve with slices (real cubing.js solver)', () => {
     for (const alg of ['M', "E'", 'S2', 'M E S', "R M U'"]) {
       const state = applyMoves(solved, parseAlg(alg));
       const solution = await solveState(state);
-      expect(stateFacelets(applyMoves(state, solution)), alg).toBe(SOLVED_FACELETS);
+      expect(isFaceletStringSolved(stateFacelets(applyMoves(state, solution))), alg).toBe(true);
     }
+    // A single slice is undone by its inverse, back to the canonical orientation.
+    const lone = await solveState(applyMoves(solved, parseAlg('M')));
+    expect(formatAlg(lone)).toBe("M'");
+    expect(stateFacelets(applyMoves(solved, parseAlg("M M'")))).toBe(SOLVED_FACELETS);
   });
 
   it('treats a rotated-but-solved cube as solved (nothing to do)', async () => {
@@ -285,11 +290,10 @@ describe('auto solve with slices (real cubing.js solver)', () => {
 });
 
 describe('slice gestures under real perspective cameras', () => {
-  /** Perspective projection of a 800×800 viewport for an orbit pose. */
+  /** Perspective projection of a 800×800 viewport for an upright camera pose. */
   function cameraProject(azimuth: number, polar: number): Project {
-    const rig = new OrbitRig();
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
-    const [x, y, z] = rig.position(12, { azimuth, polar, zoom: 1 });
+    const [x, y, z] = sphericalPosition(12, { azimuth, polar, zoom: 1 });
     camera.position.set(x, y, z);
     camera.lookAt(0, 0, 0);
     camera.updateMatrixWorld();
@@ -311,17 +315,52 @@ describe('slice gestures under real perspective cameras', () => {
     return snap ? formatAlg([snap.move]) : null;
   }
 
-  const poses = [
-    { name: 'home three-quarter view', azimuth: HOME_POSE.azimuth, polar: HOME_POSE.polar },
-    { name: 'orbited round to the back-left', azimuth: -2.4, polar: 1.15 },
-    { name: 'looking up from below', azimuth: 0.4, polar: 2.3 },
+  /** The stage's own projection for a trackball view: fixed studio camera, turned cube. */
+  function rigProject(rig: OrbitRig): { project: Project; camDir: THREE.Vector3 } {
+    rig.step(0, true);
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+    camera.position.set(...rig.cameraPosition(12));
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    const q = rig.cubeQuaternion(new THREE.Quaternion());
+    const v = new THREE.Vector3();
+    const project: Project = ([px, py, pz]) => {
+      v.set(px, py, pz).applyQuaternion(q).project(camera);
+      return { x: ((v.x + 1) / 2) * 800, y: ((1 - v.y) / 2) * 800 };
+    };
+    // Direction to the camera in cube coordinates.
+    const camDir = camera.position.clone().normalize().applyQuaternion(q.clone().invert());
+    return { project, camDir };
+  }
+
+  const tumbled = new OrbitRig();
+  tumbled.rotateBy(0, -700, 800); // rolled over: white faces the floor
+  const twisted = new OrbitRig();
+  twisted.rotateBy(-260, 0, 800);
+  twisted.rotateBy(0, 420, 800);
+  twisted.rotateBy(180, 0, 800); // an arbitrary tumble with roll
+
+  const poses: Array<{ name: string; view: () => { project: Project; camDir: THREE.Vector3 } }> = [
+    { name: 'home three-quarter view', view: () => upright(HOME_POSE.azimuth, HOME_POSE.polar) },
+    { name: 'orbited round to the back-left', view: () => upright(-2.4, 1.15) },
+    { name: 'looking up from below', view: () => upright(0.4, 2.3) },
+    { name: 'upside down (white facing the floor)', view: () => rigProject(tumbled) },
+    { name: 'tumbled with roll', view: () => rigProject(twisted) },
   ];
+
+  function upright(azimuth: number, polar: number) {
+    return { project: cameraProject(azimuth, polar), camDir: new THREE.Vector3(...sphericalPosition(1, { azimuth, polar, zoom: 1 })) };
+  }
+
+  it('the tumbled pose really is upside down', () => {
+    tumbled.step(0, true);
+    expect(tumbled.up()[1]).toBeLessThan(-0.5);
+  });
 
   for (const pose of poses) {
     describe(pose.name, () => {
       // Only faces that point toward the camera are dragged; the expected move is view-independent.
-      const project = cameraProject(pose.azimuth, pose.polar);
-      const camDir = new THREE.Vector3(...new OrbitRig().position(1, { azimuth: pose.azimuth, polar: pose.polar, zoom: 1 }));
+      const { project, camDir } = pose.view();
       const visible = (n: [number, number, number]) => camDir.dot(new THREE.Vector3(...n)) > 0.2;
       const cases: Array<{ normal: [number, number, number]; point: [number, number, number]; target: [number, number, number]; expected: string }> = [
         // Front face, middle column pushed up → stickers carried F→U: M' (M moves U→F).

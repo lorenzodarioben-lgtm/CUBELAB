@@ -22,7 +22,9 @@ export function HelpDialog() {
               <strong>S</strong>. The centre sticker belongs to both strips, so its drag direction decides.
             </li>
             <li>
-              <strong>Orbit</strong> — drag the empty background. Right-drag or Shift-drag orbits from anywhere, including over the cube.
+              <strong>Orbit</strong> — drag the empty background to turn the cube over in any direction, like rolling it in your hand: keep
+              dragging up or down and white ends up facing the floor. Right-drag or Shift-drag orbits from anywhere, including over the cube.{' '}
+              <Kbd>C</Kbd> brings the view home.
             </li>
             <li>
               <strong>Zoom</strong> — scroll, or pinch with two fingers (two fingers also orbit). On phones, the Twist / Orbit switch makes
@@ -39,10 +41,15 @@ export function HelpDialog() {
           </p>
           <p>
             <strong>M</strong> is the middle layer between L and R, turning like L. <strong>E</strong> sits between U and D and turns like D.{' '}
-            <strong>S</strong> sits between F and B and turns like F. Orbiting the camera never changes a letter: white is U, green is F.
+            <strong>S</strong> sits between F and B and turns like F.
+          </p>
+          <p>
+            <strong>x y z</strong> rotate the whole cube like R, U and F — a re-grip, not a turn. Letters always mean positions: after{' '}
+            <strong>x2</strong> yellow is on top and <strong>U</strong> turns it. Orbiting only changes your view, never a letter.
           </p>
           <p className="muted">
-            Turns count in STM (any layer, any angle = 1). History also records HTM (a slice = 2) and QTM (a double = 2 quarters).
+            Turns count in STM (any layer, any angle = 1). History also records HTM (a slice = 2) and QTM (a double = 2 quarters). Rotations
+            count 0, never start the clock, and are allowed during inspection.
           </p>
         </section>
 
@@ -103,6 +110,14 @@ export function HelpDialog() {
               )}
               <tr>
                 <td>
+                  <Kbd>X</Kbd> <Kbd>Y</Kbd> <Kbd>Z</Kbd>
+                </td>
+                <td>
+                  Rotate the whole cube · with <Kbd>Shift</Kbd> counter-clockwise
+                </td>
+              </tr>
+              <tr>
+                <td>
                   <Kbd>N</Kbd> · <Kbd>A</Kbd>
                 </td>
                 <td>New Scramble · Auto Solve</td>
@@ -129,11 +144,11 @@ export function HelpDialog() {
                 <td>
                   <Kbd>←</Kbd> <Kbd>→</Kbd> <Kbd>↑</Kbd> <Kbd>↓</Kbd> · <Kbd>C</Kbd>
                 </td>
-                <td>Orbit camera · reset camera</td>
+                <td>Turn the view (any direction) · reset the view</td>
               </tr>
               <tr>
                 <td>
-                  <Kbd>Z</Kbd> · <Kbd>?</Kbd> · <Kbd>Esc</Kbd>
+                  <Kbd>`</Kbd> · <Kbd>?</Kbd> · <Kbd>Esc</Kbd>
                 </td>
                 <td>Zen mode · this guide · close / cancel</td>
               </tr>
@@ -142,8 +157,9 @@ export function HelpDialog() {
         </section>
       </div>
       <p className="help-footnote muted">
-        Scrambles are random-state (uniformly random legal positions). Auto Solve reads whatever state the cube is in — slices included — returns
-        any displaced centres with the fewest slice turns, then solves the rest with a two-phase solver, verifying every solution before it plays.
+        Scrambles are random-state (uniformly random legal positions). Auto Solve reads whatever state the cube is in — slices and rotations
+        included. It weighs homing displaced centres with slice turns against solving in the orientation you are holding, plays the shorter, and
+        verifies every solution before it plays.
         Everything runs locally; nothing is sent anywhere.
       </p>
     </Dialog>

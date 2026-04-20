@@ -2,10 +2,15 @@
  * Shared, memoised geometry and materials for the cube — modelled on a modern
  * premium speedcube: molded black plastic pieces with softened edges, tight
  * seams, and slightly raised, bevelled colour tiles sitting inside the flat
- * area of each face. One body geometry, one tile geometry and one material per
- * colour are shared by every piece; everything is disposed on change/unmount.
+ * area of each face. One body geometry and one tile geometry are shared by
+ * every piece; everything is disposed on change/unmount.
  *
- * All textures are generated procedurally at runtime (no image assets).
+ * Realism comes from imperfection as much as from shading: the tiles carry a
+ * fine orange-peel surface under a smooth coat, and each colour has a few
+ * barely different moulding variants (tone and sheen), so a face reads as nine
+ * separate parts catching the light slightly differently rather than one
+ * perfect CG plane. All textures are generated procedurally and
+ * deterministically at runtime (no image assets).
  */
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
@@ -29,17 +34,18 @@ const TILE_BEVEL = 0.009;
 export const STICKER_OFFSET = BODY_SIZE / 2 - 0.0025;
 /** Height of the tile's top surface above its base plane (bevel on both faces). */
 export const TILE_TOP = TILE_DEPTH + 2 * TILE_BEVEL;
+/** Moulding variants per colour; each tile picks one deterministically. */
+export const TILE_VARIANTS = 4;
 
 export interface CubeResources {
   readonly body: THREE.BufferGeometry;
   readonly sticker: THREE.BufferGeometry;
   readonly label: THREE.BufferGeometry;
   readonly core: THREE.BufferGeometry;
-  readonly mark: THREE.BufferGeometry;
   readonly bodyMaterial: THREE.Material;
   readonly coreMaterial: THREE.Material;
-  readonly markMaterial: THREE.Material;
-  readonly stickerMaterials: Readonly<Record<Face, THREE.Material>>;
+  /** `TILE_VARIANTS` materials per colour. */
+  readonly stickerMaterials: Readonly<Record<Face, readonly THREE.Material[]>>;
   readonly labelMaterials: Readonly<Record<Face, THREE.Material>>;
   readonly shadows: boolean;
   dispose(): void;
@@ -60,41 +66,86 @@ function roundedSquare(size: number, radius: number): THREE.Shape {
   return shape;
 }
 
-/** Deterministic value noise so the plastic's micro-roughness is identical on every load. */
-function noiseTexture(size: number, base: number, amplitude: number, seed: number): THREE.DataTexture {
-  const data = new Uint8Array(size * size * 4);
-  let s = seed >>> 0;
-  const rand = () => {
+/** Small deterministic PRNG (LCG) so every load renders the identical cube. */
+export function seededRandom(seed: number): () => number {
+  let s = seed >>> 0 || 1;
+  return () => {
     s = (s * 1664525 + 1013904223) >>> 0;
     return s / 4294967296;
   };
-  // Two octaves of smoothed noise: a soft mottling plus very fine grain.
-  const coarse = Array.from({ length: 17 * 17 }, rand);
-  const lerp = (a: number, b: number, t: number) => a + (b - a) * (t * t * (3 - 2 * t));
+}
+
+/**
+ * Tileable value noise in [0, 1]: a soft mottling (`cells` per side) plus a
+ * very fine grain. Wraps seamlessly, so it can repeat across a surface.
+ */
+function noiseField(size: number, cells: number, grain: number, seed: number): Float32Array {
+  const rand = seededRandom(seed);
+  const lattice = Array.from({ length: cells * cells }, rand);
+  const at = (i: number, j: number) => lattice[(((j % cells) + cells) % cells) * cells + (((i % cells) + cells) % cells)]!;
+  const smooth = (t: number) => t * t * (3 - 2 * t);
+  const out = new Float32Array(size * size);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const gx = (x / size) * 16;
-      const gy = (y / size) * 16;
+      const gx = (x / size) * cells;
+      const gy = (y / size) * cells;
       const ix = Math.floor(gx);
       const iy = Math.floor(gy);
-      const c = (i: number, j: number) => coarse[(j % 17) * 17 + (i % 17)]!;
-      const smooth = lerp(lerp(c(ix, iy), c(ix + 1, iy), gx - ix), lerp(c(ix, iy + 1), c(ix + 1, iy + 1), gx - ix), gy - iy);
-      const v = base + amplitude * ((smooth - 0.5) * 0.6 + (rand() - 0.5) * 0.4);
-      const byte = Math.max(0, Math.min(255, Math.round(v * 255)));
-      const i = (y * size + x) * 4;
-      data[i] = byte;
-      data[i + 1] = byte;
-      data[i + 2] = byte;
-      data[i + 3] = 255;
+      const tx = smooth(gx - ix);
+      const ty = smooth(gy - iy);
+      const top = at(ix, iy) + (at(ix + 1, iy) - at(ix, iy)) * tx;
+      const bottom = at(ix, iy + 1) + (at(ix + 1, iy + 1) - at(ix, iy + 1)) * tx;
+      out[y * size + x] = (top + (bottom - top) * ty) * (1 - grain) + rand() * grain;
     }
   }
+  return out;
+}
+
+function dataTexture(data: Uint8Array, size: number, colorSpace: THREE.ColorSpace = THREE.NoColorSpace): THREE.DataTexture {
   const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.magFilter = THREE.LinearFilter;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.generateMipmaps = true;
+  texture.anisotropy = 4;
+  texture.colorSpace = colorSpace;
   texture.needsUpdate = true;
   return texture;
+}
+
+/** Greyscale roughness map: `base` ± `amplitude` of mottled noise. */
+function roughnessTexture(size: number, base: number, amplitude: number, seed: number): THREE.DataTexture {
+  const field = noiseField(size, 16, 0.4, seed);
+  const data = new Uint8Array(size * size * 4);
+  for (let i = 0; i < field.length; i++) {
+    const byte = Math.max(0, Math.min(255, Math.round((base + amplitude * (field[i]! - 0.5)) * 255)));
+    data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = byte;
+    data[i * 4 + 3] = 255;
+  }
+  return dataTexture(data, size);
+}
+
+/**
+ * Tangent-space normal map of a moulded surface: shallow, irregular "orange
+ * peel" bumps with a fine grain, derived from a tileable height field.
+ */
+function orangePeelTexture(size: number, cells: number, seed: number): THREE.DataTexture {
+  const h = noiseField(size, cells, 0.35, seed);
+  const data = new Uint8Array(size * size * 4);
+  const at = (x: number, y: number) => h[((y + size) % size) * size + ((x + size) % size)]!;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = at(x + 1, y) - at(x - 1, y);
+      const dy = at(x, y + 1) - at(x, y - 1);
+      const n = new THREE.Vector3(-dx * 2.2, -dy * 2.2, 1).normalize();
+      const i = (y * size + x) * 4;
+      data[i] = Math.round((n.x * 0.5 + 0.5) * 255);
+      data[i + 1] = Math.round((n.y * 0.5 + 0.5) * 255);
+      data[i + 2] = Math.round((n.z * 0.5 + 0.5) * 255);
+      data[i + 3] = 255;
+    }
+  }
+  return dataTexture(data, size);
 }
 
 const LABEL_INK: Readonly<Record<Face, string>> = {
@@ -106,51 +157,23 @@ const LABEL_INK: Readonly<Record<Face, string>> = {
   L: 'rgba(40,16,0,0.62)',
 };
 
-function canvasTexture(draw: (ctx: CanvasRenderingContext2D, size: number) => void, size = 128): THREE.CanvasTexture {
+function labelTexture(face: Face): THREE.Texture {
+  const size = 128;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
-  if (ctx) draw(ctx, size);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  return texture;
-}
-
-function labelTexture(face: Face): THREE.Texture {
-  return canvasTexture((ctx, size) => {
+  if (ctx) {
     ctx.fillStyle = LABEL_INK[face];
     ctx.font = `600 ${size * 0.6}px "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(face, size / 2, size * 0.55);
-  });
-}
-
-/** The CUBELAB mark, pad-printed in a pale grey on the white centre cap. */
-function markTexture(): THREE.Texture {
-  return canvasTexture((ctx, size) => {
-    const k = size / 64;
-    ctx.scale(k, k);
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 2.4;
-    ctx.strokeStyle = 'rgba(70, 70, 76, 0.34)';
-    ctx.beginPath();
-    ctx.moveTo(32, 9);
-    ctx.lineTo(52, 20.5);
-    ctx.lineTo(52, 43.5);
-    ctx.lineTo(32, 55);
-    ctx.lineTo(12, 43.5);
-    ctx.lineTo(12, 20.5);
-    ctx.closePath();
-    ctx.moveTo(12, 20.5);
-    ctx.lineTo(32, 32);
-    ctx.lineTo(52, 20.5);
-    ctx.moveTo(32, 32);
-    ctx.lineTo(32, 55);
-    ctx.stroke();
-  }, 256);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
 }
 
 /**
@@ -181,52 +204,79 @@ export function createCubeResources(tier: RenderTier, finish: Finish): CubeResou
   sticker.computeVertexNormals();
 
   const label = new THREE.PlaneGeometry(0.46, 0.46);
-  const mark = new THREE.PlaneGeometry(0.42, 0.42);
   const core = new THREE.SphereGeometry(0.62, high ? 32 : 16, high ? 24 : 12);
 
   const Material = high ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
   const textures: THREE.Texture[] = [];
+  const track = <T extends THREE.Texture>(t: T): T => {
+    textures.push(t);
+    return t;
+  };
 
-  // Molded plastic: dark, slightly satin, with a faint mottled micro-roughness.
-  const roughnessMap = noiseTexture(high ? 256 : 128, gloss ? 0.56 : 0.8, 0.2, 7);
-  textures.push(roughnessMap);
+  // Molded black plastic: a fine frosted grain (normal map), mottled sheen
+  // (roughness map) and a thin coat, so the rounded edges carry soft studio
+  // reflections instead of reading as flat black.
+  const bodyRoughness = track(roughnessTexture(high ? 256 : 128, gloss ? 0.36 : 0.6, 0.16, 7));
+  const bodyNormal = high ? track(orangePeelTexture(256, 32, 11)) : null;
+  if (bodyNormal) bodyNormal.repeat.set(3, 3);
   const bodyMaterial = new Material({
-    color: '#0b0b0d',
+    color: '#0c0c0e',
     roughness: 1,
-    roughnessMap,
+    roughnessMap: bodyRoughness,
     metalness: 0,
+    ...(bodyNormal ? { normalMap: bodyNormal, normalScale: new THREE.Vector2(0.06, 0.06) } : {}),
     ...(high
       ? {
-          clearcoat: gloss ? 0.32 : 0.06,
-          clearcoatRoughness: gloss ? 0.42 : 0.7,
-          specularIntensity: 0.55,
+          clearcoat: gloss ? 0.42 : 0.12,
+          clearcoatRoughness: gloss ? 0.32 : 0.6,
+          specularIntensity: 0.7,
           ior: 1.49,
         }
       : {}),
   });
 
-  const coreMaterial = new THREE.MeshStandardMaterial({ color: '#060607', roughness: 0.9, metalness: 0 });
+  const coreMaterial = new THREE.MeshStandardMaterial({ color: '#050506', roughness: 0.9, metalness: 0 });
 
-  const stickerMaterials = {} as Record<Face, THREE.Material>;
+  // Tiles: an injection-moulded colour part with an orange-peel surface under
+  // a smooth coat (gloss) or a satin texture (matte). Tile UVs are the shape's
+  // own coordinates (about −0.4…0.4), so a repeat of 1.6 spans ~1.3 tiles.
+  const tileNormal = high ? track(orangePeelTexture(256, 32, 23)) : null;
+  if (tileNormal) tileNormal.repeat.set(3.5, 3.5);
+  const tileRoughness = track(roughnessTexture(high ? 256 : 128, 0.5, 0.16, 31));
+  tileRoughness.repeat.set(1.25, 1.25);
+
+  const rand = seededRandom(97);
+  const stickerMaterials = {} as Record<Face, THREE.Material[]>;
   const labelMaterials = {} as Record<Face, THREE.Material>;
+  const tint = new THREE.Color();
   for (const face of FACES) {
-    stickerMaterials[face] = new Material({
-      color: FACE_COLORS[face].hex,
-      roughness: gloss ? 0.26 : 0.56,
-      metalness: 0,
-      ...(high
-        ? {
-            clearcoat: gloss ? 0.75 : 0.08,
-            clearcoatRoughness: gloss ? 0.14 : 0.5,
-            specularIntensity: 0.6,
-            ior: 1.5,
-          }
-        : {}),
-    });
-    const texture = labelTexture(face);
-    textures.push(texture);
+    const variants: THREE.Material[] = [];
+    for (let v = 0; v < TILE_VARIANTS; v++) {
+      // Tiny, deterministic batch-to-batch differences in tone and sheen.
+      tint.set(FACE_COLORS[face].hex).offsetHSL((rand() - 0.5) * 0.008, (rand() - 0.5) * 0.04, (rand() - 0.5) * 0.024);
+      const sheen = (rand() - 0.5) * 0.08;
+      variants.push(
+        new Material({
+          color: tint.clone(),
+          // The roughness map is centred on 0.5, so this scales it around the finish's target.
+          roughness: (gloss ? 0.5 : 1.08) + sheen,
+          roughnessMap: tileRoughness,
+          metalness: 0,
+          ...(tileNormal ? { normalMap: tileNormal, normalScale: new THREE.Vector2(gloss ? 0.035 : 0.06, gloss ? 0.035 : 0.06) } : {}),
+          ...(high
+            ? {
+                clearcoat: gloss ? 0.85 : 0.1,
+                clearcoatRoughness: gloss ? 0.09 + sheen * 0.3 : 0.45,
+                specularIntensity: 0.65,
+                ior: 1.5,
+              }
+            : {}),
+        }),
+      );
+    }
+    stickerMaterials[face] = variants;
     labelMaterials[face] = new THREE.MeshBasicMaterial({
-      map: texture,
+      map: track(labelTexture(face)),
       transparent: true,
       depthWrite: false,
       toneMapped: false,
@@ -235,26 +285,13 @@ export function createCubeResources(tier: RenderTier, finish: Finish): CubeResou
     });
   }
 
-  const markMap = markTexture();
-  textures.push(markMap);
-  const markMaterial = new THREE.MeshStandardMaterial({
-    map: markMap,
-    transparent: true,
-    depthWrite: false,
-    roughness: 0.5,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-  });
-
   return {
     body,
     sticker,
     label,
     core,
-    mark,
     bodyMaterial,
     coreMaterial,
-    markMaterial,
     stickerMaterials,
     labelMaterials,
     shadows: tier === 'high',
@@ -263,12 +300,10 @@ export function createCubeResources(tier: RenderTier, finish: Finish): CubeResou
       sticker.dispose();
       label.dispose();
       core.dispose();
-      mark.dispose();
       bodyMaterial.dispose();
       coreMaterial.dispose();
-      markMaterial.dispose();
       for (const face of FACES) {
-        stickerMaterials[face].dispose();
+        stickerMaterials[face].forEach((m) => m.dispose());
         labelMaterials[face].dispose();
       }
       textures.forEach((t) => t.dispose());

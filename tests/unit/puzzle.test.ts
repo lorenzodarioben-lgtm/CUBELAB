@@ -84,11 +84,14 @@ describe('notation', () => {
     expect(countQTM(parseAlg("R U2 F'"))).toBe(4);
   });
 
-  it('rejects rotations, wide moves and no-ops (slices are accepted)', () => {
+  it('accepts slices and whole-cube rotations; rejects wide moves and no-ops', () => {
     expect(parseMove("M'")).toEqual(mv('M', 3));
     expect(parseMove('E2')).toEqual(mv('E', 2));
     expect(parseMove('S')).toEqual(mv('S', 1));
-    for (const bad of ['x', 'y', 'Rw', 'r', 'R4', '(R', 'Q', "R''", 'M4']) {
+    expect(parseMove("x'")).toEqual(mv('x', 3));
+    expect(parseMove('y2')).toEqual(mv('y', 2));
+    expect(parseMove('z')).toEqual(mv('z', 1));
+    for (const bad of ['X', 'Rw', 'r', 'u', 'R4', '(R', 'Q', "R''", 'M4', 'x4']) {
       expect(() => parseMove(bad)).toThrow(NotationError);
     }
   });

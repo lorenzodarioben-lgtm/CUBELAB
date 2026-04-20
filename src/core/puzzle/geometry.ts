@@ -16,7 +16,8 @@
  * L/D/B (outward normal = −axis).
  *
  * Slices live at layer 0 and borrow the direction of their reference face:
- * M turns like L (+), E like D (+), S like F (−).
+ * M turns like L (+), E like D (+), S like F (−). Whole-cube rotations turn
+ * every layer: x like R, y like U, z like F (all −).
  */
 import type { Face, Move, MoveFamily } from './notation';
 
@@ -28,8 +29,8 @@ export type Mat3 = readonly [number, number, number, number, number, number, num
 
 export const IDENTITY: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
-/** Rotation axis and lattice layer turned by each move family. */
-export const MOVE_AXIS: Readonly<Record<MoveFamily, { axis: Axis; layer: Layer }>> = {
+/** Rotation axis and lattice layer turned by each move family (`null` = the whole cube). */
+export const MOVE_AXIS: Readonly<Record<MoveFamily, { axis: Axis; layer: Layer | null }>> = {
   R: { axis: 0, layer: 1 },
   M: { axis: 0, layer: 0 },
   L: { axis: 0, layer: -1 },
@@ -39,6 +40,9 @@ export const MOVE_AXIS: Readonly<Record<MoveFamily, { axis: Axis; layer: Layer }
   F: { axis: 2, layer: 1 },
   S: { axis: 2, layer: 0 },
   B: { axis: 2, layer: -1 },
+  x: { axis: 0, layer: null },
+  y: { axis: 1, layer: null },
+  z: { axis: 2, layer: null },
 };
 
 /**
@@ -56,6 +60,9 @@ const CLOCKWISE_SIGN: Readonly<Record<MoveFamily, -1 | 1>> = {
   M: 1,
   E: 1,
   S: -1,
+  x: -1,
+  y: -1,
+  z: -1,
 };
 
 export const FACE_NORMAL: Readonly<Record<Face, Vec3>> = {

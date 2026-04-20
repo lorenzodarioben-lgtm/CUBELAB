@@ -112,7 +112,7 @@ export function useKeyboard(services: AppServices): void {
         case 'KeyC':
           rig.reset();
           break;
-        case 'KeyZ':
+        case 'Backquote':
           toggleZen(services);
           break;
         default:
