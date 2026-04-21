@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { FACE_COLORS } from '../../src/core/puzzle/colors';
 import { SOLVED, debug, trackErrors } from './helpers';
+
+/** `#rrggbb` → the `rgb(r, g, b)` form computed styles report. */
+const rgb = (hex: string) => `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
 
 // Launch Chromium with every 3D API disabled.
 test.use({ launchOptions: { args: ['--disable-3d-apis', '--disable-webgl'] } });
@@ -17,7 +21,7 @@ test.describe('without WebGL', () => {
     await page.waitForFunction(() => window.__CUBELAB__.idle() && window.__CUBELAB__.version() === 1);
     expect(await debug.facelets(page)).toBe('UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB');
     // The net mirrors the model sticker for sticker (U face right column turned green).
-    await expect(page.locator('.face-net__face').first().locator('.face-net__sticker').nth(2)).toHaveCSS('background-color', 'rgb(15, 169, 88)');
+    await expect(page.locator('.face-net__face').first().locator('.face-net__sticker').nth(2)).toHaveCSS('background-color', rgb(FACE_COLORS.F.hex));
 
     await page.getByRole('button', { name: /New Scramble/ }).click();
     await page.waitForFunction(() => window.__CUBELAB__.timer().phase === 'ready', null, { timeout: 30_000 });

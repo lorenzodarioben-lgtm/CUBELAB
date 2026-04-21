@@ -11,12 +11,13 @@ export interface FaceColor {
 }
 
 export const FACE_COLORS: Readonly<Record<Face, FaceColor>> = {
-  U: { name: 'white', hex: '#f3f3ef' },
-  D: { name: 'yellow', hex: '#ffd31a' },
-  F: { name: 'green', hex: '#0fa958' },
-  B: { name: 'blue', hex: '#1d5ad6' },
-  R: { name: 'red', hex: '#d42a36' },
-  L: { name: 'orange', hex: '#ff6a17' },
+  // Bright stickerless plastics: vivid but not neon, white neutral rather than grey.
+  U: { name: 'white', hex: '#f5f5f1' },
+  D: { name: 'yellow', hex: '#ffdc1c' },
+  F: { name: 'green', hex: '#0fae4f' },
+  B: { name: 'blue', hex: '#1f62e4' },
+  R: { name: 'red', hex: '#ec1e2e' },
+  L: { name: 'orange', hex: '#ff7816' },
 };
 
 export const OPPOSITE_FACE: Readonly<Record<Face, Face>> = {

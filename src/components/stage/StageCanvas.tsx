@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { useServices, useStudio, useUi } from '../../app/context';
 import { markGestureHintSeen } from '../../app/uiStore';
 import { CubeModel } from '../cube/CubeModel';
-import { SPACING, STICKER_OFFSET, TILE_TOP } from '../cube/cubeResources';
+import { SPACING, SURFACE_OFFSET } from '../cube/cubeResources';
 import type { RenderTier } from '../cube/cubeResources';
 import { HoverIndicator } from '../cube/HoverIndicator';
 import { HoverState } from '../cube/hoverState';
@@ -27,7 +27,7 @@ const FOV = 27;
 /** Bounding-sphere radius of the cube (half its space diagonal, in world units). */
 const CUBE_RADIUS = 2.6;
 /** Half the cube's outer width, to the top of the tiles. */
-const CUBE_HALF = SPACING + STICKER_OFFSET + TILE_TOP;
+const CUBE_HALF = SPACING + SURFACE_OFFSET;
 /** Resting height of the floor the shadow lies on. */
 const FLOOR_Y = -2.1;
 const FLOOR_CLEARANCE = 0.12;
@@ -168,7 +168,7 @@ function StudioEnvironment({ size, intensity }: { size: number; intensity: numbe
 function Lighting({ high, shadows }: { high: boolean; shadows: boolean }) {
   return (
     <>
-      <hemisphereLight args={['#ffffff', '#141416', 0.3]} />
+      <hemisphereLight args={['#ffffff', '#1a1a1d', 0.38]} />
       <directionalLight
         position={[-4.5, 8, 5.5]}
         intensity={1.35}
@@ -184,7 +184,7 @@ function Lighting({ high, shadows }: { high: boolean; shadows: boolean }) {
         shadow-camera-near={2}
         shadow-camera-far={22}
       />
-      <directionalLight position={[6.5, 2.5, 4.5]} intensity={0.75} color="#f1f4ff" />
+      <directionalLight position={[6.5, 2.5, 4.5]} intensity={1.05} color="#f4f6ff" />
       <StudioEnvironment size={high ? 256 : 128} intensity={1} />
     </>
   );

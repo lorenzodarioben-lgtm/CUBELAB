@@ -49,6 +49,7 @@ const SCRAMBLE = "R U F' L2 D B2 R' U2 F L' D2 B'";
 {
   const { context, page } = await open({ width: 1440, height: 900 }, { settings: { scrambleStyle: 'instant' } });
   await shot(page, 'desktop-1440-solved');
+  await shot(page, 'cube-solved', { x: 400, y: 120, width: 640, height: 660 });
   await page.goto(BASE + '?scramble=' + encodeURIComponent(SCRAMBLE));
   await ready(page);
   await page.waitForTimeout(600);
@@ -58,8 +59,9 @@ const SCRAMBLE = "R U F' L2 D B2 R' U2 F L' D2 B'";
   await page.waitForTimeout(1200);
   await shot(page, 'desktop-1440-timing-with-slices');
 
-  // Mid-turn slice captures, held by a real mouse drag.
+  // Mid-turn captures (a face, then each slice), held by a real mouse drag.
   for (const [name, from, to] of [
+    ['R', [1, 0, 1.5], [1, 1.4, 1.5]],
     ['M', [0, 0, 1.5], [0, 1.4, 1.5]],
     ['E', [0, 0, 1.5], [1.4, 0, 1.5]],
     ['S', [0, 1.5, 0], [1.4, 1.5, 0]],

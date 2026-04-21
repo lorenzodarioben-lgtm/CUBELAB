@@ -1,19 +1,84 @@
 # CUBELAB — Handoff
 
-Status (2026-10-12): third pass complete — **free-tumbling view** (white can face the floor),
-**whole-cube rotations `x y z`** as real moves, **no logo**, and a **realism pass** on materials and
-lighting — on top of the second pass (M / E / S slices end to end, premium visual overhaul). This
-document is deliberately candid about what was and was not verified.
+Status (2026-10-12): fourth pass complete — the cube is now a **stickerless GAN-style speedcube**
+(moulded pieces with the characteristic rounded cuts, coloured plastic caps over black mechanism,
+glossy UV-coat materials). Earlier passes: free-tumbling view and `x y z` rotations (third), M / E / S
+slices and the premium redesign (second). This document is deliberately candid about what was and was
+not verified.
 
 ## Repository state
 
 - The folder had no Git repository; one was initialised for this pass.
   - `main` — `53229f6` *Baseline: CUBELAB v1* (the delivered v1, untouched).
   - `premium-slices-upgrade` (checked out) — second pass in three commits (slices, visual overhaul,
-    hardening + docs) plus the third pass on top. Nothing is pushed anywhere; merge when happy
+    hardening + docs) plus the third and fourth passes on top. Nothing is pushed anywhere; merge when happy
     (`git checkout main && git merge premium-slices-upgrade`).
 - `.gitattributes` normalises line endings to LF.
 - Screenshots: `artifacts/before/` (v1) and `artifacts/after/` (this pass).
+
+## Fourth pass — stickerless GAN-style cube
+
+Brief: make the 3D cube read as a premium stickerless GAN-style speedcube, using four supplied product
+photos as the reference (where the written brief and the photos differed, the photos won: flatter
+faces and crisper edges than "softly inflated"). No branding copied; nothing else in the app changed
+behaviour.
+
+**Geometry** (`src/components/cube/pieceGeometry.ts`, new). The old model was a rounded box per
+cubie with flat raised tiles on top. Pieces are now solid moulded parts defined by signed distance
+fields and meshed once per tier:
+- Each visible face is a *rounded extrusion* of that face's 2D outline; the piece is the intersection
+  of its faces' extrusions, plain planes on hidden sides, and one rounded box over the whole cube.
+- Outline corners that point at the face centre get the large GAN cut (radius 0.37 of a 1.0 cell):
+  the centre is a rounded "coin", edges have two cuts, corners one, so a small four-pointed black
+  opening shows the mechanism at every diagonal, as in the photos.
+- Seam rims have a tight 0.03 fillet (seams read as thin dark grooves); the cube's own edges and
+  corners are rounded 0.075 as a whole (soft silhouette, spherical corners); faces are pillowed by
+  0.0045 toward their middle; seams are 0.014.
+- Meshing: a grid on a slightly larger box (sin-spaced, dense at the box edges where the fillets are)
+  is projected radially onto the surface (the solid is star-shaped about the piece centre) with an
+  Illinois root finder; normals come from the SDF gradient, so shading is smooth at any tessellation.
+  Three canonical shapes (corner, edge, centre) are built per tier — 40 / 30 / 24 grid cells per box
+  face (19.2k / 10.8k / 6.9k triangles per piece) — about 80 ms for all three at the high tier — and
+  each cubie shows its kind turned to its home pose (`PIECE_FRAMES` in `cubeResources.ts`).
+
+**Materials** (`src/components/cube/pieceMaterial.ts`, new). Colour is the plastic, so it is decided
+per fragment, not baked into a mesh or sticker: each visible face has a coloured cap 0.13 deep and
+everything deeper is black mechanism plastic; where two caps meet on a cube edge the one the point is
+further into wins, so colours meet on the edge's 45° line like two-shot moulding. Boundaries are
+anti-aliased with screen-space derivatives. On top of `MeshPhysicalMaterial`: glossy UV-coat
+(roughness 0.2, clear coat 0.6 at 0.1) or satin matte; black internals satin (0.34) with a thinner
+coat; a faint low-frequency roughness drift; a *cavity* term (light falls off with depth below the
+nearest visible face, reflections less than diffuse) so the diagonal openings and the insides exposed
+mid-turn read as deep mechanism rather than lit grey or a flat void; and a *seam* term (surfaces
+facing into a neighbouring piece's cell are shaded by it) so seams stay dark and never sparkle, even on
+tiers without shadow maps. Palette retuned to bright stickerless plastics (`colors.ts`; the Move Pad
+swatches and 2D fallback follow). Per-tile tilt/variants from the third pass are gone (a moulded
+stickerless part has no separate tiles).
+
+**Lighting** (`studioEnvironment.ts`, `StageCanvas.tsx`). Same studio, rebalanced for brighter
+plastics: a larger, brighter right-side strip and stronger right fill and sky fill, so shadow-side
+orange stays orange and white stays neutral; the two bounce cards that the front and right faces
+mirror are larger and brighter, so big faces carry a soft gradient reflection instead of flat colour.
+
+**Other**: facelet read-back now uses invisible per-facelet anchors riding on the cubie groups (same
+verification strength as before); face letters sit on the anchors; the hover outline traces the
+hovered piece's real outline (round on centres). Medium/low tiers keep the same look minus shadow maps.
+
+**Screenshots to inspect** (`artifacts/after/`): `cube-solved.png` (solved, home view),
+`cube-macro.png` (close-up: miters, seams, openings), `cube-midturn-R.png` (face move part-way),
+`cube-midturn-M.png` / `-E` / `-S` (slices part-way), `cube-white-down.png` (tumbled, white to the
+floor), plus `desktop-1440-*.png` and `mobile-*.png` for the page.
+
+**Look-dev log**: iterated on real GPU captures. First pass was too soft and inflated (fillet 0.055,
+pillow 0.009) and the diagonal openings showed lit coloured walls → crisper seams, separate cube-edge
+rounding, flatter faces, thinner caps, stronger cavity. Shadow-side orange went brown and white grey →
+more right fill. Medium/low tiers showed specular sparkles in the seams (no shadow maps) → the seam
+term.
+
+**Remaining limitations of the look**: the black mechanism is plain (no modelled internals or the
+honeycomb texture some GAN cubes show), so very deep looks mid-turn read as smooth black; the cap/body
+split is a shading boundary on a single solid, not a separate modelled cap; on the medium tier a
+hairline glint can survive at the diagonal openings at phone pixel densities.
 
 ## Third pass — free view, x/y/z rotations, realism, no logo
 
@@ -86,21 +151,22 @@ shorter; tests assert "solved in some orientation" there.
 
 ## Verification after changes
 
-Windows 11, Node 22.19.0, run in this directory on the final tree of the third pass
-(`npm run test:all`, 13 min end to end):
+Windows 11, Node 22.19.0, run in this directory on the final tree of the fourth pass:
 
 | Command | Result |
 | --- | --- |
 | `npm run typecheck` | pass, 0 errors |
 | `npm run lint` | pass, 0 errors, 0 warnings |
-| `npm test` | **223 / 223** passed, 10 files (real cubing.js scrambler + solver) |
+| `npm test` | **238 / 238** passed, 11 files (new: `pieces.test.ts` — frames/colour slots, SDF and mesh invariants, hover outline, shader hooks) |
 | `npm run build` | pass |
-| `npm run test:e2e` | **26 / 26** passed (9.9 min): Chromium desktop 1440×900 (22), Chromium phone 390×844 touch (2), Firefox smoke (1), WebKit smoke (1) |
-| `npm run screenshots` | 26 captures in `artifacts/after/` (new: `cube-white-down`, `desktop-1440-rotate-pad`); no console warnings or errors |
-| Renderer memory | flat across three Low ↔ Auto + finish cycles (5 geometries, 10 textures) |
+| `npm run test:e2e` | **26 / 26** passed (5.2 min): Chromium desktop 1440×900 (22), Chromium phone 390×844 touch (2), Firefox smoke (1), WebKit smoke (1) |
+| `npm run screenshots` | 28 captures in `artifacts/after/` (new: `cube-solved`, `cube-midturn-R`); no console warnings or errors |
+| Frame time, desktop high tier, continuous face + slice turns | median 16.7 ms, p95 16.8 ms (vsync-bound 60 fps) |
 
-Firefox and WebKit both ran the real WebGL stage (not the fallback) with rendered stickers equal to
-the model. (Second pass, for reference: 178 unit, 23 browser tests.)
+The first full gate of this pass had one failure: the no-WebGL spec hard-coded the old green; the 2D
+net was correctly showing the new palette. The spec now derives the expected colour from
+`FACE_COLORS`, and the complete browser suite was re-run green. Firefox and WebKit ran the real WebGL
+stage with rendered facelets equal to the model. (Earlier passes: 223 / 26, 178 / 23.)
 
 ## M / E / S — representation and guarantees
 
@@ -188,7 +254,9 @@ cards everywhere, lavender gradient button); no move list.
 | Centre homing + verified solve | `src/core/solver/solver.ts` |
 | Turn tape, STM, commit handling | `src/app/studio.ts`, `src/components/panels/MoveLog.tsx` |
 | Gestures, hover | `src/components/cube/gestures.ts`, `hoverState.ts`, `HoverIndicator.tsx`, `src/components/stage/Interaction.tsx` |
-| Physical cube | `src/components/cube/cubeResources.ts`, `CubeModel.tsx` |
+| Piece shapes (SDF + mesher) | `src/components/cube/pieceGeometry.ts` |
+| Stickerless material (caps, cavity, seams) | `src/components/cube/pieceMaterial.ts` |
+| Physical cube (resources, frames, model) | `src/components/cube/cubeResources.ts`, `CubeModel.tsx` |
 | Free view (trackball) | `src/components/stage/orbitRig.ts` |
 | Studio environment (IBL) | `src/components/stage/studioEnvironment.ts` |
 | Lighting, tiers, framing, cube frame | `src/components/stage/StageCanvas.tsx` |
@@ -196,6 +264,7 @@ cards everywhere, lavender gradient button); no move list.
 | Worker bundling | `vite.config.ts` |
 | Slice tests | `tests/unit/slices.test.ts`, `tests/e2e/slices.spec.ts`, `tests/e2e/stress.spec.ts` |
 | Rotation / free-view tests | `tests/unit/rotations.test.ts`, `tests/unit/gestures.test.ts`, `tests/e2e/rotations.spec.ts` |
+| Piece geometry / material tests | `tests/unit/pieces.test.ts` |
 
 ## Known limitations and trade-offs
 
@@ -224,5 +293,6 @@ Run `npm run test:e2e` on real devices (BrowserStack or a USB-connected Android 
 the tap-after-drag behaviour, then merge `premium-slices-upgrade` into `main`.
 
 Further improvements, in order: move per-commit store updates into one `setState` to cut React work;
-instanced sticker meshes for low-end GPUs; full Playwright suite on Firefox/WebKit; a "settle upright"
-option for the trackball; visual-regression snapshots of `artifacts/after/`.
+modelled black internals (core arms, honeycomb) for close mid-turn views; full Playwright suite on
+Firefox/WebKit; a "settle upright" option for the trackball; visual-regression snapshots of
+`artifacts/after/`.

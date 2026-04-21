@@ -37,13 +37,13 @@ const PANELS: readonly Panel[] = [
   // Rim strip behind-right: bright edges on the far silhouette.
   { size: [2, 10], position: [7.5, 3.2, -5.5], radiance: 2.6 },
   // Right side strip: lifts the R face a touch.
-  { size: [2.2, 6], position: [9, 1.4, 1.5], radiance: 1.6, tint: '#f4f7ff' },
+  { size: [3.2, 8], position: [9, 1.6, 1.8], radiance: 2.2, tint: '#f4f7ff' },
   // Low front fill card (what a photographer bounces in under the lens).
   { size: [7, 2.4], position: [1, 0.2, 9.5], radiance: 0.85, tint: '#fffaf2' },
   // Bounce cards low front-left and low back-right, where the F and R faces
   // mirror from the home view: a faint sheen that sets glossy tiles apart.
-  { size: [9, 4], position: [-5.6, -4.4, 7.4], radiance: 0.42, tint: '#fff8f0' },
-  { size: [9, 4], position: [5.6, -4.4, -7.4], radiance: 0.28, tint: '#f6f8ff' },
+  { size: [10, 4.4], position: [-5.6, -3.9, 7.4], radiance: 0.75, tint: '#fff8f0' },
+  { size: [10, 4.4], position: [5.6, -3.9, -7.4], radiance: 0.45, tint: '#f6f8ff' },
 ];
 
 const FLOOR = new THREE.Color('#050506');

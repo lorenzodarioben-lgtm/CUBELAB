@@ -1,14 +1,12 @@
 /**
- * The rendered cube: 26 cubie groups with stable identities, each carrying its
- * own body and stickers. Every frame, each group's transform is rebuilt from
- * the committed integer state (position = O·home, rotation = O), plus — for the
- * nine pieces of the layer in flight — the engine's current visual rotation.
- * Nothing accumulates frame to frame, so there is no drift and no gaps.
- *
- * Each tile is seated individually, with a deterministic hair of tilt and
- * offset (well under a degree and a few hundredths of a millimetre at real
- * scale) and one of a few moulding variants, so neighbouring tiles catch the
- * studio reflections slightly differently, as on a physical cube.
+ * The rendered cube: 26 cubie groups with stable identities. Each carries one
+ * stickerless piece mesh (a canonical corner, edge or centre shape, turned to
+ * the cubie's home pose and coloured by its own material) plus an invisible
+ * anchor per facelet for the verification read-back and the optional face
+ * letters. Every frame, each group's transform is rebuilt from the committed
+ * integer state (position = O·home, rotation = O), plus — for the pieces of the
+ * layer in flight — the engine's current visual rotation. Nothing accumulates
+ * frame to frame, so there is no drift and no gaps.
  */
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -19,40 +17,24 @@ import { CUBIE_DEFS } from '../../core/puzzle/cubies';
 import { mulVec } from '../../core/puzzle/geometry';
 import type { Face } from '../../core/puzzle/notation';
 import type { Finish } from '../../core/persistence/settings';
-import { SPACING, STICKER_OFFSET, TILE_TOP, TILE_VARIANTS, createCubeResources, seededRandom } from './cubeResources';
+import { PIECE_FRAMES, SPACING, SURFACE_OFFSET, createCubeResources } from './cubeResources';
 import type { RenderTier } from './cubeResources';
 
 const AXES = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)] as const;
 const Z = new THREE.Vector3(0, 0, 1);
-/** Largest tile tilt (radians, ≈0.45°) and in-plane offset (world units). */
-const TILT = 0.008;
-const SHIFT = 0.0035;
 
-function stickerQuaternion(normal: readonly number[]): THREE.Quaternion {
-  return new THREE.Quaternion().setFromUnitVectors(Z, new THREE.Vector3(normal[0], normal[1], normal[2]));
-}
-
-interface TileSeat {
-  readonly position: THREE.Vector3;
-  readonly quaternion: THREE.Quaternion;
-  readonly variant: number;
-}
-
-/** A tile's deterministic seat on its piece: nominal pose plus a tiny tilt and shift. */
-function tileSeat(normal: readonly number[], rand: () => number): TileSeat {
-  const quaternion = stickerQuaternion(normal);
-  const angle = rand() * Math.PI * 2;
-  const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0), TILT * Math.sqrt(rand()));
-  const shift = new THREE.Vector3((rand() - 0.5) * 2 * SHIFT, (rand() - 0.5) * 2 * SHIFT, 0).applyQuaternion(quaternion);
-  return {
-    position: new THREE.Vector3(normal[0], normal[1], normal[2]).multiplyScalar(STICKER_OFFSET).add(shift),
-    quaternion: quaternion.multiply(tilt),
-    variant: Math.floor(rand() * TILE_VARIANTS),
-  };
-}
+/** Each facelet's anchor: on the face's surface, +Z along the outward normal. */
+const ANCHORS = CUBIE_DEFS.map((def) =>
+  def.stickers.map((s) => ({
+    color: s.color as Face,
+    position: new THREE.Vector3(s.normal[0], s.normal[1], s.normal[2]).multiplyScalar(SURFACE_OFFSET),
+    quaternion: new THREE.Quaternion().setFromUnitVectors(Z, new THREE.Vector3(s.normal[0], s.normal[1], s.normal[2])),
+  })),
+);
 
 export interface StickerRegistry {
-  readonly meshes: THREE.Mesh[];
+  /** One anchor per facelet, carrying `userData.color`; moves with its cubie. */
+  readonly meshes: THREE.Object3D[];
 }
 
 interface CubeModelProps {
@@ -113,19 +95,14 @@ export function CubeModel({ engine, quality, finish, faceLabels, registry }: Cub
     if (engine.isAnimating()) invalidate();
   });
 
-  const stickers = useMemo(() => {
-    const rand = seededRandom(2024);
-    return CUBIE_DEFS.map((def) => def.stickers.map((s) => ({ color: s.color as Face, ...tileSeat(s.normal, rand) })));
-  }, []);
-
-  // Sticker meshes register themselves for the debug/verification API and
+  // Facelet anchors register themselves for the debug/verification API and
   // unregister via React 19 ref cleanups when they unmount.
-  const registerSticker = useCallback(
-    (mesh: THREE.Mesh | null) => {
-      if (!mesh) return;
-      registry.meshes.push(mesh);
+  const registerAnchor = useCallback(
+    (anchor: THREE.Object3D | null) => {
+      if (!anchor) return;
+      registry.meshes.push(anchor);
       return () => {
-        const index = registry.meshes.indexOf(mesh);
+        const index = registry.meshes.indexOf(anchor);
         if (index >= 0) registry.meshes.splice(index, 1);
       };
     },
@@ -135,7 +112,7 @@ export function CubeModel({ engine, quality, finish, faceLabels, registry }: Cub
   const shadows = resources.shadows;
   return (
     <group name="cube">
-      {/* The mechanism's dark core: only ever glimpsed through seams mid-turn. */}
+      {/* The mechanism's dark core: only ever glimpsed between layers mid-turn. */}
       <mesh geometry={resources.core} material={resources.coreMaterial} />
       {CUBIE_DEFS.map((def) => (
         <group
@@ -146,20 +123,16 @@ export function CubeModel({ engine, quality, finish, faceLabels, registry }: Cub
           }}
           userData={{ cubie: def.id }}
         >
-          <mesh geometry={resources.body} material={resources.bodyMaterial} castShadow={shadows} receiveShadow={shadows} />
-          {stickers[def.id]!.map((s, i) => (
-            <group key={i} position={s.position} quaternion={s.quaternion}>
-              <mesh
-                ref={registerSticker}
-                geometry={resources.sticker}
-                material={resources.stickerMaterials[s.color][s.variant]}
-                userData={{ color: s.color, cubie: def.id }}
-                castShadow={shadows}
-                receiveShadow={shadows}
-              />
-              {faceLabels && (
-                <mesh geometry={resources.label} material={resources.labelMaterials[s.color]} position-z={TILE_TOP + 0.0006} renderOrder={2} />
-              )}
+          <mesh
+            geometry={resources.pieces[def.kind]}
+            material={resources.pieceMaterials[def.id]}
+            quaternion={PIECE_FRAMES[def.id]!.quaternion}
+            castShadow={shadows}
+            receiveShadow={shadows}
+          />
+          {ANCHORS[def.id]!.map((a, i) => (
+            <group key={i} ref={registerAnchor} position={a.position} quaternion={a.quaternion} userData={{ color: a.color, cubie: def.id }}>
+              {faceLabels && <mesh geometry={resources.label} material={resources.labelMaterials[a.color]} position-z={0.0015} renderOrder={2} />}
             </group>
           ))}
         </group>

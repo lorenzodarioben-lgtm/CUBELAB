@@ -203,22 +203,24 @@ committed integer state plus the in-flight rotation, so nothing accumulates.
 can tumble through the poles. Drags rotate about the screen's own axes, so the cube follows the
 pointer. The stage applies the view by turning the **cube** in front of a fixed studio camera, not by
 flying the camera: the lights stay above, the shadow stays on the floor (lowered under a corner-down
-cube), and reflections travel across the tiles as it turns. Hit-testing, projection and the rendered
+cube), and reflections travel across the pieces as it turns. Hit-testing, projection and the rendered
 facelet read-back all work in cube coordinates, so twists behave identically upside down.
 
 ### Rendering
 
-Molded-plastic pieces (0.975 bodies, 0.06 roundover, frosted grain + mottled sheen + thin coat) and
-bevelled colour tiles seated inside each face's flat area, with a fine orange-peel surface under a
-smooth coat. Each tile is seated individually — a deterministic hair of tilt (< 0.5°) and offset plus
-one of four moulding variants per colour (tone and sheen) — so neighbouring tiles catch the light
-slightly differently, as on a real cube. No logo. Lighting is image-based: a small photographic studio
-(dark graded cyclorama, overhead softbox, a strip box placed so the top face carries a half reflection,
-key and rim strips, fill and bounce cards) built in code and prefiltered once with PMREM, plus a key
-light for soft shadows — no image assets. Render tiers: **high** (desktop: physical materials + soft
-real-time shadows + contact shadow), **medium** (touch devices on Auto: same materials, no shadow
-passes), **low** (standard materials, coarser geometry). Frames are rendered on demand only while
-something moves.
+A stickerless speedcube in the GAN style. Pieces are solid moulded parts built from signed distance
+fields (`pieceGeometry.ts`): each face's outline is a rounded square whose corners pointing at the face
+centre are cut with a large radius (round centre "coins", a small black opening at every diagonal),
+seams have tight fillets, and the cube's own edges and corners are rounded as a whole. Colour is the
+plastic: a shader (`pieceMaterial.ts`) gives each visible face a coloured cap over black mechanism
+plastic, meeting on the cube edges' 45° lines, with glossy UV-coat or satin matte finishes, darkening
+with depth inside the openings and in the seams. No logo. Lighting is image-based: a small
+photographic studio (dark graded cyclorama, overhead softbox, a strip box placed so the top face
+carries a half reflection, key and rim strips, fill and bounce cards) built in code and prefiltered
+once with PMREM, plus a key light for soft shadows — no image assets. Render tiers: **high** (desktop:
+physical materials, finest piece meshes, soft real-time shadows + contact shadow), **medium** (touch
+devices on Auto: same materials, lighter meshes, no shadow passes), **low** (standard materials,
+coarser meshes). Frames are rendered on demand only while something moves.
 
 ### Bundling cubing.js's worker
 
