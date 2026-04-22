@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useServices, useStudio, useUi } from '../../app/context';
 import type { Settings } from '../../core/persistence/settings';
 import { Button, Dialog, Segmented, Switch } from '../ui/primitives';
+import { CubeStylePicker } from './CubeStylePicker';
 
 function Row({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
@@ -51,7 +52,14 @@ export function SettingsDialog() {
   return (
     <Dialog open={open} onClose={() => ui.setState({ settingsOpen: false })} eyebrow="Preferences" title="Settings" className="settings">
       <Group title="Cube">
-        <Row title="Finish" description="Plastic and sticker material.">
+        <div className="setting setting--stacked">
+          <div className="setting__text">
+            <span className="setting__title">Cube style</span>
+            <span className="setting__description">Changes only the model on screen — your cube, timer and history carry on.</span>
+          </div>
+          <CubeStylePicker value={settings.cubeStyle} onChange={(cubeStyle) => set({ cubeStyle })} />
+        </div>
+        <Row title="Finish" description="Gloss or satin plastic, for either style.">
           <Segmented label="Finish" value={settings.finish} onChange={(finish) => set({ finish })} options={[{ value: 'gloss', label: 'Gloss' }, { value: 'matte', label: 'Matte' }]} />
         </Row>
         <Row title="Sticker letters" description="Prints each sticker's face letter — helpful for colour vision differences.">

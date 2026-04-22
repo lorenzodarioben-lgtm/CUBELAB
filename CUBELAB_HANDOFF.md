@@ -1,20 +1,128 @@
 # CUBELAB — Handoff
 
-Status (2026-10-12): fourth pass complete — the cube is now a **stickerless GAN-style speedcube**
-(moulded pieces with the characteristic rounded cuts, coloured plastic caps over black mechanism,
-glossy UV-coat materials). Earlier passes: free-tumbling view and `x y z` rotations (third), M / E / S
-slices and the premium redesign (second). This document is deliberately candid about what was and was
-not verified.
+Status (2026-10-12): fifth pass complete — **two cube styles** (Classic Stickered, recovered from the
+third pass, and Premium Stickerless, the default) on one shared puzzle state, switchable live from
+Settings and persisted; the stickerless pieces' **inner corners corrected** to the GAN references.
+Earlier passes: stickerless GAN-style pieces (fourth), free-tumbling view and `x y z` rotations
+(third), M / E / S slices and the premium redesign (second). This document is deliberately candid
+about what was and was not verified.
 
 ## Repository state
 
 - The folder had no Git repository; one was initialised for this pass.
   - `main` — `53229f6` *Baseline: CUBELAB v1* (the delivered v1, untouched).
   - `premium-slices-upgrade` (checked out) — second pass in three commits (slices, visual overhaul,
-    hardening + docs) plus the third and fourth passes on top. Nothing is pushed anywhere; merge when happy
+    hardening + docs) plus the third, fourth and fifth passes on top. Nothing is pushed anywhere; merge when happy
     (`git checkout main && git merge premium-slices-upgrade`).
 - `.gitattributes` normalises line endings to LF.
-- Screenshots: `artifacts/before/` (v1) and `artifacts/after/` (this pass).
+- Screenshots: `artifacts/before/` (v1), `artifacts/after/` (current default style) and
+  `artifacts/styles/` (both styles side by side, selector, live switch).
+
+## Fifth pass — two cube styles + precision GAN corners
+
+Brief: let users choose between the earlier **Classic Stickered** cube and the current **Premium
+Stickerless** one (state-preserving, persisted, premium selector), and correct the stickerless pieces'
+inner-facing corners, which the user circled as too round ("melted") against the GAN reference photos.
+
+**Baseline (before any change, at `9825bf2`)**: typecheck ✓, lint ✓, unit 238/238 ✓, build ✓,
+browser 26/26 ✓ (desktop 22, phone 2, Firefox 1, WebKit 1). Working tree clean.
+
+### Where the Classic Stickered model came from
+
+`65bf5ff` (third pass) is the last commit with the stickered cube: rounded black bodies, raised
+bevelled tiles with an orange-peel coat, four moulding variants per colour and per-tile seats (tilt
+< 0.5°, offset < 0.0035). Its geometry, materials, procedural textures and seats were recovered from
+that commit's `cubeResources.ts` / `CubeModel.tsx` into `src/components/cube/stickeredResources.ts`
+— no revert; the seats are generated with the same seed in the same order, so the tiles sit exactly
+where they did. It is lit by today's studio and uses today's palette (very close to the old one).
+
+### Architecture (one state, two models)
+
+- One puzzle state, one `CubeEngine`, one set of 26 cubie groups in `CubeModel.tsx` whose transforms
+  are rebuilt every frame from the engine (committed state + turn in flight). A style only decides
+  what hangs on each group: `StickeredPiece` (body + tiles) or `StickerlessPiece` (one moulded mesh).
+- Because the groups and their transforms are untouched by a style change, switching is safe at any
+  moment, including mid-turn: the new model appears on the same groups in the same pose on the next
+  frame. No queueing is needed; a dedicated test switches during slow solver playback (moves in
+  flight) and during inspection.
+- Interaction is model-independent: twists hit-test an analytic cube in cube coordinates, and the
+  render read-back uses invisible per-facelet anchors at the face plane (`ANCHOR_OFFSET`), present
+  in both styles. The hover outline follows the style (`HoverState` stores the facelet, piece kind and
+  cut mask; `HoverIndicator` draws the tile ring or the exact stickerless outline at that style's
+  surface).
+- `CubeVisuals` (`cubeResources.ts`) owns all GPU resources for one tier + finish: each style's set is
+  created on first use and kept until the tier/finish changes or the stage unmounts. Stickerless piece
+  meshes (~80 ms to build) are cached CPU-side and reference-counted, so their GPU buffers are freed
+  when no set uses them and they re-upload on next use without rebuilding.
+- At idle after the stage settles, `useWarmOtherStyle` builds the hidden style's resources and
+  compiles its shaders with `compileAsync` on a staging scene (nothing visible, nothing uploaded):
+  the first switch went from ~790 ms to ~50 ms to paint.
+- Setting: `cubeStyle: 'stickerless' | 'stickered'` in the existing versioned settings
+  (`settings.ts`), default Stickerless. Settings saved before this pass have no field and load as
+  Stickerless with every other preference intact; unknown/corrupt values fall back to Stickerless. No
+  storage version bump was needed; history is untouched.
+- The studio controller never sees the style: `updateSettings` only saves it, so the timer, attempt,
+  inspection, move log, undo/redo, solver and history cannot be affected — asserted in unit tests by
+  snapshotting all of them across 25 switches mid-attempt.
+
+### Selector
+
+Settings → Cube → **Cube style**: two cards (Classic Stickered — "Black-frame cube with raised coloured
+tiles."; Premium Stickerless — "Modern speedcube with moulded coloured plastic.") in a native radio
+group (arrow keys, focus ring, screen-reader names). Previews are renders of the real models with a
+transparent background (`scripts/capture-style-previews.mjs` → `src/assets/cube-styles/*.webp`,
+13–17 KB each), so no extra WebGL renderers run in Settings. Selected = ivory border and filled mark.
+A quick switch next to the cube was considered and left out: the stage corner already holds the view
+controls, and the choice is a set-and-forget preference.
+
+### Stickerless inner corners (the circled areas)
+
+The fourth pass cut every outline corner that points at the face centre with the same circular arc of
+radius 0.37 — on corners and edges too, which scooped them into near-semicircles. Now
+(`pieceGeometry.ts`):
+- the cut radius depends on the piece: centre 0.40, edge 0.27, corner 0.19 (`INNER_RADIUS`);
+- cuts are superellipses (exponent 2.6, `INNER_EXPONENT`) instead of circular arcs: they leave the
+  straight sides with continuous curvature and remove less at the apex, which reads as a crisp
+  moulded corner;
+- along the diagonal the cut now reaches 0.063 (corner), 0.089 (edge), 0.132 (centre) instead of
+  0.153 everywhere, so the black openings sit mostly against the rounded-square centre cap, as in
+  the GAN photos; edges and corners keep more coloured material and look squared-off;
+- exterior rounding (0.075), seam fillets (0.03), pillow, caps and colour are unchanged.
+An over-correction was tried and rejected on screenshots (centre 0.34 / edge 0.21 / corner 0.14,
+exponent 3): the openings almost vanished and the cube looked generic.
+
+### Tests added
+
+- `tests/unit/pieces.test.ts` (+): measured cut depth per kind with bounds that fail if the old
+  uniform scoop (or an over-squared cut) returns; openings are real geometry (all four pieces clear of
+  the lattice point); mesh validity (finite data, indices in range, zero inverted triangles).
+- `tests/unit/styles.test.ts` (new): default/migration/corruption/round trip of `cubeStyle`; every
+  stickered tile seated on the right face of the right cubie, tilt < 0.0085 rad; disposal of every
+  stickered resource; reference-counted stickerless meshes (shared, freed only by the last user,
+  idempotent dispose); tier detail ordering.
+- `tests/unit/studio.test.ts` (+4): switching during a running attempt with undo/redo history (25
+  switches, full session snapshot unchanged, then redo/turn/auto-solve), during inspection, during
+  solver playback, and persistence across reload with history intact.
+- `tests/e2e/cube-style.spec.ts` (new, 5): default + switch + reload persistence; the exact user
+  scenario (scramble, R U M E' x2 F2, tumble, switch, compare cube/timer/log/view/solver, keep turning,
+  switch back, auto-solve); drags, slices, rotations, Move Pad and undo on the stickered model with
+  render == model; switching during inspection and during slow solver playback; **100 switches** with
+  geometry/texture/program counts identical after warm-up.
+
+### Visual comparison
+
+`artifacts/styles/` (new): `stickered/` and `stickerless/` each hold `solved`, `scrambled`, `macro`,
+`midturn-R`, `midturn-M`, `upside-down`, `quality-low`, `desktop`, `mobile`; plus
+`selector-{desktop,mobile}-{stickered,stickerless}.png` and `switch-1-stickerless.png` /
+`switch-2-stickered.png` (same scrambled session before and after a live switch). `artifacts/after/`
+was refreshed (default style, refined corners). Regenerate with `node scripts/capture-style-matrix.mjs`.
+
+### Performance (RTX 3050, ANGLE/D3D11, 1440×900)
+
+Continuous face/slice/rotation turning: both styles, high and low tier, median 16.7 ms, p95 ≤ 16.8 ms
+(vsync-bound 60 fps). Switch latency (click → new model painted): ~40–50 ms warm and, with the idle
+pre-warm, ~50 ms for the first switch. GPU counts across three rounds of Low/Auto + Matte/Gloss +
+style switches return exactly to baseline (8 geometries, 10 textures, 8 programs).
 
 ## Fourth pass — stickerless GAN-style cube
 
@@ -151,22 +259,25 @@ shorter; tests assert "solved in some orientation" there.
 
 ## Verification after changes
 
-Windows 11, Node 22.19.0, run in this directory on the final tree of the fourth pass:
+Windows 11, Node 22.19.0, run in this directory on the final tree of the fifth pass
+(`npm run test:all`, ~5 min end to end):
 
 | Command | Result |
 | --- | --- |
 | `npm run typecheck` | pass, 0 errors |
 | `npm run lint` | pass, 0 errors, 0 warnings |
-| `npm test` | **238 / 238** passed, 11 files (new: `pieces.test.ts` — frames/colour slots, SDF and mesh invariants, hover outline, shader hooks) |
+| `npm test` | **256 / 256** passed, 12 files (new: `styles.test.ts`; extended: `pieces.test.ts`, `studio.test.ts`) |
 | `npm run build` | pass |
-| `npm run test:e2e` | **26 / 26** passed (5.2 min): Chromium desktop 1440×900 (22), Chromium phone 390×844 touch (2), Firefox smoke (1), WebKit smoke (1) |
-| `npm run screenshots` | 28 captures in `artifacts/after/` (new: `cube-solved`, `cube-midturn-R`); no console warnings or errors |
-| Frame time, desktop high tier, continuous face + slice turns | median 16.7 ms, p95 16.8 ms (vsync-bound 60 fps) |
+| `npm run test:e2e` | **31 / 31** passed (4.1 min): Chromium desktop 1440×900 (27, incl. the new 5-test `cube-style.spec.ts`), Chromium phone 390×844 touch emulation (2), Firefox smoke (1), WebKit smoke (1) |
+| Ad-hoc Firefox + WebKit, Classic Stickered | renders, turns (`R M x U'`), live-switches both ways; render == model; no console errors |
+| `npm run screenshots` | 28 captures in `artifacts/after/`; no console warnings or errors |
+| `node scripts/capture-style-matrix.mjs` | 18 per-style captures + selector + live-switch shots in `artifacts/styles/`; render == model after the switch; no console warnings or errors |
+| Frame time, both styles, high + low tier, continuous turning | median 16.7 ms, p95 ≤ 16.8 ms (vsync-bound) |
+| GPU resources, 100 switches (e2e) and 3 rounds of tier/finish/style changes | identical counts after warm-up |
 
-The first full gate of this pass had one failure: the no-WebGL spec hard-coded the old green; the 2D
-net was correctly showing the new palette. The spec now derives the expected colour from
-`FACE_COLORS`, and the complete browser suite was re-run green. Firefox and WebKit ran the real WebGL
-stage with rendered facelets equal to the model. (Earlier passes: 223 / 26, 178 / 23.)
+The Firefox/WebKit Playwright projects run the smoke spec only (default style); the stickered model
+was checked in both engines with the ad-hoc script above. Touch is Chromium's emulation, not a
+physical phone. (Earlier passes: 238 / 26, 223 / 26, 178 / 23.)
 
 ## M / E / S — representation and guarantees
 
@@ -254,9 +365,14 @@ cards everywhere, lavender gradient button); no move list.
 | Centre homing + verified solve | `src/core/solver/solver.ts` |
 | Turn tape, STM, commit handling | `src/app/studio.ts`, `src/components/panels/MoveLog.tsx` |
 | Gestures, hover | `src/components/cube/gestures.ts`, `hoverState.ts`, `HoverIndicator.tsx`, `src/components/stage/Interaction.tsx` |
-| Piece shapes (SDF + mesher) | `src/components/cube/pieceGeometry.ts` |
+| Shared cubie model + style switch + pre-warm | `src/components/cube/CubeModel.tsx` |
+| Style resource owner (`CubeVisuals`), surfaces | `src/components/cube/cubeResources.ts` |
+| Classic Stickered model (recovered) | `src/components/cube/stickeredResources.ts` |
+| Premium Stickerless resources, piece frames | `src/components/cube/stickerlessResources.ts` |
+| Piece shapes (SDF + mesher, inner cuts) | `src/components/cube/pieceGeometry.ts` |
 | Stickerless material (caps, cavity, seams) | `src/components/cube/pieceMaterial.ts` |
-| Physical cube (resources, frames, model) | `src/components/cube/cubeResources.ts`, `CubeModel.tsx` |
+| Cube style setting | `src/core/persistence/settings.ts` |
+| Style selector | `src/components/panels/CubeStylePicker.tsx`, `SettingsDialog.tsx`, `src/assets/cube-styles/` |
 | Free view (trackball) | `src/components/stage/orbitRig.ts` |
 | Studio environment (IBL) | `src/components/stage/studioEnvironment.ts` |
 | Lighting, tiers, framing, cube frame | `src/components/stage/StageCanvas.tsx` |
@@ -265,6 +381,7 @@ cards everywhere, lavender gradient button); no move list.
 | Slice tests | `tests/unit/slices.test.ts`, `tests/e2e/slices.spec.ts`, `tests/e2e/stress.spec.ts` |
 | Rotation / free-view tests | `tests/unit/rotations.test.ts`, `tests/unit/gestures.test.ts`, `tests/e2e/rotations.spec.ts` |
 | Piece geometry / material tests | `tests/unit/pieces.test.ts` |
+| Cube style tests | `tests/unit/styles.test.ts`, `tests/unit/studio.test.ts`, `tests/e2e/cube-style.spec.ts` |
 
 ## Known limitations and trade-offs
 
@@ -285,6 +402,10 @@ cards everywhere, lavender gradient button); no move list.
   reducing React work per commit (see next steps).
 - Singles truncate and means round (WCA convention), so a one-solve session can show 0.33 vs 0.34.
 - Not covered by automated tests: audible sound, clipboard copy, CSV download, browser fullscreen.
+- Cube styles: the switch is an immediate swap (no crossfade — a blend would need both models drawn
+  at once, with doubled draw calls). The style previews in Settings are static renders: re-run
+  `scripts/capture-style-previews.mjs` after visual changes to either model. Both styles share one
+  palette and one studio; per-style lighting was not needed.
 
 ## Exact next action
 

@@ -403,3 +403,91 @@ describe('whole-cube rotations through the controller', () => {
     expect(studio.state.facelets.slice(0, 9)).toBe('DDDDDDDDD'); // yellow stays on top
   });
 });
+
+describe('cube style is a visual preference, never a puzzle event', () => {
+  /** Everything a style change must leave exactly as it was. */
+  function snapshot(studio: Studio) {
+    const s = studio.state;
+    return {
+      version: studio.engine.version,
+      pattern: JSON.stringify(studio.engine.state.pattern.patternData),
+      facelets: s.facelets,
+      solved: s.solved,
+      timer: { ...s.timer },
+      scramble: s.scramble.text,
+      moveLog: formatAlg(s.moveLog),
+      moveCount: s.moveCount,
+      history: s.history.length,
+      canUndo: studio.engine.canUndo(),
+      canRedo: studio.engine.canRedo(),
+      solver: { status: s.solver.status, cursor: s.solver.cursor, moves: formatAlg(s.solver.moves) },
+    };
+  }
+
+  it('switching during a running attempt with undo/redo history changes nothing but the setting', async () => {
+    const { studio, run, settle, turnAll, clock } = setup();
+    await studio.newScramble();
+    await settle();
+    turnAll(parseAlg("R U M E' x2 F2"));
+    studio.undo();
+    run();
+    expect(studio.state.timer.phase).toBe('running');
+    clock.advance(1234);
+    const before = snapshot(studio);
+    for (let i = 0; i < 25; i++) {
+      studio.updateSettings({ cubeStyle: i % 2 === 0 ? 'stickered' : 'stickerless' });
+      expect(snapshot(studio)).toEqual(before);
+    }
+    expect(studio.state.settings.cubeStyle).toBe('stickered');
+    // The session carries on: redo, keep turning, auto-solve.
+    studio.redo();
+    run();
+    turnAll(parseAlg("R U'"));
+    await studio.autoSolve();
+    await settle();
+    run();
+    expect(studio.state.solver.status).toBe('done');
+    expect(studio.state.solved).toBe(true);
+  });
+
+  it('switching during spacebar inspection keeps the inspection clock', async () => {
+    const { studio, settle } = setup();
+    studio.updateSettings({ timerMode: 'spacebar', inspection: true });
+    await studio.newScramble();
+    await settle();
+    studio.spaceDown(0);
+    studio.spaceUp(50);
+    expect(studio.state.timer.phase).toBe('inspecting');
+    const before = snapshot(studio);
+    studio.updateSettings({ cubeStyle: 'stickered' });
+    expect(snapshot(studio)).toEqual(before);
+  });
+
+  it('switching during solver playback lets the solution play out', async () => {
+    const { studio, run, frames } = setup({ initialState: applyMoves(createSolvedState(kpuzzle), parseAlg("R U F' L D2 B' M")) });
+    await studio.autoSolve();
+    expect(studio.state.solver.status).toBe('playing');
+    frames(20);
+    const before = snapshot(studio);
+    studio.updateSettings({ cubeStyle: 'stickered' });
+    expect(snapshot(studio)).toEqual(before);
+    run();
+    expect(studio.state.solver.status).toBe('done');
+    expect(studio.state.solved).toBe(true);
+  });
+
+  it('never creates a solve record, and the choice survives a reload with history intact', async () => {
+    const storage = createMemoryStore();
+    const first = setup({}, storage);
+    await first.studio.newScramble();
+    await first.settle();
+    first.turnAll(invertAlg(parseAlg(SCRAMBLE)));
+    expect(first.studio.state.history).toHaveLength(1);
+    first.studio.updateSettings({ cubeStyle: 'stickered' });
+    expect(first.studio.state.history).toHaveLength(1);
+    first.studio.flushPersistence();
+    const second = setup({}, storage);
+    expect(second.studio.state.settings.cubeStyle).toBe('stickered');
+    expect(second.studio.state.history).toHaveLength(1);
+  });
+});

@@ -21,8 +21,8 @@
 import * as THREE from 'three';
 import type { Finish } from '../../core/persistence/settings';
 import { CAP_DEPTH, PIECE_HALF } from './pieceGeometry';
+import type { RenderTier } from './renderTier';
 
-export type RenderTier = 'high' | 'medium' | 'low';
 
 /** Canonical face slots: +X, −X, +Y, −Y, +Z, −Z. */
 export const FACE_SLOTS = [

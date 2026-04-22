@@ -28,6 +28,8 @@ export interface DebugApi {
   /** Screen position of a point given in cube coordinates (follows the view). */
   project?: (point: [number, number, number]) => { x: number; y: number };
   renderInfo?: () => { geometries: number; textures: number; programs: number };
+  /** The cube style the 3D scene is actually showing (`null` before the stage mounts). */
+  renderedStyle?: () => string | null;
 }
 
 export function installDebugApi(studio: Studio, rig: OrbitRig): void {

@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { faceletIndex } from '../../core/puzzle/facelets';
 import { faceFromNormal } from '../../core/puzzle/geometry';
-import { SPACING, SURFACE_OFFSET } from './cubeResources';
+import { ANCHOR_OFFSET, SPACING } from './cubeResources';
 
 const normal = new THREE.Vector3();
 const position = new THREE.Vector3();
@@ -32,7 +32,7 @@ export function readVisualFacelets(meshes: readonly THREE.Object3D[], root?: THR
     relative.multiplyMatrices(inverseRoot, mesh.matrixWorld).decompose(position, quaternion, scale);
     normal.set(0, 0, 1).applyQuaternion(quaternion);
     const n: [number, number, number] = [Math.round(normal.x), Math.round(normal.y), Math.round(normal.z)];
-    position.addScaledVector(normal, -SURFACE_OFFSET).divideScalar(SPACING);
+    position.addScaledVector(normal, -ANCHOR_OFFSET).divideScalar(SPACING);
     const cubie: [number, number, number] = [Math.round(position.x) + 0, Math.round(position.y) + 0, Math.round(position.z) + 0];
     out[faceletIndex(faceFromNormal(n), cubie)] = String(mesh.userData.color);
   }

@@ -1,7 +1,7 @@
 # CUBELAB
 
-**The interactive cubing studio.** A photoreal 3×3×3 you can turn with your fingers, mouse or
-keyboard — all six faces *and* the M / E / S middle slices — scramble with real random-state WCA
+**The interactive cubing studio.** A photoreal 3×3×3 — a modern stickerless speedcube or a classic
+stickered cube, your choice — that you can turn with your fingers, mouse or keyboard — all six faces *and* the M / E / S middle slices — scramble with real random-state WCA
 scrambles, time against an accurate clock, and auto-solve from whatever state it is in, with the
 solution played back move by move.
 
@@ -53,6 +53,8 @@ npm run test:e2e     # Playwright against the production build (builds + preview
 | `npm run test:e2e`    | Playwright: Chromium desktop 1440×900, Chromium phone 390×844 (touch), Firefox and WebKit smoke |
 | `npm run test:all`    | Everything above, in order                                                      |
 | `npm run screenshots` | Re-capture `artifacts/after/*.png` (needs `npm run preview` running)             |
+| `node scripts/capture-style-matrix.mjs` | Both cube styles side by side → `artifacts/styles/` (needs preview) |
+| `node scripts/capture-style-previews.mjs` | Re-render the Settings previews in `src/assets/cube-styles/` (needs preview) |
 
 First Playwright run on a new machine: `npx playwright install chromium firefox webkit`.
 
@@ -134,8 +136,8 @@ History supports details, delete, clear-all and CSV export.
 
 Animated or instant scrambles (with skip), solver playback with Play/Pause, Step, Replay, Stop and
 three speeds, Reset (confirms if it would discard a running attempt), camera reset, copy scramble and
-share links (`?scramble=R%20M%27%20U`), Zen mode, sticker letters for colour-vision differences,
-gloss/matte finish, render quality (auto/high/low), reduced motion, orbit sensitivity, optional
+share links (`?scramble=R%20M%27%20U`), Zen mode, two cube styles (Classic Stickered / Premium
+Stickerless), sticker letters for colour-vision differences, gloss/matte finish, render quality (auto/high/low), reduced motion, orbit sensitivity, optional
 synthesized sound (off by default), and a 2D net fallback when WebGL is unavailable.
 
 ## Architecture
@@ -152,13 +154,17 @@ src/
     persistence/ versioned, validated localStorage (settings, history v2, cube snapshot)
     audio/       optional Web Audio feedback
   app/           Studio controller (vanilla Zustand store), UI store, actions, debug hooks
-  components/    stage (R3F canvas, lighting, camera rig, pointer arbitration), cube (meshes,
-                 materials, gestures, hover outline), controls, panels, ui primitives
+  components/    stage (R3F canvas, lighting, camera rig, pointer arbitration), cube (shared cubie
+                 model, stickered + stickerless resources, piece SDF mesher, piece shader,
+                 gestures, hover outline), controls, panels (incl. cube-style picker), ui primitives
+  assets/        cube-style previews rendered from the real models
   hooks/         keyboard, environment (visibility, reduced motion, fullscreen)
   styles/        tokens · base · layout · components
 tests/
-  unit/          puzzle, slices, engine, solver, timer, stats, persistence, gestures, studio flows
-  e2e/           studio, slices, stress, phone (touch), no-WebGL, reduced motion, cross-browser smoke
+  unit/          puzzle, slices, rotations, engine, solver, timer, stats, persistence, gestures,
+                 pieces (geometry), styles, studio flows
+  e2e/           studio, slices, rotations, cube styles, stress, phone (touch), no-WebGL, reduced
+                 motion, cross-browser smoke
 ```
 
 ### One authoritative state
@@ -208,19 +214,34 @@ facelet read-back all work in cube coordinates, so twists behave identically ups
 
 ### Rendering
 
-A stickerless speedcube in the GAN style. Pieces are solid moulded parts built from signed distance
-fields (`pieceGeometry.ts`): each face's outline is a rounded square whose corners pointing at the face
-centre are cut with a large radius (round centre "coins", a small black opening at every diagonal),
-seams have tight fillets, and the cube's own edges and corners are rounded as a whole. Colour is the
-plastic: a shader (`pieceMaterial.ts`) gives each visible face a coloured cap over black mechanism
-plastic, meeting on the cube edges' 45° lines, with glossy UV-coat or satin matte finishes, darkening
-with depth inside the openings and in the seams. No logo. Lighting is image-based: a small
-photographic studio (dark graded cyclorama, overhead softbox, a strip box placed so the top face
-carries a half reflection, key and rim strips, fill and bounce cards) built in code and prefiltered
-once with PMREM, plus a key light for soft shadows — no image assets. Render tiers: **high** (desktop:
-physical materials, finest piece meshes, soft real-time shadows + contact shadow), **medium** (touch
-devices on Auto: same materials, lighter meshes, no shadow passes), **low** (standard materials,
-coarser meshes). Frames are rendered on demand only while something moves.
+Two cube styles share everything except the physical model (Settings → Cube style):
+
+| | Classic Stickered | Premium Stickerless (default) |
+| --- | --- | --- |
+| Pieces | Molded black bodies (0.975, 0.06 roundover) | Solid moulded parts from signed distance fields (`pieceGeometry.ts`) |
+| Colour | Raised, bevelled tiles: orange-peel coat, four moulding variants per colour, each tile seated with a hair of tilt | The plastic itself: a shader (`pieceMaterial.ts`) gives each face a coloured cap over black mechanism, meeting on the cube edges' 45° lines |
+| Signature | Black frame around every tile | GAN-style cuts on corners pointing at the face centre: rounded-square centre caps, crisp squared-off edge and corner cuts, black openings at the diagonals |
+
+![Classic Stickered](artifacts/styles/stickered/scrambled.png) ![Premium Stickerless](artifacts/styles/stickerless/scrambled.png)
+
+**One state, two models.** There is one puzzle state, one move engine and one set of 26 cubie
+groups whose transforms the engine drives; a style only decides which meshes hang on those groups
+(`CubeModel.tsx`). Switching is therefore instant and safe at any moment — mid-turn, during
+inspection, a timed attempt or solver playback — and changes nothing else: not the cube, the timer,
+the move log, undo/redo, the view or the history. Interaction is model-independent (twists hit-test
+an analytic cube; facelet read-back uses style-independent anchors), so both styles behave
+identically. `CubeVisuals` (`cubeResources.ts`) owns each style's GPU resources for the current tier
+and finish, creates them on first use, keeps them until the tier or finish changes, and pre-warms the
+hidden style's resources and shaders at idle so even the first switch is quick. The choice persists
+with the other settings; settings saved before styles existed load as Stickerless.
+
+Both styles use the same image-based lighting: a small photographic studio (dark graded cyclorama,
+overhead softbox, a strip box placed so the top face carries a half reflection, key and rim strips,
+fill and bounce cards) built in code and prefiltered once with PMREM, plus a key light for soft
+shadows — no image assets. Render tiers: **high** (desktop: physical materials, finest meshes, soft
+real-time shadows + contact shadow), **medium** (touch devices on Auto: same materials, lighter
+meshes, no shadow passes), **low** (standard materials, coarser meshes). Frames are rendered on demand
+only while something moves.
 
 ### Bundling cubing.js's worker
 
@@ -232,8 +253,8 @@ before cubing.js falls back).
 ## Debug / verification hooks
 
 `window.__CUBELAB__` exposes read-only inspection (`facelets()`, `patternFacelets()`, `visualFacelets()`
-read from the three.js scene graph, `project(point)`, `moveLog()`, `renderInfo()`, `camera()`,
-`timer()`, `solver()` …) used by the browser tests. Nothing on it can change state.
+read from the three.js scene graph, `project(point)`, `moveLog()`, `renderInfo()`, `renderedStyle()`,
+`camera()`, `timer()`, `solver()` …) used by the browser tests. Nothing on it can change state.
 
 ## Known limitations
 

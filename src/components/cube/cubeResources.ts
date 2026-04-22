@@ -1,65 +1,42 @@
 /**
- * Shared resources for the cube, modelled on a premium stickerless speedcube:
- * solid moulded pieces whose visible faces are coloured plastic caps over
- * black mechanism plastic (see `pieceGeometry.ts` and `pieceMaterial.ts`).
+ * Visual resources for both cube styles, behind one owner.
  *
- * Piece meshes are per tier (three canonical shapes, oriented per cubie);
- * materials are per cubie and per finish. Everything here is disposed on
- * change/unmount. All textures are generated at runtime (no image assets).
+ * The puzzle has a single state and a single cubie hierarchy; a cube style is
+ * only the physical model hung on those cubies. `CubeVisuals` owns everything
+ * GPU-backed for one render tier and finish:
+ *
+ *   - Classic Stickered (`stickeredResources.ts`): black bodies + raised tiles;
+ *   - Premium Stickerless (`stickerlessResources.ts`): moulded coloured pieces;
+ *   - the face-letter overlays, shared by both.
+ *
+ * Each style's set is created the first time it is shown and then kept until
+ * the tier or finish changes (or the stage unmounts), so switching back and
+ * forth is instant and never recompiles shaders; GPU memory is bounded by the
+ * two sets and released in `dispose()`.
  */
 import * as THREE from 'three';
-import { FACE_COLORS } from '../../core/puzzle/colors';
-import { CUBE_ROTATIONS, mulVec, vecEquals } from '../../core/puzzle/geometry';
-import { CUBIE_DEFS } from '../../core/puzzle/cubies';
-import type { CubieKind } from '../../core/puzzle/cubies';
 import { FACES } from '../../core/puzzle/notation';
 import type { Face } from '../../core/puzzle/notation';
-import type { Finish } from '../../core/persistence/settings';
-import { CANONICAL_HOME, PIECE_HALF, PILLOW, buildPieceGeometry } from './pieceGeometry';
-import { FACE_SLOTS, createPieceMaterial } from './pieceMaterial';
-import type { RenderTier } from './pieceMaterial';
+import type { CubeStyle, Finish } from '../../core/persistence/settings';
+import { STICKERED_SURFACE, createStickeredResources } from './stickeredResources';
+import type { StickeredResources } from './stickeredResources';
+import { STICKERLESS_SURFACE, createStickerlessResources } from './stickerlessResources';
+import type { StickerlessResources } from './stickerlessResources';
+import type { RenderTier } from './renderTier';
 
-export type { RenderTier } from './pieceMaterial';
+export type { RenderTier } from './renderTier';
 
 /** Lattice spacing between cubie centres (world units). */
 export const SPACING = 1;
-/** Distance from a cubie centre to the middle of its outer face (the top of the pillow). */
-export const SURFACE_OFFSET = PIECE_HALF + PILLOW;
-
-/** Grid resolution per box face of each piece mesh, by tier. */
-const PIECE_DETAIL: Readonly<Record<RenderTier, number>> = { high: 40, medium: 30, low: 24 };
-
-export interface PieceFrame {
-  readonly kind: CubieKind;
-  /** Rotation taking the canonical piece of this kind to this cubie's home pose. */
-  readonly quaternion: THREE.Quaternion;
-  /** Face colour for each canonical slot (null = no visible face there). */
-  readonly slots: readonly (Face | null)[];
-}
-
-/** Per-cubie placement of the canonical piece meshes, derived from the cubie definitions. */
-export const PIECE_FRAMES: readonly PieceFrame[] = CUBIE_DEFS.map((def) => {
-  const rotation = CUBE_ROTATIONS.find((m) => vecEquals(mulVec(m, CANONICAL_HOME[def.kind]), def.home))!;
-  const slots = FACE_SLOTS.map((slot) => {
-    const homeNormal = mulVec(rotation, slot);
-    return def.stickers.find((s) => vecEquals(s.normal, homeNormal))?.color ?? null;
-  });
-  const m = rotation;
-  const matrix = new THREE.Matrix4().set(m[0], m[1], m[2], 0, m[3], m[4], m[5], 0, m[6], m[7], m[8], 0, 0, 0, 0, 1);
-  return { kind: def.kind, quaternion: new THREE.Quaternion().setFromRotationMatrix(matrix), slots };
-});
-
-export interface CubeResources {
-  readonly pieces: Readonly<Record<CubieKind, THREE.BufferGeometry>>;
-  /** One material per cubie id. */
-  readonly pieceMaterials: readonly THREE.Material[];
-  readonly label: THREE.BufferGeometry;
-  readonly core: THREE.BufferGeometry;
-  readonly coreMaterial: THREE.Material;
-  readonly labelMaterials: Readonly<Record<Face, THREE.Material>>;
-  readonly shadows: boolean;
-  dispose(): void;
-}
+/** Where the invisible facelet anchors sit: the cubie's face plane (style-independent). */
+export const ANCHOR_OFFSET = 0.5;
+/** Distance from a cubie centre to the visible top of its outer face, per style. */
+export const SURFACE_OFFSET: Readonly<Record<CubeStyle, number>> = {
+  stickered: STICKERED_SURFACE,
+  stickerless: STICKERLESS_SURFACE,
+};
+/** The outermost surface over both styles (for the floor and framing). */
+export const MAX_SURFACE_OFFSET = Math.max(STICKERED_SURFACE, STICKERLESS_SURFACE);
 
 const LABEL_INK: Readonly<Record<Face, string>> = {
   U: 'rgba(20,20,26,0.62)',
@@ -89,65 +66,57 @@ function labelTexture(face: Face): THREE.Texture {
   return texture;
 }
 
-/**
- * Render tiers.
- *  high   — physical materials, finest piece meshes, real-time soft shadows (desktop).
- *  medium — same materials, lighter meshes, no shadow passes (touch devices).
- *  low    — standard materials, coarser meshes, no shadows.
- */
-export function createCubeResources(tier: RenderTier, finish: Finish): CubeResources {
-  const detail = PIECE_DETAIL[tier];
-  const pieces = {
-    corner: buildPieceGeometry(CANONICAL_HOME.corner, detail),
-    edge: buildPieceGeometry(CANONICAL_HOME.edge, detail),
-    center: buildPieceGeometry(CANONICAL_HOME.center, detail),
-  };
+export class CubeVisuals {
+  readonly tier: RenderTier;
+  readonly finish: Finish;
+  /** Real-time shadows are cast on the high tier only. */
+  readonly shadows: boolean;
+  readonly label = new THREE.PlaneGeometry(0.46, 0.46);
+  readonly labelMaterials: Readonly<Record<Face, THREE.Material>>;
+  #stickered: StickeredResources | null = null;
+  #stickerless: StickerlessResources | null = null;
+  #textures: THREE.Texture[] = [];
+  #disposed = false;
 
-  const palette = Object.fromEntries(FACES.map((face) => [face, new THREE.Color(FACE_COLORS[face].hex)])) as Record<Face, THREE.Color>;
-  const pieceMaterials = PIECE_FRAMES.map((frame, id) =>
-    createPieceMaterial(
-      frame.slots.map((face) => (face ? palette[face] : null)),
-      { tier, finish },
-      (id * 7.31) % 13,
-    ),
-  );
-
-  const label = new THREE.PlaneGeometry(0.46, 0.46);
-  // The mechanism's core: fills the central cell, glimpsed only between layers mid-turn.
-  const core = new THREE.SphereGeometry(0.5, tier === 'low' ? 16 : 32, tier === 'low' ? 12 : 24);
-  const coreMaterial = new THREE.MeshStandardMaterial({ color: '#050506', roughness: 0.7, metalness: 0 });
-
-  const textures: THREE.Texture[] = [];
-  const labelMaterials = {} as Record<Face, THREE.Material>;
-  for (const face of FACES) {
-    const map = labelTexture(face);
-    textures.push(map);
-    labelMaterials[face] = new THREE.MeshBasicMaterial({
-      map,
-      transparent: true,
-      depthWrite: false,
-      toneMapped: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-    });
+  constructor(tier: RenderTier, finish: Finish) {
+    this.tier = tier;
+    this.finish = finish;
+    this.shadows = tier === 'high';
+    const labelMaterials = {} as Record<Face, THREE.Material>;
+    for (const face of FACES) {
+      const map = labelTexture(face);
+      this.#textures.push(map);
+      labelMaterials[face] = new THREE.MeshBasicMaterial({
+        map,
+        transparent: true,
+        depthWrite: false,
+        toneMapped: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+      });
+    }
+    this.labelMaterials = labelMaterials;
   }
 
-  return {
-    pieces,
-    pieceMaterials,
-    label,
-    core,
-    coreMaterial,
-    labelMaterials,
-    shadows: tier === 'high',
-    dispose() {
-      Object.values(pieces).forEach((g) => g.dispose());
-      pieceMaterials.forEach((m) => m.dispose());
-      label.dispose();
-      core.dispose();
-      coreMaterial.dispose();
-      for (const face of FACES) labelMaterials[face].dispose();
-      textures.forEach((t) => t.dispose());
-    },
-  };
+  /** The Classic Stickered set, created on first use. */
+  get stickered(): StickeredResources {
+    this.#stickered ??= createStickeredResources(this.tier, this.finish);
+    return this.#stickered;
+  }
+
+  /** The Premium Stickerless set, created on first use. */
+  get stickerless(): StickerlessResources {
+    this.#stickerless ??= createStickerlessResources(this.tier, this.finish);
+    return this.#stickerless;
+  }
+
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.#stickered?.dispose();
+    this.#stickerless?.dispose();
+    this.label.dispose();
+    for (const face of FACES) this.labelMaterials[face].dispose();
+    this.#textures.forEach((t) => t.dispose());
+  }
 }

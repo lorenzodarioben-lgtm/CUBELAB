@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { useServices, useStudio, useUi } from '../../app/context';
 import { markGestureHintSeen } from '../../app/uiStore';
 import { CubeModel } from '../cube/CubeModel';
-import { SPACING, SURFACE_OFFSET } from '../cube/cubeResources';
+import { MAX_SURFACE_OFFSET, SPACING } from '../cube/cubeResources';
 import type { RenderTier } from '../cube/cubeResources';
 import { HoverIndicator } from '../cube/HoverIndicator';
 import { HoverState } from '../cube/hoverState';
@@ -27,7 +27,7 @@ const FOV = 27;
 /** Bounding-sphere radius of the cube (half its space diagonal, in world units). */
 const CUBE_RADIUS = 2.6;
 /** Half the cube's outer width, to the top of the tiles. */
-const CUBE_HALF = SPACING + SURFACE_OFFSET;
+const CUBE_HALF = SPACING + MAX_SURFACE_OFFSET;
 /** Resting height of the floor the shadow lies on. */
 const FLOOR_Y = -2.1;
 const FLOOR_CLEARANCE = 0.12;
@@ -212,10 +212,11 @@ function BlobShadow() {
   );
 }
 
-/** Read-only verification hooks: rendered facelets and cube→screen projection. */
+/** Read-only verification hooks: rendered facelets, cube→screen projection and the shown style. */
 function DebugBridge({ registry, frame }: { registry: StickerRegistry; frame: RefObject<THREE.Group | null> }) {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
   useEffect(() => {
     const api = (window as unknown as { __CUBELAB__?: Record<string, unknown> }).__CUBELAB__;
     if (!api) return;
@@ -234,12 +235,15 @@ function DebugBridge({ registry, frame }: { registry: StickerRegistry; frame: Re
       textures: gl.info.memory.textures,
       programs: gl.info.programs?.length ?? 0,
     });
+    // The style actually on screen (the model the scene graph carries), not the setting.
+    api.renderedStyle = () => (scene.getObjectByName('cube')?.userData.style as string | undefined) ?? null;
     return () => {
       delete api.visualFacelets;
       delete api.project;
       delete api.renderInfo;
+      delete api.renderedStyle;
     };
-  }, [camera, gl, registry, frame]);
+  }, [camera, gl, scene, registry, frame]);
   return null;
 }
 
@@ -315,8 +319,15 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
       <CameraRig rig={rig} reduced={reduced} transportOpen={transportOpen} zen={zen} frame={frameRef} floor={floorRef} />
       <Lighting high={quality !== 'low'} shadows={quality === 'high'} />
       <group ref={frameRef} name="cube-frame">
-        <CubeModel engine={studio.engine} quality={quality} finish={settings.finish} faceLabels={settings.faceLabels} registry={registry} />
-        <HoverIndicator hover={hover} engine={studio.engine} />
+        <CubeModel
+          engine={studio.engine}
+          quality={quality}
+          finish={settings.finish}
+          style={settings.cubeStyle}
+          faceLabels={settings.faceLabels}
+          registry={registry}
+        />
+        <HoverIndicator hover={hover} engine={studio.engine} style={settings.cubeStyle} />
       </group>
       <group ref={floorRef} name="floor">
         {/* Mounted once and switched off below the high tier: drei's ContactShadows never frees its

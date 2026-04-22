@@ -10,8 +10,13 @@ export type MotionPreference = 'system' | 'reduce' | 'full';
 export type KeyMap = 'faces' | 'speed';
 export type TouchMode = 'twist' | 'orbit';
 export type PadLayers = 'faces' | 'slices' | 'rotations';
+/** The physical cube model: classic black-frame with raised tiles, or moulded stickerless plastic. */
+export type CubeStyle = 'stickerless' | 'stickered';
+export const CUBE_STYLES: readonly CubeStyle[] = ['stickerless', 'stickered'];
 
 export interface Settings {
+  /** Visual only: both styles render the same puzzle state. */
+  readonly cubeStyle: CubeStyle;
   readonly turnSpeed: TurnSpeed;
   readonly playbackSpeed: PlaybackSpeed;
   readonly scrambleStyle: ScrambleStyle;
@@ -31,6 +36,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  cubeStyle: 'stickerless',
   turnSpeed: 'normal',
   playbackSpeed: 'normal',
   scrambleStyle: 'animate',
@@ -83,6 +89,8 @@ export function sanitizeSettings(raw: unknown): Settings {
   const r = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
   const d = DEFAULT_SETTINGS;
   return {
+    // Settings saved before cube styles existed have no field: they get the default.
+    cubeStyle: pick(r.cubeStyle, CUBE_STYLES, d.cubeStyle),
     turnSpeed: pick(r.turnSpeed, ['relaxed', 'normal', 'snappy', 'instant'], d.turnSpeed),
     playbackSpeed: pick(r.playbackSpeed, ['slow', 'normal', 'fast'], d.playbackSpeed),
     scrambleStyle: pick(r.scrambleStyle, ['animate', 'instant'], d.scrambleStyle),
