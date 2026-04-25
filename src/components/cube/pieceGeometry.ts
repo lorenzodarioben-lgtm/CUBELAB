@@ -6,13 +6,12 @@
  * seam). Seen from a face, each piece's outline is a rounded square whose
  * corners differ by position, as on real stickerless cubes:
  *
- *   - corners that point at the face's centre are cut, with a radius that
- *     depends on the piece: generous on centre caps (a rounded-square
- *     "coin"), moderate on edges, small on corners, so the black opening at
- *     each diagonal sits mostly against the centre, as on GAN cubes. These
- *     cuts are superellipses rather than circular arcs: they meet the straight
- *     sides with continuous curvature and remove less material at the apex,
- *     which reads as a crisp moulded corner instead of a scooped one;
+ *   - corners that point at the face's centre are cut: centre caps and edge
+ *     pieces with a large round arc (the centre reads as a rounded "coin",
+ *     edges get their soft rounded ends), corner pieces with only a small
+ *     radius, so their inner corner stays crisp and almost square as on GAN
+ *     cubes. A small black opening shows the mechanism at each diagonal,
+ *     framed by three rounded pieces and one sharp corner;
  *   - every other corner, and the rims along the seams between pieces, get a
  *     small fillet, so seams read as tight grooves that catch a thin highlight;
  *   - the cube's own outer edges and corners are rounded a little more, as a
@@ -44,14 +43,12 @@ export const RIM_RADIUS = 0.03;
 export const CUBE_EDGE_RADIUS = 0.075;
 export type PieceKind = 'corner' | 'edge' | 'center';
 
-/** Size of the cut on outline corners that point at the face centre, per piece kind. */
-export const INNER_RADIUS: Readonly<Record<PieceKind, number>> = { center: 0.4, edge: 0.27, corner: 0.19 };
 /**
- * Superellipse exponent of those cuts (2 would be a circular arc). Higher is
- * squarer: the curve leaves the straight sides gradually and the apex sits
- * closer to the sharp corner (at 1 − 2^(−1/n) of the radius along each axis).
+ * Radius of the circular cut on outline corners that point at the face
+ * centre, per piece kind. Centres and edges keep the large GAN arc; corner
+ * pieces are nearly square there.
  */
-export const INNER_EXPONENT = 2.6;
+export const INNER_RADIUS: Readonly<Record<PieceKind, number>> = { center: 0.37, edge: 0.37, corner: 0.08 };
 /** How far each face is pillowed outward at its middle. */
 export const PILLOW = 0.0045;
 const PILLOW_RAMP = 0.22;
@@ -71,31 +68,20 @@ export function pieceKind(home: Vec3): PieceKind {
   return visible === 3 ? 'corner' : visible === 2 ? 'edge' : 'center';
 }
 
-export interface OutlineCorner {
-  readonly radius: number;
-  /** Superellipse exponent; 2 = circular arc. */
-  readonly exponent: number;
-}
-
-/** Shape of one outline corner: the piece-specific cut if it points at the face centre, else the rim radius. */
-export function outlineCorner(kind: PieceKind, inner: boolean): OutlineCorner {
-  return inner ? { radius: INNER_RADIUS[kind], exponent: INNER_EXPONENT } : { radius: RIM_RADIUS, exponent: 2 };
+/** Radius of one outline corner: the piece-specific cut if it points at the face centre, else the rim radius. */
+export function outlineCornerRadius(kind: PieceKind, inner: boolean): number {
+  return inner ? INNER_RADIUS[kind] : RIM_RADIUS;
 }
 
 /**
- * 2D rounded rectangle centred at the origin with half-size h and a corner per
- * quadrant: c[0] (+,+), c[1] (+,−), c[2] (−,+), c[3] (−,−). Exact along the
- * sides and on circular corners; on superellipse corners the p-norm slightly
- * underestimates distance, which keeps it a safe bound for root finding.
+ * 2D rounded rectangle centred at the origin with half-size h and a radius per
+ * quadrant: r[0] (+,+), r[1] (+,−), r[2] (−,+), r[3] (−,−). Exact inside and out.
  */
-function sdRoundRect(x: number, y: number, h: number, c: readonly OutlineCorner[]): number {
-  const { radius, exponent } = x > 0 ? (y > 0 ? c[0]! : c[1]!) : y > 0 ? c[2]! : c[3]!;
+function sdRoundRect(x: number, y: number, h: number, r: readonly number[]): number {
+  const radius = x > 0 ? (y > 0 ? r[0]! : r[1]!) : y > 0 ? r[2]! : r[3]!;
   const qx = Math.abs(x) - h + radius;
   const qy = Math.abs(y) - h + radius;
-  const ox = Math.max(qx, 0);
-  const oy = Math.max(qy, 0);
-  const corner = exponent === 2 ? Math.hypot(ox, oy) : (ox ** exponent + oy ** exponent) ** (1 / exponent);
-  return Math.min(Math.max(qx, qy), 0) + corner - radius;
+  return Math.min(Math.max(qx, qy), 0) + Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) - radius;
 }
 
 interface Face {
@@ -105,8 +91,8 @@ interface Face {
   /** In-plane axes. */
   readonly b: 0 | 1 | 2;
   readonly c: 0 | 1 | 2;
-  /** Outline corners, quadrants as in `sdRoundRect` over (b, c). */
-  readonly corners: readonly OutlineCorner[];
+  /** Outline corner radii, quadrants as in `sdRoundRect` over (b, c). */
+  readonly radii: readonly number[];
 }
 
 function smoothstep(e0: number, e1: number, x: number): number {
@@ -131,8 +117,8 @@ export function pieceSdf(home: Vec3): (x: number, y: number, z: number) => numbe
     // A corner of the outline is "inner" when it sits at one of the four lattice
     // points around the face centre: (±½, ±½) in face-grid units.
     const corner = (beta: number, gamma: number) =>
-      outlineCorner(kind, Math.abs(home[b] + beta / 2) === 0.5 && Math.abs(home[c] + gamma / 2) === 0.5);
-    faces.push({ axis, sign: h as 1 | -1, b, c, corners: [corner(1, 1), corner(1, -1), corner(-1, 1), corner(-1, -1)] });
+      outlineCornerRadius(kind, Math.abs(home[b] + beta / 2) === 0.5 && Math.abs(home[c] + gamma / 2) === 0.5);
+    faces.push({ axis, sign: h as 1 | -1, b, c, radii: [corner(1, 1), corner(1, -1), corner(-1, 1), corner(-1, -1)] });
   }
   const p = [0, 0, 0];
   // The whole cube as one rounded box, in this piece's coordinates.
@@ -149,7 +135,7 @@ export function pieceSdf(home: Vec3): (x: number, y: number, z: number) => numbe
     for (const slab of slabs) d = Math.max(d, slab.sign * p[slab.axis]! - s);
     let pillow = 0;
     for (const f of faces) {
-      const outline = sdRoundRect(p[f.b]!, p[f.c]!, s, f.corners);
+      const outline = sdRoundRect(p[f.b]!, p[f.c]!, s, f.radii);
       const height = f.sign * p[f.axis]! - s;
       // Rounded extrusion: inset the outline and the face by the rim radius, then grow back.
       const wx = outline + RIM_RADIUS;

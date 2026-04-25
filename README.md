@@ -220,7 +220,7 @@ Two cube styles share everything except the physical model (Settings → Cube st
 | --- | --- | --- |
 | Pieces | Molded black bodies (0.975, 0.06 roundover) | Solid moulded parts from signed distance fields (`pieceGeometry.ts`) |
 | Colour | Raised, bevelled tiles: orange-peel coat, four moulding variants per colour, each tile seated with a hair of tilt | The plastic itself: a shader (`pieceMaterial.ts`) gives each face a coloured cap over black mechanism, meeting on the cube edges' 45° lines |
-| Signature | Black frame around every tile | GAN-style cuts on corners pointing at the face centre: rounded-square centre caps, crisp squared-off edge and corner cuts, black openings at the diagonals |
+| Signature | Black frame around every tile | GAN-style cuts where pieces meet the face centre: round centre caps and rounded edge ends, crisp near-square inner corners on the corner pieces, black openings at the diagonals |
 
 ![Classic Stickered](artifacts/styles/stickered/scrambled.png) ![Premium Stickerless](artifacts/styles/stickerless/scrambled.png)
 

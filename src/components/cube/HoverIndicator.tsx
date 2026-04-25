@@ -2,8 +2,8 @@
  * A faint outline on the facelet under the mouse, so the strip you are about
  * to grab — outer face or middle slice — is visible before you press. It
  * follows the shown cube style: a ring around the raised tile on the Classic
- * Stickered cube, the piece's own outline (with its piece-specific cuts at the
- * corners that point at the face centre) on the Premium Stickerless cube.
+ * Stickered cube, the piece's own outline (round cuts on centres and edges, a
+ * crisp corner on corner pieces) on the Premium Stickerless cube.
  * Mouse only; hidden while anything animates, during drags and on touch input.
  */
 import { useEffect, useMemo, useRef } from 'react';
@@ -12,72 +12,54 @@ import * as THREE from 'three';
 import type { CubeEngine } from '../../core/engine/cubeEngine';
 import type { CubeStyle } from '../../core/persistence/settings';
 import { ANCHOR_OFFSET, SURFACE_OFFSET } from './cubeResources';
-import { PIECE_HALF, outlineCorner } from './pieceGeometry';
-import type { OutlineCorner, PieceKind } from './pieceGeometry';
+import { PIECE_HALF, outlineCornerRadius } from './pieceGeometry';
+import type { PieceKind } from './pieceGeometry';
 import type { HoverState } from './hoverState';
 
 const KINDS: readonly PieceKind[] = ['center', 'edge', 'corner'];
 const RING_INSET = 0.035;
 const RING_WIDTH = 0.028;
-/** Visual minimum radius for the ring's small corners. */
+/** Visual minimum radius for the ring's corners. */
 const SMALL = 0.05;
 
 /**
- * Closed outline of a rounded rectangle (half-size h) with a corner per
- * quadrant (+,+), (+,−), (−,+), (−,−), each a superellipse of its own radius
- * and exponent, inset by `inset` from the piece edge. Traced counter-clockwise.
+ * Rounded rectangle (half-size h) with a radius per quadrant (+,+), (+,−),
+ * (−,+), (−,−), each reduced by `inset` so the path runs parallel to the piece
+ * outline. Traced counter-clockwise.
  */
-function outlinePath(path: THREE.Path, h: number, corners: readonly OutlineCorner[], inset: number): void {
-  const steps = 12;
-  // Quadrant order around the loop: (+,−) → (+,+) → (−,+) → (−,−).
-  const loop: Array<[number, number, OutlineCorner]> = [
-    [1, -1, corners[1]!],
-    [1, 1, corners[0]!],
-    [-1, 1, corners[2]!],
-    [-1, -1, corners[3]!],
-  ];
-  const points: THREE.Vector2[] = [];
-  loop.forEach(([sx, sy, corner], q) => {
-    const r = Math.max(corner.exponent === 2 ? SMALL : 0.01, corner.radius - inset);
-    const e = corner.exponent;
-    const cx = sx * (h - r);
-    const cy = sy * (h - r);
-    // Sweep this quadrant's corner from its first side to its second, counter-clockwise.
-    const start = [-Math.PI / 2, 0, Math.PI / 2, Math.PI][q]!;
-    for (let i = 0; i <= steps; i++) {
-      const t = start + (i / steps) * (Math.PI / 2);
-      const c = Math.cos(t);
-      const s = Math.sin(t);
-      const x = Math.sign(c) * Math.abs(c) ** (2 / e);
-      const y = Math.sign(s) * Math.abs(s) ** (2 / e);
-      points.push(new THREE.Vector2(cx + r * x, cy + r * y));
-    }
-  });
-  path.setFromPoints(points);
-  path.closePath();
+function outlinePath(path: THREE.Path, h: number, radii: readonly number[], inset: number): void {
+  const [pp, pm, mp, mm] = radii.map((r) => Math.max(SMALL - inset * 0.5, r - inset)) as [number, number, number, number];
+  path.moveTo(-h + mm, -h);
+  path.lineTo(h - pm, -h);
+  path.absarc(h - pm, -h + pm, pm, -Math.PI / 2, 0, false);
+  path.lineTo(h, h - pp);
+  path.absarc(h - pp, h - pp, pp, 0, Math.PI / 2, false);
+  path.lineTo(-h + mp, h);
+  path.absarc(-h + mp, h - mp, mp, Math.PI / 2, Math.PI, false);
+  path.lineTo(-h, -h + mm);
+  path.absarc(-h + mm, -h + mm, mm, Math.PI, Math.PI * 1.5, false);
 }
 
-function ring(h: number, corners: readonly OutlineCorner[]): THREE.ShapeGeometry {
+function ring(h: number, radii: readonly number[]): THREE.ShapeGeometry {
   const outer = new THREE.Shape();
-  outlinePath(outer, h - RING_INSET, corners, RING_INSET);
+  outlinePath(outer, h - RING_INSET, radii, RING_INSET);
   const hole = new THREE.Path();
-  outlinePath(hole, h - RING_INSET - RING_WIDTH, corners, RING_INSET + RING_WIDTH);
+  outlinePath(hole, h - RING_INSET - RING_WIDTH, radii, RING_INSET + RING_WIDTH);
   outer.holes.push(hole);
-  return new THREE.ShapeGeometry(outer);
+  return new THREE.ShapeGeometry(outer, 12);
 }
 
-/** Ring following a stickerless piece outline; `shape` bit i set = quadrant i is cut. */
+/** Ring following a stickerless piece outline; `shape` bit i set = quadrant i points at the face centre. */
 function stickerlessRing(kind: PieceKind, shape: number): THREE.ShapeGeometry {
   return ring(
     PIECE_HALF,
-    [0, 1, 2, 3].map((i) => outlineCorner(kind, (shape & (1 << i)) !== 0)),
+    [0, 1, 2, 3].map((i) => outlineCornerRadius(kind, (shape & (1 << i)) !== 0)),
   );
 }
 
 /** Ring just outside a Classic Stickered tile (a rounded square). */
 function stickeredRing(): THREE.ShapeGeometry {
-  const corner: OutlineCorner = { radius: 0.14, exponent: 2 };
-  return ring(0.43 + RING_INSET, [corner, corner, corner, corner]);
+  return ring(0.43 + RING_INSET, [0.14, 0.14, 0.14, 0.14]);
 }
 
 export function HoverIndicator({ hover, engine, style }: { hover: HoverState; engine: CubeEngine; style: CubeStyle }) {

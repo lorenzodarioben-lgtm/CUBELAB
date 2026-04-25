@@ -2,7 +2,8 @@
 
 Status (2026-10-12): fifth pass complete — **two cube styles** (Classic Stickered, recovered from the
 third pass, and Premium Stickerless, the default) on one shared puzzle state, switchable live from
-Settings and persisted; the stickerless pieces' **inner corners corrected** to the GAN references.
+Settings and persisted; the stickerless **corner pieces' inner corners** made crisp to match the GAN
+references (centres and edges unchanged).
 Earlier passes: stickerless GAN-style pieces (fourth), free-tumbling view and `x y z` rotations
 (third), M / E / S slices and the premium redesign (second). This document is deliberately candid
 about what was and was not verified.
@@ -75,26 +76,28 @@ transparent background (`scripts/capture-style-previews.mjs` → `src/assets/cub
 A quick switch next to the cube was considered and left out: the stage corner already holds the view
 controls, and the choice is a set-and-forget preference.
 
-### Stickerless inner corners (the circled areas)
+### Stickerless inner corners (the circled areas) — corner pieces only
 
 The fourth pass cut every outline corner that points at the face centre with the same circular arc of
-radius 0.37 — on corners and edges too, which scooped them into near-semicircles. Now
-(`pieceGeometry.ts`):
-- the cut radius depends on the piece: centre 0.40, edge 0.27, corner 0.19 (`INNER_RADIUS`);
-- cuts are superellipses (exponent 2.6, `INNER_EXPONENT`) instead of circular arcs: they leave the
-  straight sides with continuous curvature and remove less at the apex, which reads as a crisp
-  moulded corner;
-- along the diagonal the cut now reaches 0.063 (corner), 0.089 (edge), 0.132 (centre) instead of
-  0.153 everywhere, so the black openings sit mostly against the rounded-square centre cap, as in
-  the GAN photos; edges and corners keep more coloured material and look squared-off;
-- exterior rounding (0.075), seam fillets (0.03), pillow, caps and colour are unchanged.
-An over-correction was tried and rejected on screenshots (centre 0.34 / edge 0.21 / corner 0.14,
-exponent 3): the openings almost vanished and the cube looked generic.
+radius 0.37, so the corner pieces' inner corner was scooped like an edge's. In the GAN photos the
+edges keep that large round end and the centre its round cap, but a corner piece's inner corner is
+crisp and nearly square. Now (`pieceGeometry.ts`, `INNER_RADIUS`):
+- **corner pieces**: inner-corner radius 0.37 → **0.08** (circular). Along the diagonal the cut now
+  reaches 0.033 instead of 0.153, so the corner keeps its colour almost to the lattice point;
+- **centres and edges: unchanged** (0.37 circular arc — the same SDF maths as `9825bf2`);
+- exterior rounding (0.075), seam fillets (0.03), pillow, caps and colour are unchanged. Each black
+  opening is now framed by three rounded pieces and one crisp corner, as in the reference.
+
+Correction log: the first version of this pass also re-cut the centres (0.40) and edges (0.27) and
+switched every inner cut to a superellipse. The user pointed out that only the corner pieces were
+meant to change, so centres and edges were restored exactly and the superellipse code removed. The
+face-on before/after (corner 0.37 vs 0.08, everything else identical) was captured at the same view
+as the user's annotation to confirm.
 
 ### Tests added
 
-- `tests/unit/pieces.test.ts` (+): measured cut depth per kind with bounds that fail if the old
-  uniform scoop (or an over-squared cut) returns; openings are real geometry (all four pieces clear of
+- `tests/unit/pieces.test.ts` (+): measured cut depth per kind — centres and edges must keep the
+  0.37 arc (cut 0.153 along the diagonal), corner pieces must stay crisp (cut < 0.05, > 0.015); openings are real geometry (all four pieces clear of
   the lattice point); mesh validity (finite data, indices in range, zero inverted triangles).
 - `tests/unit/styles.test.ts` (new): default/migration/corruption/round trip of `cubeStyle`; every
   stickered tile seated on the right face of the right cubie, tilt < 0.0085 rad; disposal of every
@@ -268,7 +271,7 @@ Windows 11, Node 22.19.0, run in this directory on the final tree of the fifth p
 | `npm run lint` | pass, 0 errors, 0 warnings |
 | `npm test` | **256 / 256** passed, 12 files (new: `styles.test.ts`; extended: `pieces.test.ts`, `studio.test.ts`) |
 | `npm run build` | pass |
-| `npm run test:e2e` | **31 / 31** passed (4.1 min): Chromium desktop 1440×900 (27, incl. the new 5-test `cube-style.spec.ts`), Chromium phone 390×844 touch emulation (2), Firefox smoke (1), WebKit smoke (1) |
+| `npm run test:e2e` | **31 / 31** passed (3.2 min): Chromium desktop 1440×900 (27, incl. the new 5-test `cube-style.spec.ts`), Chromium phone 390×844 touch emulation (2), Firefox smoke (1), WebKit smoke (1) |
 | Ad-hoc Firefox + WebKit, Classic Stickered | renders, turns (`R M x U'`), live-switches both ways; render == model; no console errors |
 | `npm run screenshots` | 28 captures in `artifacts/after/`; no console warnings or errors |
 | `node scripts/capture-style-matrix.mjs` | 18 per-style captures + selector + live-switch shots in `artifacts/styles/`; render == model after the switch; no console warnings or errors |

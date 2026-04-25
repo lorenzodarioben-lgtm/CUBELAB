@@ -12,7 +12,6 @@ import { PIECE_FRAMES } from '../../src/components/cube/stickerlessResources';
 import {
   CANONICAL_HOME,
   CUBE_EDGE_RADIUS,
-  INNER_EXPONENT,
   INNER_RADIUS,
   PIECE_HALF,
   PILLOW,
@@ -78,7 +77,8 @@ describe('piece shape (signed distance)', () => {
       ].filter(([bx, bz]) => Math.abs(home[0] + bx! / 2) === 0.5 && Math.abs(home[2] + bz! / 2) === 0.5);
       expect(innerCorners.length).toBe(kind === 'center' ? 4 : kind === 'edge' ? 2 : 1);
       for (const [bx, bz] of innerCorners) {
-        expect(inner(bx!, bz!)).toBeGreaterThan(0.02);
+        // Cut away (deeply on centres and edges, just a little on corner pieces).
+        expect(inner(bx!, bz!)).toBeGreaterThan(kind === 'corner' ? 0 : 0.05);
         // …but the cut is a rounded corner, not a missing quadrant.
         const d = s - INNER_RADIUS[kind] * 0.6;
         expect(sdf(bx! * d * 0.5, s - 0.02, bz! * d * 0.5)).toBeLessThan(0);
@@ -112,24 +112,19 @@ describe('piece shape (signed distance)', () => {
     return lo * Math.SQRT2;
   }
 
-  it('inner cuts are crisp and piece-specific, not uniform scoops (GAN reference)', () => {
-    // A circular cut of radius R removes R(√2 − 1) along the diagonal; the old
-    // uniform 0.37 arc removed 0.153 on every piece. Corners and edges must stay
-    // well under that, the centre keeps the deepest cut, and openings must remain.
+  it('only corner pieces have a crisp inner corner; centres and edges keep the large round cut', () => {
+    // A circular cut of radius R removes R(√2 − 1) along the diagonal: 0.153 for
+    // the 0.37 arc that centres and edges have had since the stickerless cube was
+    // introduced. Corner pieces were the scooped ones (GAN reference): now crisp.
+    const arc = 0.37 * (Math.SQRT2 - 1);
+    expect(INNER_RADIUS.center).toBe(0.37);
+    expect(INNER_RADIUS.edge).toBe(0.37);
+    expect(cutDepth('center')).toBeCloseTo(arc, 2);
+    expect(cutDepth('edge')).toBeCloseTo(arc, 2);
     const corner = cutDepth('corner');
-    const edge = cutDepth('edge');
-    const center = cutDepth('center');
-    expect(corner).toBeGreaterThan(0.035);
-    expect(corner).toBeLessThan(0.085);
-    expect(edge).toBeGreaterThan(0.06);
-    expect(edge).toBeLessThan(0.11);
-    expect(center).toBeGreaterThan(0.1);
-    expect(center).toBeLessThan(0.145);
-    expect(corner).toBeLessThan(edge);
-    expect(edge).toBeLessThan(center);
-    // Superellipse, not a circular arc: squarer than a circle of the same radius.
-    expect(INNER_EXPONENT).toBeGreaterThan(2);
-    expect(corner).toBeLessThan(INNER_RADIUS.corner * (Math.SQRT2 - 1) * Math.SQRT2 * 0.95);
+    expect(corner).toBeLessThan(0.05);
+    // …but still a moulded radius, not a knife edge.
+    expect(corner).toBeGreaterThan(0.015);
   });
 
   it('the black opening at each diagonal is real geometry: all four pieces stay clear of it', () => {
