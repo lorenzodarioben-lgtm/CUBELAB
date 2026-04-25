@@ -17,6 +17,7 @@ import {
   PILLOW,
   RIM_RADIUS,
   buildPieceGeometry,
+  facePillow,
   pieceSdf,
 } from '../../src/components/cube/pieceGeometry';
 import { FACE_SLOTS, createPieceMaterial } from '../../src/components/cube/pieceMaterial';
@@ -138,6 +139,66 @@ describe('piece shape (signed distance)', () => {
     ];
     for (const [home, x, z] of pieces) {
       expect(pieceSdf(home)(x * 0.96, y, z * 0.96)).toBeGreaterThan(0);
+    }
+  });
+
+  /** Height of the +Y face's surface above the piece centre at in-plane (x, z), found by bisection. */
+  function surfaceHeight(sdf: (x: number, y: number, z: number) => number, x: number, z: number): number {
+    let lo = s - 0.05; // inside
+    let hi = s + 0.05; // outside
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      if (sdf(x, mid, z) > 0) hi = mid;
+      else lo = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  it('faces are gently domed: highest in the middle, falling smoothly to the seams', () => {
+    expect(facePillow(0, 0)).toBe(PILLOW);
+    expect(facePillow(s, 0)).toBe(0);
+    expect(facePillow(0, -s - 0.1)).toBe(0);
+    const sdf = pieceSdf(CANONICAL_HOME.center);
+    const middle = surfaceHeight(sdf, 0, 0);
+    expect(middle).toBeCloseTo(s + PILLOW, 4);
+    // Monotonic fall toward a seam, and a real dome (not a plateau): visibly lower halfway out.
+    let previous = middle;
+    for (const x of [0.1, 0.2, 0.3, 0.4]) {
+      const h = surfaceHeight(sdf, x, 0);
+      expect(h).toBeLessThan(previous);
+      previous = h;
+    }
+    expect(middle - surfaceHeight(sdf, 0.25, 0)).toBeGreaterThan(PILLOW * 0.2);
+  });
+
+  it('the dome is smooth across the diagonals (no crease to break reflections)', () => {
+    // Surface slope across the diagonal, just either side of it: a crease would flip its sign abruptly.
+    const sdf = pieceSdf(CANONICAL_HOME.center);
+    const slope = (x: number, z: number) => (surfaceHeight(sdf, x + 1e-3, z - 1e-3) - surfaceHeight(sdf, x - 1e-3, z + 1e-3)) / 2.8e-3;
+    for (const t of [0.12, 0.2, 0.28]) {
+      const d = 0.004;
+      expect(Math.abs(slope(t + d, t - d) - slope(t - d, t + d))).toBeLessThan(0.004);
+    }
+  });
+
+  it('the dome never grows into a neighbour: seam walls stay inside the cell up to the rim', () => {
+    for (const kind of KINDS) {
+      const home = CANONICAL_HOME[kind];
+      const sdf = pieceSdf(home);
+      // Every side of the +Y face that borders another piece (a hidden side), just below the face.
+      for (const [axis, sign] of [
+        [0, 1],
+        [0, -1],
+        [2, 1],
+        [2, -1],
+      ] as const) {
+        if (home[axis] === sign) continue; // that side is the cube's outside, not a seam
+        for (const depth of [0.002, 0.01, 0.03, 0.08]) {
+          const p: [number, number, number] = [0, s - depth, 0];
+          p[axis] = sign * (s + 0.001);
+          expect(sdf(...p), `${kind} ${axis}${sign} ${depth}`).toBeGreaterThan(0);
+        }
+      }
     }
   });
 

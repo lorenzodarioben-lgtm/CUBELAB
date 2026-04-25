@@ -1,6 +1,6 @@
 # CUBELAB — Handoff
 
-Status (2026-10-12): fifth pass complete — **two cube styles** (Classic Stickered, recovered from the
+Status (2026-10-12): sixth pass complete — **softly domed ("pillowy") stickerless faces**. Fifth pass: **two cube styles** (Classic Stickered, recovered from the
 third pass, and Premium Stickerless, the default) on one shared puzzle state, switchable live from
 Settings and persisted; the stickerless **corner pieces' inner corners** made crisp to match the GAN
 references (centres and edges unchanged).
@@ -18,6 +18,34 @@ about what was and was not verified.
 - `.gitattributes` normalises line endings to LF.
 - Screenshots: `artifacts/before/` (v1), `artifacts/after/` (current default style) and
   `artifacts/styles/` (both styles side by side, selector, live switch).
+
+## Sixth pass — pillowy stickerless faces
+
+User feedback: the stickerless faces looked very flat; they should be ever so slightly more pillowy,
+close to a supplied product photo of a stickerless speedcube with softly domed faces.
+
+Cause: the "pillow" was a plateau — 0.0045 of lift reached within 0.22 of each edge and flat across
+the rest of the face — so every face rendered as one flat tone. Changes (`pieceGeometry.ts`, stickerless
+only; Classic Stickered untouched):
+- **Dome**: each face is now a smooth dome, `PILLOW` 0.018 high in the middle (≈ 0.3 mm on a 19 mm
+  piece), falling to exactly zero at every seam (`facePillow`: product of two `1 − t²` profiles across
+  the face). Smooth everywhere — a dome built from distance-to-outline would crease along the
+  diagonals and break the reflections — and zero at the seams, so it never grows into a neighbour.
+- **Edge roll**: the seam rim fillet `RIM_RADIUS` 0.03 → 0.055, so each face rolls softly into its seam
+  like the reference; the plan-view corners between pieces follow (0.055). Corner pieces' crisp inner
+  corner (0.08) and the 0.37 arcs of centres and edges are unchanged, as are the exterior rounding,
+  caps, colours and lighting.
+- The hover outline is draped over the dome (its vertices follow `facePillow`) instead of floating flat
+  at the peak.
+- Look-dev: 0.012 / 0.045 was tried first — better but still flatter than the photo — then 0.018 /
+  0.055, compared side by side with the photo; checked mid-turn, upside down, Low tier, phone (no seam
+  glints) and the hover outline. Frame time unchanged (16.7 ms).
+- Tests (`pieces.test.ts`, +3): the dome peaks at `PILLOW` and falls monotonically; no crease across the
+  diagonals (a distance-based dome fails this by 10×); seam walls stay inside the cell at every depth
+  for every piece kind.
+- Verification: typecheck ✓, lint ✓, unit **259 / 259** ✓, build ✓, browser **31 / 31** ✓ (desktop 27,
+  phone emulation 2, Firefox 1, WebKit 1); `artifacts/styles/` (incl. the new Settings preview) and
+  `artifacts/after/` regenerated with no console warnings or errors.
 
 ## Fifth pass — two cube styles + precision GAN corners
 

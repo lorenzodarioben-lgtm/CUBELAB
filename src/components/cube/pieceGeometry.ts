@@ -13,11 +13,17 @@
  *     cubes. A small black opening shows the mechanism at each diagonal,
  *     framed by three rounded pieces and one sharp corner;
  *   - every other corner, and the rims along the seams between pieces, get a
- *     small fillet, so seams read as tight grooves that catch a thin highlight;
+ *     soft fillet, so each face rolls over into its seam and seams read as
+ *     gentle grooves that catch a thin highlight;
  *   - the cube's own outer edges and corners are rounded a little more, as a
  *     whole (one rounded box over all 26 pieces), so the silhouette is softened
  *     and the corners are spherical;
- *   - each face is very slightly pillowed toward its middle.
+ *   - each face is a gentle dome (a "pillow"): highest in the middle and
+ *     falling smoothly to every seam, so a face catches the studio light as a
+ *     soft gradient rather than one flat tone. The dome is the product of two
+ *     1D profiles across the face, which is smooth everywhere (no creases
+ *     along the diagonals) and exactly zero at the seams, so it never grows
+ *     into a neighbouring piece.
  *
  * Construction: for each visible face the piece is a rounded extrusion of that
  * face's 2D outline (exact SDF, rim fillet included); hidden sides are plain
@@ -37,8 +43,8 @@ import type { Vec3 } from '../../core/puzzle/geometry';
 
 /** Half the width of a piece (lattice spacing 1, seam 0.014). */
 export const PIECE_HALF = 0.493;
-/** Fillet on the rims along seams; also the radius of outline corners on the cube's boundary. */
-export const RIM_RADIUS = 0.03;
+/** Fillet on the rims along seams (the edge roll); also the radius of outline corners on the cube's boundary. */
+export const RIM_RADIUS = 0.055;
 /** Rounding of the cube's own outer edges and corners. */
 export const CUBE_EDGE_RADIUS = 0.075;
 export type PieceKind = 'corner' | 'edge' | 'center';
@@ -49,9 +55,10 @@ export type PieceKind = 'corner' | 'edge' | 'center';
  * pieces are nearly square there.
  */
 export const INNER_RADIUS: Readonly<Record<PieceKind, number>> = { center: 0.37, edge: 0.37, corner: 0.08 };
-/** How far each face is pillowed outward at its middle. */
-export const PILLOW = 0.0045;
-const PILLOW_RAMP = 0.22;
+/** How far each face domes outward at its middle. */
+export const PILLOW = 0.018;
+/** Shape of the dome across a face: 2 is parabolic; higher is flatter in the middle, rounder at the rim. */
+const PILLOW_EXPONENT = 2;
 /** Depth of the coloured cap; below it a piece is black mechanism plastic. */
 export const CAP_DEPTH = 0.13;
 
@@ -93,6 +100,15 @@ interface Face {
   readonly c: 0 | 1 | 2;
   /** Outline corner radii, quadrants as in `sdRoundRect` over (b, c). */
   readonly radii: readonly number[];
+}
+
+/**
+ * Height of a face's dome above its plane at in-plane coordinates (u, v) of
+ * the piece's own frame: PILLOW in the middle, 0 at (and beyond) the seams.
+ */
+export function facePillow(u: number, v: number): number {
+  const profile = (w: number) => 1 - Math.min(1, Math.abs(w) / PIECE_HALF) ** PILLOW_EXPONENT;
+  return PILLOW * profile(u) * profile(v);
 }
 
 function smoothstep(e0: number, e1: number, x: number): number {
@@ -142,7 +158,8 @@ export function pieceSdf(home: Vec3): (x: number, y: number, z: number) => numbe
       const wy = height + RIM_RADIUS;
       const extrusion = Math.min(Math.max(wx, wy), 0) + Math.hypot(Math.max(wx, 0), Math.max(wy, 0)) - RIM_RADIUS;
       d = Math.max(d, extrusion);
-      pillow += PILLOW * smoothstep(0, PILLOW_RAMP, -outline) * (1 - smoothstep(0, CAP_DEPTH, -height));
+      // The dome fades out below the face, so side walls and the mechanism keep their shape.
+      pillow += facePillow(p[f.b]!, p[f.c]!) * (1 - smoothstep(0, CAP_DEPTH, -height));
     }
     return d - pillow;
   };

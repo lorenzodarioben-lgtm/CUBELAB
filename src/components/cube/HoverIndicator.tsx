@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import type { CubeEngine } from '../../core/engine/cubeEngine';
 import type { CubeStyle } from '../../core/persistence/settings';
 import { ANCHOR_OFFSET, SURFACE_OFFSET } from './cubeResources';
-import { PIECE_HALF, outlineCornerRadius } from './pieceGeometry';
+import { PIECE_HALF, facePillow, outlineCornerRadius } from './pieceGeometry';
 import type { PieceKind } from './pieceGeometry';
 import type { HoverState } from './hoverState';
 
@@ -49,12 +49,22 @@ function ring(h: number, radii: readonly number[]): THREE.ShapeGeometry {
   return new THREE.ShapeGeometry(outer, 12);
 }
 
-/** Ring following a stickerless piece outline; `shape` bit i set = quadrant i points at the face centre. */
+/** Gap between an outline and the surface it lies on. */
+const HOVER_GAP = 0.004;
+
+/**
+ * Ring following a stickerless piece outline; `shape` bit i set = quadrant i
+ * points at the face centre. Its vertices are lifted onto the face's dome, so
+ * the ring hugs the surface instead of floating at the dome's peak.
+ */
 function stickerlessRing(kind: PieceKind, shape: number): THREE.ShapeGeometry {
-  return ring(
+  const geometry = ring(
     PIECE_HALF,
     [0, 1, 2, 3].map((i) => outlineCornerRadius(kind, (shape & (1 << i)) !== 0)),
   );
+  const position = geometry.getAttribute('position');
+  for (let i = 0; i < position.count; i++) position.setZ(i, facePillow(position.getX(i), position.getY(i)) + HOVER_GAP);
+  return geometry;
 }
 
 /** Ring just outside a Classic Stickered tile (a rounded square). */
@@ -91,8 +101,9 @@ export function HoverIndicator({ hover, engine, style }: { hover: HoverState; en
   );
   useEffect(() => hover.subscribe(() => invalidate()), [hover, invalidate]);
 
-  // Lifted from the face plane to just above the shown style's surface.
-  const lift = SURFACE_OFFSET[style] - ANCHOR_OFFSET + 0.004;
+  // Lifted from the face plane: to just above the flat tile, or to the face
+  // plane of a stickerless piece (its ring already follows the dome).
+  const lift = style === 'stickered' ? SURFACE_OFFSET.stickered - ANCHOR_OFFSET + HOVER_GAP : PIECE_HALF - ANCHOR_OFFSET;
   useFrame(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
