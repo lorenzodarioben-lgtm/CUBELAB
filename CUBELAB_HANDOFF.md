@@ -1,6 +1,8 @@
 # CUBELAB — Handoff
 
-Status (2026-10-12): sixth pass complete — **softly domed ("pillowy") stickerless faces**. Fifth pass: **two cube styles** (Classic Stickered, recovered from the
+Status (2026-10-13): seventh pass complete — the **Classic Stickered cube rebuilt as a premium GAN-style
+stickered cube** (moulded glossy-black bodies, shaped stickers, honeycomb interior). Sixth pass: softly
+domed ("pillowy") stickerless faces. Fifth pass: **two cube styles** (Classic Stickered, recovered from the
 third pass, and Premium Stickerless, the default) on one shared puzzle state, switchable live from
 Settings and persisted; the stickerless **corner pieces' inner corners** made crisp to match the GAN
 references (centres and edges unchanged).
@@ -18,6 +20,60 @@ about what was and was not verified.
 - `.gitattributes` normalises line endings to LF.
 - Screenshots: `artifacts/before/` (v1), `artifacts/after/` (current default style) and
   `artifacts/styles/` (both styles side by side, selector, live switch).
+
+## Seventh pass — Classic Stickered as a premium GAN-style stickered cube
+
+Brief: the Classic Stickered cube looked plain next to three supplied product photos of a black-plastic
+GAN stickered speedcube (GAN 356 style); make it substantially more realistic. Where brief and photos
+differed, the photos won (e.g. the brief's "raised tiles" vs the photos' thin vinyl stickers).
+
+What the photos show, and the old model lacked: stickers shaped like their piece (round centres,
+D-shaped edges, near-square corners) instead of identical rounded squares; a thin, even black border;
+glossy black with a soft sheen on flat areas and bright lines on the rolled rims; rounded outer cube
+edges; a moulded honeycomb on the internal faces seen mid-turn; nothing reading as a flat black void.
+
+**Geometry** (`stickeredResources.ts`, `pieceGeometry.ts`):
+- Bodies are now moulded pieces from the same SDF mesher as the stickerless cube, with their own design
+  `STICKERED_SHAPE` (`PieceShape` added so one mesher serves both): inner cuts centre 0.48 / edge 0.40 /
+  corner 0.08, rim roll 0.07, flat faces (no dome), outer cube rounding 0.095 (stickerless 0.075).
+  Meshes are shared through the reference-counted cache now in `pieceMeshes.ts`, keyed by design.
+- Stickers: thin (0.009) extrusions of the piece's own outline inset by a 0.088 black border, with
+  0.003 rounded edges, laid flat with a hand-laid in-plane rotation < 0.3° and offset < 0.0025. Nine
+  outlines cover the cube (one centre, four edge and four corner orientations). A test checks every
+  point under every sticker is solid body (no floating edges at the rounded cube edge).
+
+**Materials** (`pieceMaterial.ts` options; stickerless defaults unchanged):
+- Body: the piece shader with every cap black. Broad sheen (roughness 0.30) under a sharp clear coat
+  (0.85 / 0.06) and stronger studio reflections (`envMapIntensity` 1.9), so flat black reads as
+  polished plastic and the rims carry bright lines. Interior a deep charcoal (#1a1a1e) with a
+  procedural **honeycomb** on internal faces (bump-mapped in the shader, no textures, high/medium tiers).
+- **Turn-driven occlusion**: closed, seams stay fully shaded (no glints on any tier); while a layer is
+  part-way round, a shared `uExposure` uniform (|sin 2θ| of the turn in flight, set each frame from
+  the engine) eases the seam/cavity shading so the faces the turn exposes are lit and show their form.
+- Stickers: vinyl, a touch less glossy than the body (roughness 0.24, coat 0.55), four print batches
+  per colour. The old orange-peel normal maps and roughness textures are gone (no textures at all).
+
+**Lighting**: unchanged studio; the black bodies' stronger reflection is a material setting, so the
+stickerless cube is untouched — verified pixel-identical to the previous build (max channel
+difference 0 on the solved capture).
+
+**Architecture**: no change to the dual-style system. New shared modules `pieceFrames.ts` (piece
+frames + facelet frames/outline masks, used by stickers and the hover outline) and `pieceMeshes.ts`;
+`CubeVisuals.setTurnExposure` forwards the turn exposure; the hover ring traces each sticker's shape.
+
+**Screenshots**: `artifacts/styles/stickered/` (solved, scrambled, macro, midturn-R, midturn-M,
+upside-down, quality-low, desktop, mobile), the selector shots with the new preview, and
+`artifacts/after/` (default style, refreshed).
+
+**Verification**: typecheck ✓, lint ✓, unit **263 / 263** ✓, build ✓, browser **31 / 31** ✓ (desktop 27, phone emulation 2, Firefox 1, WebKit 1; the stickered style was also checked by hand in Firefox and WebKit: renders, turns, live-switches, render == model, no errors); style matrix and
+screenshots regenerated with no console warnings or errors. Frame time while turning on the stickered
+style (high tier): median 16.7 ms, p95 16.7 ms. Tests added (`styles.test.ts`): sticker outlines per
+kind, stickers inside the rims and fully seated, design parameters (and stickerless parameters pinned),
+honeycomb + exposure wiring with stickerless uniform defaults pinned, resource ownership with shared
+body meshes.
+
+**Limitations**: no logo cap on the white centre (deliberate); the honeycomb is a shading detail, not
+modelled geometry, and is off on the low tier; the internal mechanism has no modelled core arms.
 
 ## Sixth pass — pillowy stickerless faces
 
@@ -398,7 +454,8 @@ cards everywhere, lavender gradient button); no move list.
 | Gestures, hover | `src/components/cube/gestures.ts`, `hoverState.ts`, `HoverIndicator.tsx`, `src/components/stage/Interaction.tsx` |
 | Shared cubie model + style switch + pre-warm | `src/components/cube/CubeModel.tsx` |
 | Style resource owner (`CubeVisuals`), surfaces | `src/components/cube/cubeResources.ts` |
-| Classic Stickered model (recovered) | `src/components/cube/stickeredResources.ts` |
+| Classic Stickered model (bodies, stickers, materials) | `src/components/cube/stickeredResources.ts` |
+| Piece/facelet frames, shared mesh cache | `src/components/cube/pieceFrames.ts`, `pieceMeshes.ts` |
 | Premium Stickerless resources, piece frames | `src/components/cube/stickerlessResources.ts` |
 | Piece shapes (SDF + mesher, inner cuts) | `src/components/cube/pieceGeometry.ts` |
 | Stickerless material (caps, cavity, seams) | `src/components/cube/pieceMaterial.ts` |

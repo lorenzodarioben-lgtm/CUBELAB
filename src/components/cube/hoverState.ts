@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Vec3 } from '../../core/puzzle/geometry';
 import { ANCHOR_OFFSET } from './cubeResources';
-import { pieceKind } from './pieceGeometry';
+import { faceletFrame } from './pieceFrames';
 import type { PieceKind } from './pieceGeometry';
 
 /**
@@ -22,7 +22,6 @@ export class HoverState {
   shape = 0;
   #listeners = new Set<() => void>();
   #key = '';
-  readonly #basis = new THREE.Matrix4();
 
   /** Points the outline at the facelet hit at `point` on the face with outward `normal`. */
   set(normal: Vec3, point: Vec3): void {
@@ -30,27 +29,11 @@ export class HoverState {
     const key = `${cubie.join(',')}|${normal.join(',')}`;
     if (this.visible && key === this.#key) return;
     this.#key = key;
-    const axis = normal.findIndex((c) => c !== 0);
-    const sign = normal[axis]!;
-    // In-plane axes, ordered so that x × y points along the outward normal.
-    const b = (axis + 1) % 3;
-    const c = (axis + 2) % 3;
-    const [xAxis, yAxis] = sign > 0 ? [b, c] : [c, b];
-    const unit = (i: number) => new THREE.Vector3(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0);
-    const n = new THREE.Vector3(normal[0], normal[1], normal[2]);
-    this.quaternion.setFromRotationMatrix(this.#basis.makeBasis(unit(xAxis), unit(yAxis), n));
-    this.position.set(cubie[0], cubie[1], cubie[2]).addScaledVector(n, ANCHOR_OFFSET);
-    this.kind = pieceKind(cubie);
-    let shape = 0;
-    [
-      [1, 1],
-      [1, -1],
-      [-1, 1],
-      [-1, -1],
-    ].forEach(([qx, qy], bit) => {
-      if (Math.abs(cubie[xAxis]! + qx! / 2) === 0.5 && Math.abs(cubie[yAxis]! + qy! / 2) === 0.5) shape |= 1 << bit;
-    });
-    this.shape = shape;
+    const frame = faceletFrame(normal, cubie);
+    this.quaternion.copy(frame.quaternion);
+    this.position.set(cubie[0], cubie[1], cubie[2]).addScaledVector(new THREE.Vector3(normal[0], normal[1], normal[2]), ANCHOR_OFFSET);
+    this.kind = frame.kind;
+    this.shape = frame.mask;
     this.visible = true;
     this.#emit();
   }

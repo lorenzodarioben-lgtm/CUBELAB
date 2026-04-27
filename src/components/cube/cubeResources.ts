@@ -110,6 +110,14 @@ export class CubeVisuals {
     return this.#stickerless;
   }
 
+  /**
+   * How far the layer turn in flight has opened the cube: 0 when every layer
+   * is aligned, 1 at 45°. Only the stickered bodies use it (their seam shading).
+   */
+  setTurnExposure(value: number): void {
+    this.#stickered?.setExposure(value);
+  }
+
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;

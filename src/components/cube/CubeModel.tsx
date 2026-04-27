@@ -26,8 +26,9 @@ import type { Face } from '../../core/puzzle/notation';
 import type { CubeStyle, Finish } from '../../core/persistence/settings';
 import { ANCHOR_OFFSET, CubeVisuals, SPACING } from './cubeResources';
 import type { RenderTier } from './cubeResources';
+import { PIECE_FRAMES } from './pieceFrames';
 import { TILE_SEATS, TILE_TOP } from './stickeredResources';
-import { PIECE_FRAMES, STICKERLESS_SURFACE } from './stickerlessResources';
+import { STICKERLESS_SURFACE } from './stickerlessResources';
 
 const AXES = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)] as const;
 const Z = new THREE.Vector3(0, 0, 1);
@@ -55,16 +56,22 @@ interface PieceProps {
   readonly faceLabels: boolean;
 }
 
-/** Classic Stickered: a black body with one raised tile per visible face. */
+/** Classic Stickered: a moulded black body (its canonical shape turned to this cubie) with one shaped sticker per visible face. */
 function StickeredPiece({ def, visuals, faceLabels }: PieceProps) {
   const res = visuals.stickered;
   const shadows = visuals.shadows;
   return (
     <>
-      <mesh geometry={res.body} material={res.bodyMaterial} castShadow={shadows} receiveShadow={shadows} />
+      <mesh
+        geometry={res.bodies[def.kind]}
+        material={res.bodyMaterials[def.kind]}
+        quaternion={PIECE_FRAMES[def.id]!.quaternion}
+        castShadow={shadows}
+        receiveShadow={shadows}
+      />
       {TILE_SEATS[def.id]!.map((seat, i) => (
         <group key={i} position={seat.position} quaternion={seat.quaternion}>
-          <mesh geometry={res.tile} material={res.tileMaterials[seat.color][seat.variant]} castShadow={shadows} receiveShadow={shadows} />
+          <mesh geometry={res.tiles[seat.shape]} material={res.tileMaterials[seat.color][seat.variant]} receiveShadow={shadows} />
           {faceLabels && (
             <mesh geometry={visuals.label} material={visuals.labelMaterials[seat.color]} position-z={TILE_TOP + 0.0006} renderOrder={2} />
           )}
@@ -123,8 +130,9 @@ function useWarmOtherStyle(visuals: CubeVisuals, style: CubeStyle): void {
         res.materials.forEach((m, id) => add(res.pieces[CUBIE_DEFS[id]!.kind], m));
       } else {
         const res = visuals.stickered;
-        add(res.body, res.bodyMaterial);
-        Object.values(res.tileMaterials).flat().forEach((m) => add(res.tile, m));
+        (['corner', 'edge', 'center'] as const).forEach((kind) => add(res.bodies[kind], res.bodyMaterials[kind]));
+        const tile = Object.values(res.tiles)[0]!;
+        Object.values(res.tileMaterials).flat().forEach((m) => add(tile, m));
       }
       gl.compileAsync(staging, camera, scene).catch(() => undefined);
     };
@@ -179,6 +187,8 @@ export function CubeModel({ engine, quality, finish, style, faceLabels, registry
       }
     }
     const visual = engine.getVisualTurn(now);
+    // A layer part-way round opens the cube (whole-cube rotations open nothing).
+    visuals.setTurnExposure(visual && visual.layer !== null ? Math.abs(Math.sin(2 * visual.angle)) : 0);
     scratch.inLayer.fill(false);
     if (visual) {
       for (const id of visual.cubies) scratch.inLayer[id] = true;

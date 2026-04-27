@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { CUBIE_DEFS } from '../../src/core/puzzle/cubies';
 import type { Vec3 } from '../../src/core/puzzle/geometry';
 import { ANCHOR_OFFSET } from '../../src/components/cube/cubeResources';
-import { PIECE_FRAMES } from '../../src/components/cube/stickerlessResources';
+import { PIECE_FRAMES } from '../../src/components/cube/pieceFrames';
 import {
   CANONICAL_HOME,
   CUBE_EDGE_RADIUS,

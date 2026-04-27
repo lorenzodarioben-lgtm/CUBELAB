@@ -33,6 +33,10 @@
  * the piece material colours each fragment by which face's cap it lies in
  * (see `pieceMaterial.ts`).
  *
+ * Both cube styles use this mesher with their own `PieceShape`: the Premium
+ * Stickerless pieces (coloured caps, domed faces) and the black bodies of the
+ * Classic Stickered cube (flat faces, a rounder centre, a glossier edge roll).
+ *
  * Meshing: a grid on a slightly larger box (denser toward its edges) is
  * projected radially onto the surface — the solid is star-shaped about the
  * piece centre — and normals come from the SDF gradient, so shading is smooth
@@ -62,6 +66,29 @@ const PILLOW_EXPONENT = 2;
 /** Depth of the coloured cap; below it a piece is black mechanism plastic. */
 export const CAP_DEPTH = 0.13;
 
+/** Shape parameters of one physical piece design. */
+export interface PieceShape {
+  /** Identifies the design (mesh cache key). */
+  readonly id: string;
+  /** Radius of outline corners that point at the face centre, per piece kind. */
+  readonly innerRadius: Readonly<Record<PieceKind, number>>;
+  /** Fillet on the rims along seams; also the radius of the other outline corners. */
+  readonly rimRadius: number;
+  /** Dome height of each face at its middle (0 = flat). */
+  readonly pillow: number;
+  /** Rounding of the cube's own outer edges and corners. */
+  readonly cubeEdgeRadius: number;
+}
+
+/** The Premium Stickerless piece design. */
+export const STICKERLESS_SHAPE: PieceShape = {
+  id: 'stickerless',
+  innerRadius: INNER_RADIUS,
+  rimRadius: RIM_RADIUS,
+  pillow: PILLOW,
+  cubeEdgeRadius: CUBE_EDGE_RADIUS,
+};
+
 /** Canonical home of each kind; real pieces are rotations of these. */
 export const CANONICAL_HOME: Readonly<Record<PieceKind, Vec3>> = {
   corner: [1, 1, 1],
@@ -76,8 +103,8 @@ export function pieceKind(home: Vec3): PieceKind {
 }
 
 /** Radius of one outline corner: the piece-specific cut if it points at the face centre, else the rim radius. */
-export function outlineCornerRadius(kind: PieceKind, inner: boolean): number {
-  return inner ? INNER_RADIUS[kind] : RIM_RADIUS;
+export function outlineCornerRadius(kind: PieceKind, inner: boolean, shape: PieceShape = STICKERLESS_SHAPE): number {
+  return inner ? shape.innerRadius[kind] : shape.rimRadius;
 }
 
 /**
@@ -104,11 +131,12 @@ interface Face {
 
 /**
  * Height of a face's dome above its plane at in-plane coordinates (u, v) of
- * the piece's own frame: PILLOW in the middle, 0 at (and beyond) the seams.
+ * the piece's own frame: `pillow` in the middle, 0 at (and beyond) the seams.
  */
-export function facePillow(u: number, v: number): number {
+export function facePillow(u: number, v: number, pillow: number = PILLOW): number {
+  if (pillow === 0) return 0;
   const profile = (w: number) => 1 - Math.min(1, Math.abs(w) / PIECE_HALF) ** PILLOW_EXPONENT;
-  return PILLOW * profile(u) * profile(v);
+  return pillow * profile(u) * profile(v);
 }
 
 function smoothstep(e0: number, e1: number, x: number): number {
@@ -117,8 +145,9 @@ function smoothstep(e0: number, e1: number, x: number): number {
 }
 
 /** Signed distance (approximately Lipschitz-1) to the piece whose home lattice position is `home`. */
-export function pieceSdf(home: Vec3): (x: number, y: number, z: number) => number {
+export function pieceSdf(home: Vec3, shape: PieceShape = STICKERLESS_SHAPE): (x: number, y: number, z: number) => number {
   const s = PIECE_HALF;
+  const rim = shape.rimRadius;
   const kind = pieceKind(home);
   const faces: Face[] = [];
   const slabs: Array<{ axis: number; sign: number }> = [];
@@ -133,12 +162,13 @@ export function pieceSdf(home: Vec3): (x: number, y: number, z: number) => numbe
     // A corner of the outline is "inner" when it sits at one of the four lattice
     // points around the face centre: (±½, ±½) in face-grid units.
     const corner = (beta: number, gamma: number) =>
-      outlineCornerRadius(kind, Math.abs(home[b] + beta / 2) === 0.5 && Math.abs(home[c] + gamma / 2) === 0.5);
+      outlineCornerRadius(kind, Math.abs(home[b] + beta / 2) === 0.5 && Math.abs(home[c] + gamma / 2) === 0.5, shape);
     faces.push({ axis, sign: h as 1 | -1, b, c, radii: [corner(1, 1), corner(1, -1), corner(-1, 1), corner(-1, -1)] });
   }
   const p = [0, 0, 0];
   // The whole cube as one rounded box, in this piece's coordinates.
-  const cubeHalf = 1 + s - CUBE_EDGE_RADIUS;
+  const edge = shape.cubeEdgeRadius;
+  const cubeHalf = 1 + s - edge;
   return (x, y, z) => {
     p[0] = x;
     p[1] = y;
@@ -147,19 +177,19 @@ export function pieceSdf(home: Vec3): (x: number, y: number, z: number) => numbe
     const qy = Math.abs(y + home[1]) - cubeHalf;
     const qz = Math.abs(z + home[2]) - cubeHalf;
     let d =
-      Math.hypot(Math.max(qx, 0), Math.max(qy, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qy, qz), 0) - CUBE_EDGE_RADIUS;
+      Math.hypot(Math.max(qx, 0), Math.max(qy, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qy, qz), 0) - edge;
     for (const slab of slabs) d = Math.max(d, slab.sign * p[slab.axis]! - s);
     let pillow = 0;
     for (const f of faces) {
       const outline = sdRoundRect(p[f.b]!, p[f.c]!, s, f.radii);
       const height = f.sign * p[f.axis]! - s;
       // Rounded extrusion: inset the outline and the face by the rim radius, then grow back.
-      const wx = outline + RIM_RADIUS;
-      const wy = height + RIM_RADIUS;
-      const extrusion = Math.min(Math.max(wx, wy), 0) + Math.hypot(Math.max(wx, 0), Math.max(wy, 0)) - RIM_RADIUS;
+      const wx = outline + rim;
+      const wy = height + rim;
+      const extrusion = Math.min(Math.max(wx, wy), 0) + Math.hypot(Math.max(wx, 0), Math.max(wy, 0)) - rim;
       d = Math.max(d, extrusion);
       // The dome fades out below the face, so side walls and the mechanism keep their shape.
-      pillow += facePillow(p[f.b]!, p[f.c]!) * (1 - smoothstep(0, CAP_DEPTH, -height));
+      if (shape.pillow > 0) pillow += facePillow(p[f.b]!, p[f.c]!, shape.pillow) * (1 - smoothstep(0, CAP_DEPTH, -height));
     }
     return d - pillow;
   };
@@ -200,8 +230,8 @@ function findRoot(f: (t: number) => number, lo: number, hi: number): number {
  * 12·n² triangles). Positions and normals are in the piece's own frame,
  * centred on the piece.
  */
-export function buildPieceGeometry(home: Vec3, n: number): THREE.BufferGeometry {
-  const sdf = pieceSdf(home);
+export function buildPieceGeometry(home: Vec3, n: number, shape: PieceShape = STICKERLESS_SHAPE): THREE.BufferGeometry {
+  const sdf = pieceSdf(home, shape);
   const bound = PIECE_HALF + 0.06;
   const vertsPerFace = (n + 1) * (n + 1);
   const positions = new Float32Array(6 * vertsPerFace * 3);

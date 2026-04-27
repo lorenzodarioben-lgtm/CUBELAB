@@ -1,6 +1,7 @@
 /**
- * Cube styles: the setting and its migration, the recovered Classic Stickered
- * model, and GPU-resource ownership of both styles. (State preservation across
+ * Cube styles: the setting and its migration, the Classic Stickered model
+ * (moulded black bodies + shaped stickers), and GPU-resource ownership of both
+ * styles. (State preservation across
  * a style change is covered at controller level in studio.test.ts and in the
  * browser suite.)
  */
@@ -10,8 +11,20 @@ import { CUBIE_DEFS } from '../../src/core/puzzle/cubies';
 import { DEFAULT_SETTINGS, sanitizeSettings } from '../../src/core/persistence/settings';
 import { STORAGE_KEYS, createMemoryStore, loadSettings, saveSettings } from '../../src/core/persistence/storage';
 import { ANCHOR_OFFSET, MAX_SURFACE_OFFSET, SURFACE_OFFSET } from '../../src/components/cube/cubeResources';
-import { BODY_SIZE, STICKER_OFFSET, TILE_SEATS, TILE_SIZE, TILE_VARIANTS, createStickeredResources } from '../../src/components/cube/stickeredResources';
+import {
+  STICKERED_SHAPE,
+  STICKER_HALF,
+  STICKER_INSET,
+  STICKER_OFFSET,
+  TILE_SEATS,
+  TILE_VARIANTS,
+  createStickeredResources,
+  stickerRadii,
+} from '../../src/components/cube/stickeredResources';
 import { PIECE_DETAIL, createStickerlessResources } from '../../src/components/cube/stickerlessResources';
+import { CANONICAL_HOME, PIECE_HALF, STICKERLESS_SHAPE, pieceSdf } from '../../src/components/cube/pieceGeometry';
+import { faceletFrame } from '../../src/components/cube/pieceFrames';
+import { createPieceMaterial } from '../../src/components/cube/pieceMaterial';
 
 describe('cube style setting', () => {
   it('defaults to Premium Stickerless for new users', () => {
@@ -43,8 +56,8 @@ describe('cube style setting', () => {
   });
 });
 
-describe('Classic Stickered model (recovered)', () => {
-  it('seats exactly one tile per facelet, on the right face of the right cubie', () => {
+describe('Classic Stickered model', () => {
+  it('seats exactly one sticker per facelet, on the right face of the right cubie, shaped like its piece', () => {
     let tiles = 0;
     for (const def of CUBIE_DEFS) {
       const seats = TILE_SEATS[def.id]!;
@@ -52,12 +65,16 @@ describe('Classic Stickered model (recovered)', () => {
       seats.forEach((seat, i) => {
         tiles++;
         const n = def.stickers[i]!.normal;
-        // On its face plane (offset only by the tiny in-plane shift)…
+        // On its face plane (offset only by the tiny hand-laid shift)…
         expect(seat.position.dot(new THREE.Vector3(...n))).toBeCloseTo(STICKER_OFFSET, 5);
-        expect(seat.position.length()).toBeLessThan(STICKER_OFFSET + 0.006);
-        // …facing outward, tilted by well under a degree.
+        expect(seat.position.length()).toBeLessThan(STICKER_OFFSET + 0.004);
+        // …facing exactly outward (laid flat, turned in-plane by well under a degree)…
         const facing = new THREE.Vector3(0, 0, 1).applyQuaternion(seat.quaternion);
-        expect(facing.angleTo(new THREE.Vector3(...n))).toBeLessThan(0.0085);
+        expect(facing.angleTo(new THREE.Vector3(...n))).toBeLessThan(1e-6);
+        const frame = faceletFrame(n, def.home);
+        expect(seat.quaternion.angleTo(frame.quaternion)).toBeLessThan(0.006);
+        // …with the outline of its own piece.
+        expect(seat.shape).toBe(`${frame.kind}:${frame.mask}`);
         expect(seat.variant).toBeGreaterThanOrEqual(0);
         expect(seat.variant).toBeLessThan(TILE_VARIANTS);
       });
@@ -65,13 +82,97 @@ describe('Classic Stickered model (recovered)', () => {
     expect(tiles).toBe(54);
   });
 
-  it('keeps tiles inside the body face and the seams open', () => {
-    expect(TILE_SIZE).toBeLessThan(BODY_SIZE - 0.12);
-    expect(BODY_SIZE).toBeLessThan(1);
-    // Tiles sit on the body; the visible surface is just above the stickerless one.
-    expect(SURFACE_OFFSET.stickered).toBeGreaterThan(BODY_SIZE / 2);
+  it('stickers follow the piece outlines: round centres, D-shaped edges, square corners', () => {
+    const centre = stickerRadii('center', 0b1111);
+    const edge = stickerRadii('edge', faceletFrame([0, 1, 0], [0, 1, 1]).mask);
+    const corner = stickerRadii('corner', faceletFrame([0, 1, 0], [1, 1, 1]).mask);
+    // Centre: every corner cut nearly to a circle.
+    for (const r of centre) expect(r).toBeGreaterThan(STICKER_HALF * 0.9);
+    // Edge: two large cuts toward the centre, two small corners at the cube edge.
+    expect(edge.filter((r) => r > 0.25)).toHaveLength(2);
+    expect(edge.filter((r) => r < 0.1)).toHaveLength(2);
+    // Corner: all four nearly square.
+    for (const r of corner) expect(r).toBeLessThan(0.1);
+  });
+
+  it('stickers sit on the flat of the body: inside its rounded rims, with a black border all round', () => {
+    expect(STICKER_INSET).toBeGreaterThan(0.06);
+    expect(STICKER_HALF).toBeLessThan(PIECE_HALF - STICKERED_SHAPE.rimRadius);
+    // The cube's rounded outer edge starts no more than a hair inside the sticker (surface drop < base embed).
+    const overhang = STICKER_HALF - (PIECE_HALF - STICKERED_SHAPE.cubeEdgeRadius);
+    const r = STICKERED_SHAPE.cubeEdgeRadius;
+    const drop = overhang > 0 ? r - Math.sqrt(r * r - overhang * overhang) : 0;
+    expect(drop).toBeLessThan(PIECE_HALF - STICKER_OFFSET);
+    // Every point under a sticker (inside its outline), just below its base, is solid body: no sticker floats.
+    for (const kind of ['corner', 'edge', 'center'] as const) {
+      const home = CANONICAL_HOME[kind];
+      const sdf = pieceSdf(home, STICKERED_SHAPE);
+      const frame = faceletFrame([0, 1, 0], home);
+      const radii = stickerRadii(kind, frame.mask);
+      // On the +Y face the facelet frame's x is world z and its y is world x.
+      const insideSticker = (fx: number, fy: number) => {
+        const r = radii[fx > 0 ? (fy > 0 ? 0 : 1) : fy > 0 ? 2 : 3]!;
+        const qx = Math.abs(fx) - STICKER_HALF + r;
+        const qy = Math.abs(fy) - STICKER_HALF + r;
+        return Math.min(Math.max(qx, qy), 0) + Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) - r < -0.002;
+      };
+      let checked = 0;
+      for (let i = -10; i <= 10; i++) {
+        for (let j = -10; j <= 10; j++) {
+          const fx = (i / 10) * STICKER_HALF;
+          const fy = (j / 10) * STICKER_HALF;
+          if (!insideSticker(fx, fy)) continue;
+          checked++;
+          expect(sdf(fy, STICKER_OFFSET - 0.0005, fx), `${kind} ${fx} ${fy}`).toBeLessThan(0);
+        }
+      }
+      expect(checked).toBeGreaterThan(250);
+    }
+    expect(SURFACE_OFFSET.stickered).toBeGreaterThan(PIECE_HALF);
     expect(MAX_SURFACE_OFFSET).toBe(Math.max(SURFACE_OFFSET.stickered, SURFACE_OFFSET.stickerless));
     expect(ANCHOR_OFFSET).toBe(0.5);
+  });
+
+  it('the stickered body design is its own: flat faces, rounder outer edges; stickerless is untouched', () => {
+    expect(STICKERED_SHAPE.id).not.toBe(STICKERLESS_SHAPE.id);
+    expect(STICKERED_SHAPE.pillow).toBe(0);
+    expect(STICKERED_SHAPE.cubeEdgeRadius).toBeGreaterThan(STICKERLESS_SHAPE.cubeEdgeRadius);
+    expect(STICKERLESS_SHAPE).toEqual({
+      id: 'stickerless',
+      innerRadius: { center: 0.37, edge: 0.37, corner: 0.08 },
+      rimRadius: 0.055,
+      pillow: 0.018,
+      cubeEdgeRadius: 0.075,
+    });
+  });
+
+  it('body material: honeycomb interior and turn-driven seam shading, stickerless defaults unchanged', () => {
+    const shader = (material: THREE.Material) => {
+      const lib = THREE.ShaderLib.physical;
+      const s = { vertexShader: lib.vertexShader, fragmentShader: lib.fragmentShader, uniforms: {} as Record<string, { value: unknown }> };
+      material.onBeforeCompile(s as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
+      return s;
+    };
+    const res = createStickeredResources('high', 'gloss');
+    const body = res.bodyMaterials.edge;
+    expect(body.defines).toHaveProperty('PIECE_HONEYCOMB');
+    const s = shader(body);
+    expect(s.fragmentShader).toContain('pieceHex(');
+    expect(s.fragmentShader).toContain('normal = pieceBump(');
+    // Exposure is shared by every body and driven by the turn in flight.
+    res.setExposure(0.7);
+    expect(s.uniforms.uExposure!.value).toBe(0.7);
+    expect((shader(res.bodyMaterials.corner).uniforms.uExposure!.value as number)).toBe(0.7);
+    res.dispose();
+    // A stickerless piece: no honeycomb, no exposure, the same occlusion as before.
+    const piece = createPieceMaterial([new THREE.Color('#fff'), null, null, null, null, null], { tier: 'high', finish: 'gloss' }, 1);
+    expect(piece.defines ?? {}).not.toHaveProperty('PIECE_HONEYCOMB');
+    const u = shader(piece).uniforms;
+    expect(u.uExposure!.value).toBe(0);
+    expect(u.uCavityMin!.value).toBe(0.12);
+    expect((u.uSeamFloor!.value as THREE.Vector4).toArray()).toEqual([0.6, 0.22, 0.45, 0.03]);
+    expect((u.uSeamRange!.value as THREE.Vector2).toArray()).toEqual([0.08, 0.6]);
+    piece.dispose();
   });
 });
 
@@ -83,22 +184,33 @@ function watchDisposals(objects: ReadonlyArray<{ addEventListener: (type: 'dispo
 }
 
 describe('GPU resource ownership', () => {
-  it('stickered: one set owns and frees all of its geometry, materials and textures', () => {
+  it('stickered: one set owns and frees its materials and stickers, and shares its body meshes', () => {
     for (const tier of ['high', 'medium', 'low'] as const) {
       const res = createStickeredResources(tier, 'gloss');
-      const materials = [res.bodyMaterial, res.coreMaterial, ...Object.values(res.tileMaterials).flat()];
-      const textures = new Set<THREE.Texture>();
+      const materials = [...Object.values(res.bodyMaterials), res.coreMaterial, ...Object.values(res.tileMaterials).flat()];
       for (const m of materials) {
-        for (const key of ['map', 'roughnessMap', 'normalMap'] as const) {
-          const t = (m as THREE.MeshStandardMaterial)[key];
-          if (t) textures.add(t);
-        }
+        for (const key of ['map', 'roughnessMap', 'normalMap'] as const) expect((m as THREE.MeshStandardMaterial)[key] ?? null).toBeNull();
       }
-      const owned = [res.body, res.tile, res.core, ...materials, ...textures];
+      // Nine sticker outlines: one centre, four edge and four corner orientations.
+      expect(Object.keys(res.tiles)).toHaveLength(9);
+      const owned = [...Object.values(res.tiles), res.core, ...materials];
       const disposed = watchDisposals(owned);
+      const bodiesDisposed = watchDisposals(Object.values(res.bodies));
       res.dispose();
       expect(disposed()).toBe(owned.length);
+      // The cached body meshes are released (GPU) by their last user.
+      expect(bodiesDisposed()).toBe(3);
+      res.dispose(); // idempotent
+      expect(disposed()).toBe(owned.length);
     }
+  });
+
+  it('stickered and stickerless body meshes are distinct cache entries', () => {
+    const a = createStickeredResources('low', 'gloss');
+    const b = createStickerlessResources('low', 'gloss');
+    expect(a.bodies.center).not.toBe(b.pieces.center);
+    a.dispose();
+    b.dispose();
   });
 
   it('stickerless: piece meshes are shared and freed only when the last user lets go', () => {

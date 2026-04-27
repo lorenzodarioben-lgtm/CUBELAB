@@ -17,6 +17,11 @@
  * a seam term — surfaces facing into a neighbouring piece's cell are shaded by
  * that piece — so seams read as tight dark lines and never sparkle, with or
  * without shadow maps.
+ *
+ * The Classic Stickered style uses the same material for its black bodies
+ * (every cap black, see `stickeredResources.ts`) with its own options: a
+ * glossier exterior, and a moulded honeycomb texture on the internal faces
+ * that a turn exposes (bump-mapped in the shader, no textures).
  */
 import * as THREE from 'three';
 import type { Finish } from '../../core/persistence/settings';
@@ -46,8 +51,39 @@ uniform vec3 uBlack;
 uniform float uBlackRoughness;
 uniform float uBlackCoat;
 uniform float uSeed;
+uniform vec2 uSeamRange;
+uniform float uCavityMin;
+// Light kept in fully occluded seams: indirect diffuse, indirect specular, direct diffuse, direct specular.
+uniform vec4 uSeamFloor;
+// The same while a layer turn has opened the cube; uExposure (0 = closed, 1 = 45° open) blends to them.
+uniform float uCavityMinOpen;
+uniform vec4 uSeamFloorOpen;
+uniform float uExposure;
 varying vec3 vPiecePos;
 varying vec3 vPieceNormal;
+
+#ifdef PIECE_HONEYCOMB
+// Distance from the centre of the nearest cell of a hexagonal grid (0 at the centre, 0.5 at a wall).
+float pieceHex(vec2 p) {
+  const vec2 r = vec2(1.0, 1.7320508);
+  vec2 h = r * 0.5;
+  vec2 a = mod(p, r) - h;
+  vec2 b = mod(p - h, r) - h;
+  vec2 g = abs(dot(a, a) < dot(b, b) ? a : b);
+  return max(dot(g, vec2(0.5, 0.8660254)), g.x);
+}
+
+// Bump mapping from a screen-space height gradient (as three.js's perturbNormalArb).
+vec3 pieceBump(vec3 surfPos, vec3 surfNorm, vec2 dHdxy, float faceDir) {
+  vec3 sigmaX = normalize(dFdx(surfPos));
+  vec3 sigmaY = normalize(dFdy(surfPos));
+  vec3 r1 = cross(sigmaY, surfNorm);
+  vec3 r2 = cross(surfNorm, sigmaX);
+  float det = dot(sigmaX, r1) * faceDir;
+  vec3 grad = sign(det) * (dHdxy.x * r1 + dHdxy.y * r2);
+  return normalize(abs(det) * surfNorm - grad);
+}
+#endif
 
 float pieceHash(vec3 p) {
   p = fract(p * 0.3183099 + 0.1);
@@ -66,6 +102,10 @@ float pieceNoise(vec3 x) {
   );
 }
 `;
+
+/** Honeycomb cell size and wall height (object units) on internal faces. */
+const HEX_CELL = 0.05;
+const HEX_DEPTH = 0.003;
 
 const COLOUR = /* glsl */ `
 #include <color_fragment>
@@ -105,7 +145,7 @@ float pieceGap = pieceBest - pieceSecond;
 float pieceBlend = 0.5 + 0.5 * smoothstep(0.0, max(fwidth(pieceGap) * 1.25, 1e-5), pieceGap);
 float pieceCap = mix(pieceSecondCap, pieceBestCap, pieceBlend);
 diffuseColor.rgb = mix(pieceSecondColor, pieceBestColor, pieceBlend);
-float pieceCavity = mix(1.0, 0.12, smoothstep(0.012, 0.2, pieceDepth));
+float pieceCavity = mix(1.0, mix(uCavityMin, uCavityMinOpen, uExposure), smoothstep(0.012, 0.2, pieceDepth));
 // How squarely the surface faces a hidden side, i.e. a neighbouring piece.
 vec3 pieceN = normalize(vPieceNormal);
 float pieceFacing[6];
@@ -119,7 +159,23 @@ float pieceHidden = 0.0;
 for (int i = 0; i < 6; i++) {
   if (uFaceOn[i] < 0.5) pieceHidden = max(pieceHidden, pieceFacing[i]);
 }
-float pieceSeam = 1.0 - smoothstep(0.08, 0.6, pieceHidden);
+float pieceSeam = 1.0 - smoothstep(uSeamRange.x, uSeamRange.y, pieceHidden);
+#ifdef PIECE_HONEYCOMB
+// Moulded honeycomb on flat internal faces (squarely facing a neighbour), away from the visible rims.
+vec3 pieceAbsN = abs(pieceN);
+vec2 pieceHexUv = pieceAbsN.x > max(pieceAbsN.y, pieceAbsN.z) ? vPiecePos.yz : (pieceAbsN.y > pieceAbsN.z ? vPiecePos.zx : vPiecePos.xy);
+float pieceHexWeight = smoothstep(0.9, 0.98, pieceHidden) * smoothstep(0.07, 0.16, pieceDepth);
+float pieceHexWall = smoothstep(0.36, 0.47, pieceHex(pieceHexUv / ${HEX_CELL.toFixed(3)})) * pieceHexWeight;
+float pieceHexHeight = pieceHexWall * ${HEX_DEPTH.toFixed(4)};
+diffuseColor.rgb *= 1.0 + 2.2 * pieceHexWall;
+#endif
+`;
+
+const HONEYCOMB = /* glsl */ `
+#include <normal_fragment_maps>
+#ifdef PIECE_HONEYCOMB
+normal = pieceBump(-vViewPosition, normal, vec2(dFdx(pieceHexHeight), dFdy(pieceHexHeight)), faceDirection);
+#endif
 `;
 
 const ROUGHNESS = /* glsl */ `
@@ -140,13 +196,14 @@ const CAVITY = /* glsl */ `
 // exposed mid-turn still shows its form instead of reading as a void.
 float pieceDirect = mix(1.0, pieceCavity, 0.7);
 float pieceSheen = mix(pieceCavity, 1.0, 0.3);
-float pieceSeamSpecular = mix(0.03, 1.0, pieceSeam);
-reflectedLight.indirectDiffuse *= pieceCavity * mix(0.6, 1.0, pieceSeam);
-reflectedLight.indirectSpecular *= pieceSheen * mix(0.22, 1.0, pieceSeam);
-reflectedLight.directDiffuse *= pieceDirect * mix(0.45, 1.0, pieceSeam);
+vec4 pieceFloor = mix(uSeamFloor, uSeamFloorOpen, uExposure);
+float pieceSeamSpecular = mix(pieceFloor.w, 1.0, pieceSeam);
+reflectedLight.indirectDiffuse *= pieceCavity * mix(pieceFloor.x, 1.0, pieceSeam);
+reflectedLight.indirectSpecular *= pieceSheen * mix(pieceFloor.y, 1.0, pieceSeam);
+reflectedLight.directDiffuse *= pieceDirect * mix(pieceFloor.z, 1.0, pieceSeam);
 reflectedLight.directSpecular *= pieceDirect * pieceSeamSpecular;
 #ifdef USE_CLEARCOAT
-  clearcoatSpecularIndirect *= pieceSheen * mix(0.22, 1.0, pieceSeam);
+  clearcoatSpecularIndirect *= pieceSheen * mix(pieceFloor.y, 1.0, pieceSeam);
   clearcoatSpecularDirect *= pieceDirect * pieceSeamSpecular;
 #endif
 `;
@@ -158,32 +215,75 @@ export interface PieceLook {
   readonly finish: Finish;
 }
 
+/** Per-design adjustments; omitted fields keep the stickerless defaults. */
+export interface PieceMaterialOptions {
+  /** Exterior plastic (within the caps): roughness and clear coat. */
+  readonly capRoughness?: number;
+  readonly capCoat?: number;
+  readonly capCoatRoughness?: number;
+  /** Interior (mechanism) plastic roughness. */
+  readonly blackRoughness?: number;
+  /** How squarely a surface must face a neighbour before seam shading starts and is complete. */
+  readonly seamRange?: readonly [number, number];
+  /** Light left deep inside the openings (1 = no cavity darkening). */
+  readonly cavityMin?: number;
+  /** Light kept in fully occluded seams: indirect diffuse, indirect specular, direct diffuse, direct specular. */
+  readonly seamFloor?: readonly [number, number, number, number];
+  /**
+   * Softer occlusion for while a turn has opened the cube, so the faces it
+   * exposes are lit; blended in by `exposure` (shared uniform, 0…1). With the
+   * cube closed every seam is shut, so full occlusion cannot hide anything.
+   */
+  readonly open?: { readonly cavityMin: number; readonly seamFloor: readonly [number, number, number, number] };
+  readonly exposure?: { value: number };
+  /** Strength of studio reflections (environment light); 1 = as lit. */
+  readonly envIntensity?: number;
+  /** Colour of the interior (mechanism) plastic. */
+  readonly interiorColor?: THREE.ColorRepresentation;
+  /** Moulded honeycomb on internal faces, seen mid-turn. */
+  readonly honeycomb?: boolean;
+}
+
 /**
  * One piece's material. `slotColors` gives the plastic colour for each
  * canonical face slot (null where the piece has no visible face). All piece
  * materials compile to one shared program.
  */
-export function createPieceMaterial(slotColors: readonly (THREE.Color | null)[], look: PieceLook, seed: number): THREE.Material {
+export function createPieceMaterial(
+  slotColors: readonly (THREE.Color | null)[],
+  look: PieceLook,
+  seed: number,
+  options: PieceMaterialOptions = {},
+): THREE.Material {
   const gloss = look.finish === 'gloss';
   const physical = look.tier !== 'low';
+  const honeycomb = options.honeycomb === true && physical;
   const uniforms = {
     uFaceColor: { value: slotColors.map((c) => (c ? c.clone() : BLACK.clone())) },
     uFaceOn: { value: slotColors.map((c) => (c ? 1 : 0)) },
-    uBlack: { value: BLACK.clone() },
-    uBlackRoughness: { value: gloss ? 0.34 : 0.5 },
+    uBlack: { value: options.interiorColor !== undefined ? new THREE.Color(options.interiorColor) : BLACK.clone() },
+    uBlackRoughness: { value: options.blackRoughness ?? (gloss ? 0.34 : 0.5) },
     uBlackCoat: { value: 0.35 },
     uSeed: { value: seed },
+    uSeamRange: { value: new THREE.Vector2(...(options.seamRange ?? [0.08, 0.6])) },
+    uCavityMin: { value: options.cavityMin ?? 0.12 },
+    uSeamFloor: { value: new THREE.Vector4(...(options.seamFloor ?? [0.6, 0.22, 0.45, 0.03])) },
+    uCavityMinOpen: { value: options.open?.cavityMin ?? options.cavityMin ?? 0.12 },
+    uSeamFloorOpen: { value: new THREE.Vector4(...(options.open?.seamFloor ?? options.seamFloor ?? [0.6, 0.22, 0.45, 0.03])) },
+    uExposure: options.exposure ?? { value: 0 },
   };
-  const common = { color: '#ffffff', roughness: gloss ? 0.2 : 0.42, metalness: 0 };
+  const common = { color: '#ffffff', roughness: options.capRoughness ?? (gloss ? 0.2 : 0.42), metalness: 0 };
   const material = physical
     ? new THREE.MeshPhysicalMaterial({
         ...common,
-        clearcoat: gloss ? 0.6 : 0.12,
-        clearcoatRoughness: gloss ? 0.1 : 0.4,
+        clearcoat: options.capCoat ?? (gloss ? 0.6 : 0.12),
+        clearcoatRoughness: options.capCoatRoughness ?? (gloss ? 0.1 : 0.4),
         specularIntensity: 0.75,
         ior: 1.5,
       })
     : new THREE.MeshStandardMaterial(common);
+  if (honeycomb) material.defines = { ...material.defines, PIECE_HONEYCOMB: '' };
+  if (options.envIntensity !== undefined) (material as THREE.MeshStandardMaterial).envMapIntensity = options.envIntensity;
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
@@ -193,9 +293,10 @@ export function createPieceMaterial(slotColors: readonly (THREE.Color | null)[],
       .replace('#include <common>', `#include <common>\n${FRAGMENT_DECLARATIONS}`)
       .replace('#include <color_fragment>', COLOUR)
       .replace('#include <roughnessmap_fragment>', ROUGHNESS)
+      .replace('#include <normal_fragment_maps>', HONEYCOMB)
       .replace('#include <lights_physical_fragment>', COAT)
       .replace('#include <aomap_fragment>', CAVITY);
   };
-  material.customProgramCacheKey = () => `cubelab-piece-${physical ? 'physical' : 'standard'}`;
+  material.customProgramCacheKey = () => `cubelab-piece-${physical ? 'physical' : 'standard'}${honeycomb ? '-honeycomb' : ''}`;
   return material;
 }

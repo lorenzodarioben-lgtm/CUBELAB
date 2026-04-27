@@ -1,7 +1,7 @@
 /**
  * A faint outline on the facelet under the mouse, so the strip you are about
  * to grab — outer face or middle slice — is visible before you press. It
- * follows the shown cube style: a ring around the raised tile on the Classic
+ * follows the shown cube style: a ring around the shaped sticker on the Classic
  * Stickered cube, the piece's own outline (round cuts on centres and edges, a
  * crisp corner on corner pieces) on the Premium Stickerless cube.
  * Mouse only; hidden while anything animates, during drags and on touch input.
@@ -15,6 +15,7 @@ import { ANCHOR_OFFSET, SURFACE_OFFSET } from './cubeResources';
 import { PIECE_HALF, facePillow, outlineCornerRadius } from './pieceGeometry';
 import type { PieceKind } from './pieceGeometry';
 import type { HoverState } from './hoverState';
+import { STICKER_HALF, stickerRadii } from './stickeredResources';
 
 const KINDS: readonly PieceKind[] = ['center', 'edge', 'corner'];
 const RING_INSET = 0.035;
@@ -67,9 +68,16 @@ function stickerlessRing(kind: PieceKind, shape: number): THREE.ShapeGeometry {
   return geometry;
 }
 
-/** Ring just outside a Classic Stickered tile (a rounded square). */
-function stickeredRing(): THREE.ShapeGeometry {
-  return ring(0.43 + RING_INSET, [0.14, 0.14, 0.14, 0.14]);
+/** Gap between a Classic Stickered sticker's edge and the ring around it. */
+const STICKER_MARGIN = 0.012;
+
+/** Ring just outside a Classic Stickered sticker, following its shaped outline. */
+function stickeredRing(kind: PieceKind, shape: number): THREE.ShapeGeometry {
+  const grow = RING_INSET + STICKER_MARGIN;
+  return ring(
+    STICKER_HALF + grow,
+    stickerRadii(kind, shape).map((r) => r + grow),
+  );
 }
 
 export function HoverIndicator({ hover, engine, style }: { hover: HoverState; engine: CubeEngine; style: CubeStyle }) {
@@ -79,7 +87,10 @@ export function HoverIndicator({ hover, engine, style }: { hover: HoverState; en
   // per piece kind, the sixteen corner combinations (four occur on a 3×3).
   const geometries = useMemo(
     () => ({
-      stickered: stickeredRing(),
+      stickered: Object.fromEntries(KINDS.map((kind) => [kind, Array.from({ length: 16 }, (_, shape) => stickeredRing(kind, shape))])) as Record<
+        PieceKind,
+        THREE.ShapeGeometry[]
+      >,
       stickerless: Object.fromEntries(KINDS.map((kind) => [kind, Array.from({ length: 16 }, (_, shape) => stickerlessRing(kind, shape))])) as Record<
         PieceKind,
         THREE.ShapeGeometry[]
@@ -93,7 +104,7 @@ export function HoverIndicator({ hover, engine, style }: { hover: HoverState; en
   );
   useEffect(
     () => () => {
-      geometries.stickered.dispose();
+      Object.values(geometries.stickered).forEach((set) => set.forEach((g) => g.dispose()));
       Object.values(geometries.stickerless).forEach((set) => set.forEach((g) => g.dispose()));
       material.dispose();
     },
@@ -110,12 +121,12 @@ export function HoverIndicator({ hover, engine, style }: { hover: HoverState; en
     // The outline marks a lattice position, so hide it while any layer is moving.
     mesh.visible = hover.visible && !engine.isAnimating();
     if (mesh.visible) {
-      mesh.geometry = style === 'stickered' ? geometries.stickered : geometries.stickerless[hover.kind][hover.shape]!;
+      mesh.geometry = geometries[style][hover.kind][hover.shape]!;
       mesh.position.copy(hover.position);
       mesh.quaternion.copy(hover.quaternion);
       mesh.translateZ(lift);
     }
   });
 
-  return <mesh ref={meshRef} geometry={geometries.stickered} material={material} visible={false} renderOrder={3} />;
+  return <mesh ref={meshRef} geometry={geometries.stickerless.center[15]} material={material} visible={false} renderOrder={3} />;
 }
