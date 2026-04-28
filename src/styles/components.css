@@ -1362,6 +1362,13 @@
   }
 }
 
+/* Sound volume + preview, side by side. */
+.sound-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* Cube style picker: two preview cards in a native radio group. */
 
 .setting--stacked {

@@ -26,6 +26,8 @@ export interface Settings {
   readonly finish: Finish;
   readonly faceLabels: boolean;
   readonly sound: boolean;
+  /** Turn-sound volume, 0…1 (applied perceptually). */
+  readonly soundVolume: number;
   readonly motion: MotionPreference;
   readonly orbitSensitivity: number;
   readonly keyMap: KeyMap;
@@ -46,6 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
   finish: 'gloss',
   faceLabels: false,
   sound: false,
+  soundVolume: 0.7,
   motion: 'system',
   orbitSensitivity: 1,
   keyMap: 'faces',
@@ -100,6 +103,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     finish: pick(r.finish, ['gloss', 'matte'], d.finish),
     faceLabels: bool(r.faceLabels, d.faceLabels),
     sound: bool(r.sound, d.sound),
+    soundVolume: num(r.soundVolume, 0, 1, d.soundVolume),
     motion: pick(r.motion, ['system', 'reduce', 'full'], d.motion),
     orbitSensitivity: num(r.orbitSensitivity, 0.4, 2, d.orbitSensitivity),
     keyMap: pick(r.keyMap, ['faces', 'speed'], d.keyMap),

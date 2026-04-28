@@ -198,9 +198,6 @@ export function createStickeredResources(tier: RenderTier, finish: Finish): Stic
       // seams fully shaded while the cube is closed (no glints), and the faces a
       // turn exposes lit enough to show their form while it is open.
       seamRange: [0.6, 0.97],
-      // Glossy black shows its shape only through what it reflects: a stronger
-      // reflection gives every rounded rim the soft sheen of a product shot.
-      envIntensity: 1.9,
       cavityMin: 0.2,
       seamFloor: [0.6, 0.22, 0.45, 0.03],
       open: { cavityMin: 0.42, seamFloor: [0.85, 0.55, 0.8, 0.35] },

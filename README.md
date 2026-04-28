@@ -55,6 +55,7 @@ npm run test:e2e     # Playwright against the production build (builds + preview
 | `npm run screenshots` | Re-capture `artifacts/after/*.png` (needs `npm run preview` running)             |
 | `node scripts/capture-style-matrix.mjs` | Both cube styles side by side → `artifacts/styles/` (needs preview) |
 | `node scripts/capture-style-previews.mjs` | Re-render the Settings previews in `src/assets/cube-styles/` (needs preview) |
+| `node scripts/render-audio-demo.mjs` | Render the turn-sound demonstration to `artifacts/audio/turn-demo.wav` (needs preview) |
 
 First Playwright run on a new machine: `npx playwright install chromium firefox webkit`.
 
@@ -138,7 +139,7 @@ Animated or instant scrambles (with skip), solver playback with Play/Pause, Step
 three speeds, Reset (confirms if it would discard a running attempt), camera reset, copy scramble and
 share links (`?scramble=R%20M%27%20U`), Zen mode, two cube styles (Classic Stickered / Premium
 Stickerless), sticker letters for colour-vision differences, gloss/matte finish, render quality (auto/high/low), reduced motion, orbit sensitivity, optional
-synthesized sound (off by default), and a 2D net fallback when WebGL is unavailable.
+speedcube turning sounds with volume and preview (off by default), and a 2D net fallback when WebGL is unavailable.
 
 ## Architecture
 
@@ -152,7 +153,7 @@ src/
     timing/      timer state machine (casual / spacebar / inspection, STM/HTM/QTM)
     stats/       WCA-style averages and time formatting
     persistence/ versioned, validated localStorage (settings, history v2, cube snapshot)
-    audio/       optional Web Audio feedback
+    audio/       turn sounds: synthesis, event→sound planner, Web Audio player
   app/           Studio controller (vanilla Zustand store), UI store, actions, debug hooks
   components/    stage (R3F canvas, lighting, camera rig, pointer arbitration), cube (shared cubie
                  model, stickered + stickerless resources, piece SDF mesher, piece shader,
@@ -162,9 +163,9 @@ src/
   styles/        tokens · base · layout · components
 tests/
   unit/          puzzle, slices, rotations, engine, solver, timer, stats, persistence, gestures,
-                 pieces (geometry), styles, studio flows
-  e2e/           studio, slices, rotations, cube styles, stress, phone (touch), no-WebGL, reduced
-                 motion, cross-browser smoke
+                 pieces (geometry), styles, audio, studio flows
+  e2e/           studio, slices, rotations, cube styles, audio, stress, phone (touch), no-WebGL,
+                 reduced motion, cross-browser smoke
 ```
 
 ### One authoritative state
@@ -219,7 +220,7 @@ Two cube styles share everything except the physical model (Settings → Cube st
 | | Classic Stickered | Premium Stickerless (default) |
 | --- | --- | --- |
 | Pieces | Glossy black moulded bodies from the same SDF mesher (flat faces, rounded outer edges, honeycomb interior seen mid-turn) | Solid moulded parts from signed distance fields (`pieceGeometry.ts`), each face a gentle dome that rolls softly into its seams |
-| Colour | Thin vinyl stickers shaped like their piece (round centres, D-shaped edges, square corners) with a black border, four print batches per colour | The plastic itself: a shader (`pieceMaterial.ts`) gives each face a coloured cap over black mechanism, meeting on the cube edges' 45° lines |
+| Colour | Thin vinyl stickers shaped like their piece (round centres, D-shaped edges, square corners) with a black border, four print batches per colour | The plastic itself: a shader (`pieceMaterial.ts`) gives each face a coloured cap over black mechanism, meeting on the cube edges' 45° lines, with a drawn parting line; satin sheen under a clear coat, its own reflector-card reflections, per-piece finish variation |
 | Signature | Black frame around every tile | GAN-style cuts where pieces meet the face centre: round centre caps and rounded edge ends, crisp near-square inner corners on the corner pieces, black openings at the diagonals |
 
 ![Classic Stickered](artifacts/styles/stickered/scrambled.png) ![Premium Stickerless](artifacts/styles/stickerless/scrambled.png)
@@ -235,13 +236,28 @@ and finish, creates them on first use, keeps them until the tier or finish chang
 hidden style's resources and shaders at idle so even the first switch is quick. The choice persists
 with the other settings; settings saved before styles existed load as Stickerless.
 
-Both styles use the same image-based lighting: a small photographic studio (dark graded cyclorama,
+Both styles share the scene lighting: a small photographic studio (dark graded cyclorama,
 overhead softbox, a strip box placed so the top face carries a half reflection, key and rim strips,
 fill and bounce cards) built in code and prefiltered once with PMREM, plus a key light for soft
-shadows — no image assets. Render tiers: **high** (desktop: physical materials, finest meshes, soft
+shadows — no image assets. The stickerless materials additionally reflect their own map of that
+studio with soft reflector cards where their faces mirror (glossy colour needs something to reflect);
+the stickered cube uses the shared one. Mid-turn, both light the faces a turn exposes (charcoal
+mechanism, honeycomb; a moulded track on the stickerless pieces). Render tiers: **high** (desktop: physical materials, finest meshes, soft
 real-time shadows + contact shadow), **medium** (touch devices on Auto: same materials, lighter
 meshes, no shadow passes), **low** (standard materials, coarser meshes). Frames are rendered on demand
 only while something moves.
+
+### Sound
+
+Turning sounds are synthesised (`src/core/audio/`; no recordings): dry plastic friction from micro
+stick-slip impacts on damped plastic modes, quiet rattle on fast turns, and a magnetic snap when the
+layer lands. The engine reports each turn's start (duration, angle, easing), drag motion and commit;
+a pure planner (`turnPlanner.ts`) turns those into voices whose level and brightness follow the layer's
+actual angular speed, and the Web Audio player (`sound.ts`) schedules them from a sound bank rendered
+once, through a volume control and limiter. Double turns tick faintly at the half-way magnet, slices
+are a shade darker, whole-cube rotations and camera moves are silent, a drag's friction follows your
+finger and a cancelled drag springs back without a snap. Off by default; Settings has volume and
+Preview. Details, measurements and the honest listening status: `CUBELAB_HANDOFF.md`.
 
 ### Bundling cubing.js's worker
 
@@ -254,7 +270,7 @@ before cubing.js falls back).
 
 `window.__CUBELAB__` exposes read-only inspection (`facelets()`, `patternFacelets()`, `visualFacelets()`
 read from the three.js scene graph, `project(point)`, `moveLog()`, `renderInfo()`, `renderedStyle()`,
-`camera()`, `timer()`, `solver()` …) used by the browser tests. Nothing on it can change state.
+`camera()`, `timer()`, `solver()`, `audio()`, `renderAudioDemo()` …) used by the browser tests. Nothing on it can change state.
 
 ## Known limitations
 

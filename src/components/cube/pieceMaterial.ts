@@ -22,6 +22,15 @@
  * (every cap black, see `stickeredResources.ts`) with its own options: a
  * glossier exterior, and a moulded honeycomb texture on the internal faces
  * that a turn exposes (bump-mapped in the shader, no textures).
+ *
+ * Optional details, each behind its own define so a design that does not ask
+ * for it compiles exactly the shader it had before:
+ *  - PIECE_CAP_SEAM: the parting line where the coloured shell meets the
+ *    black body, seen on side walls mid-turn (two-shot moulding);
+ *  - PIECE_TRACK: a shallow moulded ring groove round the turning axis on
+ *    internal faces (the track the pieces ride on);
+ *  - PIECE_WAVY: very low-frequency surface waviness on the coloured shell, so
+ *    studio reflections bend a little differently on every piece.
  */
 import * as THREE from 'three';
 import type { Finish } from '../../core/persistence/settings';
@@ -72,7 +81,17 @@ float pieceHex(vec2 p) {
   vec2 g = abs(dot(a, a) < dot(b, b) ? a : b);
   return max(dot(g, vec2(0.5, 0.8660254)), g.x);
 }
+#endif
 
+#ifdef PIECE_TRACK
+uniform vec3 uPieceHome;
+#endif
+#ifdef PIECE_WAVY
+uniform float uWavy;
+#endif
+
+#if defined(PIECE_HONEYCOMB) || defined(PIECE_TRACK) || defined(PIECE_WAVY)
+#define PIECE_BUMP
 // Bump mapping from a screen-space height gradient (as three.js's perturbNormalArb).
 vec3 pieceBump(vec3 surfPos, vec3 surfNorm, vec2 dHdxy, float faceDir) {
   vec3 sigmaX = normalize(dFdx(surfPos));
@@ -106,6 +125,9 @@ float pieceNoise(vec3 x) {
 /** Honeycomb cell size and wall height (object units) on internal faces. */
 const HEX_CELL = 0.05;
 const HEX_DEPTH = 0.003;
+/** Track groove: radius from the turning axis and depth (object units). */
+const TRACK_RADIUS = 1.16;
+const TRACK_DEPTH = 0.004;
 
 const COLOUR = /* glsl */ `
 #include <color_fragment>
@@ -124,10 +146,12 @@ float pieceSecond = -10.0;
 vec3 pieceSecondColor = uBlack;
 float pieceSecondCap = 0.0;
 float pieceDepth = 10.0;
+float pieceTop = -10.0;
 for (int i = 0; i < 6; i++) {
   if (uFaceOn[i] < 0.5) continue;
   float h = pieceHeights[i];
   pieceDepth = min(pieceDepth, ${PIECE_HALF.toFixed(4)} - h);
+  pieceTop = max(pieceTop, h);
   if (h > pieceBest) {
     pieceSecond = pieceBest;
     pieceSecondColor = pieceBestColor;
@@ -160,21 +184,47 @@ for (int i = 0; i < 6; i++) {
   if (uFaceOn[i] < 0.5) pieceHidden = max(pieceHidden, pieceFacing[i]);
 }
 float pieceSeam = 1.0 - smoothstep(uSeamRange.x, uSeamRange.y, pieceHidden);
+float pieceBumpHeight = 0.0;
+// Flat internal faces (squarely facing a neighbour), away from the visible rims.
+float pieceInner = smoothstep(0.9, 0.98, pieceHidden) * smoothstep(0.07, 0.16, pieceDepth);
 #ifdef PIECE_HONEYCOMB
-// Moulded honeycomb on flat internal faces (squarely facing a neighbour), away from the visible rims.
+// Moulded honeycomb on the internal faces.
 vec3 pieceAbsN = abs(pieceN);
 vec2 pieceHexUv = pieceAbsN.x > max(pieceAbsN.y, pieceAbsN.z) ? vPiecePos.yz : (pieceAbsN.y > pieceAbsN.z ? vPiecePos.zx : vPiecePos.xy);
-float pieceHexWeight = smoothstep(0.9, 0.98, pieceHidden) * smoothstep(0.07, 0.16, pieceDepth);
-float pieceHexWall = smoothstep(0.36, 0.47, pieceHex(pieceHexUv / ${HEX_CELL.toFixed(3)})) * pieceHexWeight;
-float pieceHexHeight = pieceHexWall * ${HEX_DEPTH.toFixed(4)};
+float pieceHexWall = smoothstep(0.36, 0.47, pieceHex(pieceHexUv / ${HEX_CELL.toFixed(3)})) * pieceInner;
+pieceBumpHeight += pieceHexWall * ${HEX_DEPTH.toFixed(4)};
 diffuseColor.rgb *= 1.0 + 2.2 * pieceHexWall;
+#endif
+#ifdef PIECE_TRACK
+{
+  // The track: a shallow ring groove round the turning axis that each internal face looks along.
+  vec3 c = vPiecePos + uPieceHome;
+  vec3 an = abs(pieceN);
+  float r = an.x > max(an.y, an.z) ? length(c.yz) : (an.y > an.z ? length(c.zx) : length(c.xy));
+  float groove = (1.0 - smoothstep(0.016, 0.032, abs(r - ${TRACK_RADIUS.toFixed(3)}))) * pieceInner;
+  pieceBumpHeight -= groove * ${TRACK_DEPTH.toFixed(4)};
+  diffuseColor.rgb *= 1.0 - 0.4 * groove;
+}
+#endif
+#ifdef PIECE_CAP_SEAM
+{
+  // Parting line between the coloured shell and the black body, on side walls.
+  float d = pieceTop - ${(PIECE_HALF - CAP_DEPTH).toFixed(4)};
+  float w = max(fwidth(d), 1e-5);
+  float line = 1.0 - smoothstep(0.0018, 0.0018 + 1.5 * w, abs(d));
+  diffuseColor.rgb *= 1.0 - 0.8 * line;
+}
+#endif
+#ifdef PIECE_WAVY
+// Moulding waviness of the shell: a few gentle undulations per piece.
+pieceBumpHeight += uWavy * (pieceNoise(vPiecePos * 2.6 + uSeed * 1.7) - 0.5) * pieceCap;
 #endif
 `;
 
-const HONEYCOMB = /* glsl */ `
+const BUMP = /* glsl */ `
 #include <normal_fragment_maps>
-#ifdef PIECE_HONEYCOMB
-normal = pieceBump(-vViewPosition, normal, vec2(dFdx(pieceHexHeight), dFdy(pieceHexHeight)), faceDirection);
+#ifdef PIECE_BUMP
+normal = pieceBump(-vViewPosition, normal, vec2(dFdx(pieceBumpHeight), dFdy(pieceBumpHeight)), faceDirection);
 #endif
 `;
 
@@ -236,12 +286,24 @@ export interface PieceMaterialOptions {
    */
   readonly open?: { readonly cavityMin: number; readonly seamFloor: readonly [number, number, number, number] };
   readonly exposure?: { value: number };
-  /** Strength of studio reflections (environment light); 1 = as lit. */
+  /**
+   * Strength of studio reflections. Only takes effect with a material-level
+   * reflection map: three.js uses `scene.environmentIntensity` for materials
+   * that fall back to the scene environment.
+   */
   readonly envIntensity?: number;
   /** Colour of the interior (mechanism) plastic. */
   readonly interiorColor?: THREE.ColorRepresentation;
   /** Moulded honeycomb on internal faces, seen mid-turn. */
   readonly honeycomb?: boolean;
+  /** Ring groove (the track) on internal faces; the piece's canonical lattice home locates the axes. */
+  readonly track?: readonly [number, number, number];
+  /** Parting line where the coloured shell meets the black body. */
+  readonly capSeam?: boolean;
+  /** Amplitude (object units) of low-frequency waviness on the coloured shell. */
+  readonly waviness?: number;
+  /** Deterministic per-piece finish variation: relative roughness and coat-roughness offsets. */
+  readonly variation?: { readonly roughness: number; readonly coat: number };
 }
 
 /**
@@ -258,6 +320,9 @@ export function createPieceMaterial(
   const gloss = look.finish === 'gloss';
   const physical = look.tier !== 'low';
   const honeycomb = options.honeycomb === true && physical;
+  const track = options.track !== undefined && physical;
+  const wavy = (options.waviness ?? 0) > 0 && physical;
+  const capSeam = options.capSeam === true;
   const uniforms = {
     uFaceColor: { value: slotColors.map((c) => (c ? c.clone() : BLACK.clone())) },
     uFaceOn: { value: slotColors.map((c) => (c ? 1 : 0)) },
@@ -271,6 +336,8 @@ export function createPieceMaterial(
     uCavityMinOpen: { value: options.open?.cavityMin ?? options.cavityMin ?? 0.12 },
     uSeamFloorOpen: { value: new THREE.Vector4(...(options.open?.seamFloor ?? options.seamFloor ?? [0.6, 0.22, 0.45, 0.03])) },
     uExposure: options.exposure ?? { value: 0 },
+    ...(track ? { uPieceHome: { value: new THREE.Vector3(...options.track!) } } : {}),
+    ...(wavy ? { uWavy: { value: options.waviness! } } : {}),
   };
   const common = { color: '#ffffff', roughness: options.capRoughness ?? (gloss ? 0.2 : 0.42), metalness: 0 };
   const material = physical
@@ -282,7 +349,16 @@ export function createPieceMaterial(
         ior: 1.5,
       })
     : new THREE.MeshStandardMaterial(common);
-  if (honeycomb) material.defines = { ...material.defines, PIECE_HONEYCOMB: '' };
+  const defines: Record<string, string> = {};
+  if (honeycomb) defines.PIECE_HONEYCOMB = '';
+  if (track) defines.PIECE_TRACK = '';
+  if (wavy) defines.PIECE_WAVY = '';
+  if (capSeam) defines.PIECE_CAP_SEAM = '';
+  if (Object.keys(defines).length > 0) material.defines = { ...material.defines, ...defines };
+  if (options.variation) {
+    material.roughness *= 1 + options.variation.roughness;
+    if (material instanceof THREE.MeshPhysicalMaterial) material.clearcoatRoughness *= 1 + options.variation.coat;
+  }
   if (options.envIntensity !== undefined) (material as THREE.MeshStandardMaterial).envMapIntensity = options.envIntensity;
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -293,10 +369,11 @@ export function createPieceMaterial(
       .replace('#include <common>', `#include <common>\n${FRAGMENT_DECLARATIONS}`)
       .replace('#include <color_fragment>', COLOUR)
       .replace('#include <roughnessmap_fragment>', ROUGHNESS)
-      .replace('#include <normal_fragment_maps>', HONEYCOMB)
+      .replace('#include <normal_fragment_maps>', BUMP)
       .replace('#include <lights_physical_fragment>', COAT)
       .replace('#include <aomap_fragment>', CAVITY);
   };
-  material.customProgramCacheKey = () => `cubelab-piece-${physical ? 'physical' : 'standard'}${honeycomb ? '-honeycomb' : ''}`;
+  const variant = Object.keys(defines).sort().join('+');
+  material.customProgramCacheKey = () => `cubelab-piece-${physical ? 'physical' : 'standard'}${variant ? `-${variant}` : ''}`;
   return material;
 }

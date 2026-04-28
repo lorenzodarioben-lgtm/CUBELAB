@@ -29,7 +29,7 @@ import type { Settings } from '../core/persistence/settings';
 import { HISTORY_LIMIT, loadCube, loadHistory, loadSettings, saveCube, saveHistory, saveSettings } from '../core/persistence/storage';
 import type { KeyValueStore, SolveRecord } from '../core/persistence/storage';
 import { silentPlayer } from '../core/audio/sound';
-import type { SoundPlayer } from '../core/audio/sound';
+import type { SoundPlayer, SoundStats } from '../core/audio/sound';
 
 export type ScrambleStatus = 'idle' | 'generating' | 'applying' | 'applied' | 'error';
 export type SolverStatus = 'idle' | 'solving' | 'playing' | 'paused' | 'done' | 'stale' | 'error';
@@ -168,6 +168,7 @@ export class Studio {
       now: this.#now,
       ...(deps.scheduleFrame ? { scheduleFrame: deps.scheduleFrame } : {}),
     });
+    this.#sound.setVolume(settings.soundVolume);
     this.#sound.setEnabled(settings.sound);
 
     const scramble: ScrambleInfo =
@@ -200,6 +201,15 @@ export class Studio {
     }));
 
     this.#unsubscribe = this.engine.subscribe((event) => this.#onEngineEvent(event));
+  }
+
+  /** Plays the turn-sound demonstration (if sound is on); the cube is not touched. */
+  previewSound(): void {
+    this.#sound.preview();
+  }
+
+  soundStats(): SoundStats {
+    return this.#sound.stats();
   }
 
   dispose(): void {
@@ -548,6 +558,7 @@ export class Studio {
     const settings = { ...this.state.settings, ...patch };
     this.#set({ settings });
     saveSettings(this.#deps.storage, settings);
+    if (patch.soundVolume !== undefined) this.#sound.setVolume(patch.soundVolume);
     if (patch.sound !== undefined) this.#sound.setEnabled(patch.sound);
     if (patch.timerMode !== undefined || patch.inspection !== undefined) {
       this.#timer({ type: 'configure', mode: settings.timerMode, inspection: settings.inspection });
@@ -703,11 +714,13 @@ export class Studio {
   }
 
   #onEngineEvent(event: EngineEvent): void {
+    // Turn audio follows the engine's own motion events (independent of React).
+    this.#sound.motion(event);
     if (event.type === 'commit') this.#onCommit(event);
     else if (event.type === 'replace') {
       this.#set({ moveLog: [], moveCount: 0 });
       this.#syncCube(false);
-    } else this.#syncFlags();
+    } else if (event.type === 'activity') this.#syncFlags();
   }
 
   #logUserMove(move: Move, source: MoveSource): void {
@@ -760,7 +773,6 @@ export class Studio {
       case 'manual':
       case 'undo':
       case 'redo': {
-        this.#sound.turn('manual');
         if (event.source !== 'manual') this.#timer({ type: 'assist', kind: event.source });
         const phaseBefore = this.state.timer.phase;
         this.#logUserMove(event.move, event.source);
@@ -812,7 +824,6 @@ export class Studio {
       }
 
       case 'solver': {
-        this.#sound.turn('auto');
         // Automated moves reset the user's log (the engine clears undo history the same way).
         if (this.state.moveCount > 0) this.#set({ moveLog: [], moveCount: 0 });
         const session = this.#session;

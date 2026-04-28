@@ -1,7 +1,10 @@
 # CUBELAB — Handoff
 
-Status (2026-10-13): seventh pass complete — the **Classic Stickered cube rebuilt as a premium GAN-style
-stickered cube** (moulded glossy-black bodies, shaped stickers, honeycomb interior). Sixth pass: softly
+Status (2026-10-13): eighth pass complete — **photoreal stickerless plastic** (its own studio
+reflections, per-piece finish, parting line, lit honeycomb/track interior mid-turn) and **speedcube turn
+audio** (synthesised sliding friction, rattle and magnetic snaps, driven by real turn motion and speed).
+Seventh pass: the **Classic Stickered cube rebuilt as a premium GAN-style stickered cube** (moulded
+glossy-black bodies, shaped stickers, honeycomb interior). Sixth pass: softly
 domed ("pillowy") stickerless faces. Fifth pass: **two cube styles** (Classic Stickered, recovered from the
 third pass, and Premium Stickerless, the default) on one shared puzzle state, switchable live from
 Settings and persisted; the stickerless **corner pieces' inner corners** made crisp to match the GAN
@@ -20,6 +23,190 @@ about what was and was not verified.
 - `.gitattributes` normalises line endings to LF.
 - Screenshots: `artifacts/before/` (v1), `artifacts/after/` (current default style) and
   `artifacts/styles/` (both styles side by side, selector, live switch).
+
+## Eighth pass — photoreal stickerless plastic + speedcube turn audio
+
+Brief: make the Premium Stickerless cube as physically convincing as the stickered one (without
+re-opening its geometry), keep the Classic Stickered look exactly, and replace the turn "click" with a
+convincing speedcube sound — sliding plastic, rattle and magnetic snap, responsive to speed.
+
+**Baseline (before any change, at `cd49a40`)**: typecheck ✓, lint ✓, unit 263/263 ✓, build ✓,
+browser 31/31 ✓ (desktop 27, phone 2, Firefox 1, WebKit 1). Working tree clean.
+
+### Why the stickerless cube looked less real (diagnosis from same-view screenshots)
+
+1. Glossy coloured plastic shows its form through what it reflects; in the dark studio a domed face
+   mirrors near-black, so every face rendered as one flat tone (the stickered cube hides this: its
+   glossy black frame carries the reflections).
+2. Mid-turn, the mechanism was black under full occlusion — a void.
+3. Nothing marked where the coloured shell ends and the black body begins.
+4. Every piece reflected identically.
+
+### Stickerless changes (geometry unchanged — dome 0.018, rim 0.055, cuts 0.37 / 0.37 / 0.08)
+
+- **Own reflection map** (`studioEnvironment.ts`, `STICKERLESS_REFLECTORS`; wired via
+  `styleReflections.ts`): the same studio plus soft-edged reflector cards placed just above where the F
+  and R faces mirror from the home view, and a dim scrim behind the camera. Each domed face now carries
+  a soft highlight fading across it. Only the stickerless materials use it (`material.envMap`); the
+  shared scene environment is untouched. An over-bright first version washed red to pink and was
+  dialled back until colours stayed saturated.
+- **Plastic**: broad satin sheen (roughness 0.26) under a sharp clear coat (0.78 / 0.07), reflections at
+  1.0 of the dedicated map; matte keeps its satin values. **Per-piece variation**: a deterministic
+  ±7 % roughness and ±20 % coat-roughness offset per piece (seeded once, never per render). **Waviness**:
+  a very low-frequency bump (amplitude 0.0009) on the shell so highlight bands bend slightly differently
+  on each piece. No scratches, noise or texture maps.
+- **Shell and mechanism** (shader options, each behind its own define): the **parting line** where the
+  coloured shell meets the black body (side walls, visible mid-turn); a charcoal (#17171a) interior with
+  the **honeycomb** and a moulded **track** ring groove (radius 1.16 from the turning axis) on internal
+  faces; and the **turn-driven exposure** already used by the stickered cube (seams and openings stay
+  deep black while the cube is closed; the faces a turn exposes are lit while it is open). The low tier
+  keeps only the parting line.
+- Verified at the reference-style views: no new artifacts (the thin rim highlight seen under
+  magnification exists identically in the before capture), colours saturated, low/medium/phone, matte
+  and hover unaffected.
+
+### Classic Stickered: protected
+
+Same-state, same-camera captures before and after this pass are **pixel-identical in all 9 views**
+(solved, scrambled, macro, R/M/E/S mid-turn, internals, upside-down; max channel difference 0). The
+shared shader changes are compiled out for it (defines), and it uses the scene environment as before.
+
+**Correction to the seventh pass**: its notes claim "stronger studio reflections (`envMapIntensity`
+1.9)" for the black bodies. That setting never took effect — three.js uses `scene.environmentIntensity`
+for any material that falls back to the scene environment. The no-op is removed (output unchanged,
+proven by the pixel diff) and the option now documents when it applies.
+
+### Turn audio (`src/core/audio/`)
+
+**Baseline found**: one 60 ms decaying white-noise burst through a fixed 1.9 kHz band-pass, fired at
+the commit (the end of the animation) for every manual/undo/redo/solver move; scramble moves silent.
+
+**Sources — procedural, no recordings.** No speedcube recordings with clear provenance were available
+in this environment (downloading sound packs or extracting audio from videos was not an option), so
+every sound is synthesised from a small physical model (`synth.ts`), rendered once at start into a
+sound bank (3 friction loops, 6 rattle pings, 8 snaps; deterministic seeds):
+- *friction*: Poisson micro stick-slip impacts (1400/s, exponential strengths) plus a little noise,
+  split across three slightly different banks of strongly damped plastic modes (1.1–9.6 kHz, τ
+  0.9–2.6 ms) with a breath of broadband noise, high-passed at 300 Hz, soft-limited; seamless loops;
+- *rattle*: short, bright modal pings (3–9 kHz, τ ≤ 3 ms);
+- *snap*: a hard sub-millisecond contact into lighter-damped modes (0.56–8.7 kHz) plus a second,
+  softer contact 2.5–5 ms later as the piece settles.
+
+**Event flow.** The engine now emits motion events (`cubeEngine.ts`): `turn` when an animated turn
+starts (move, source, duration, start/end angle, easing, from-drag), `drag` begin / move / release /
+cancel for pointer twists, and the existing `commit`. The studio forwards every engine event to the
+player (`studio.ts`); nothing else (camera, style, settings, React renders) reaches it. The pure
+`TurnPlanner` (`turnPlanner.ts`) turns events into voices, and `VoiceExecutor` (`sound.ts`) schedules
+them on the audio clock:
+- **slide** from the turn's first frame for its whole duration, its level following the layer's
+  actual angular speed along the easing curve (strongest early for snapping user turns, mid-turn for
+  smooth playback), brightness (low-pass 1.7–6.8 kHz) and level rising with angular speed
+  (`intensityOf`: 3 rad/s lazy → 22 rad/s flick);
+- **rattle**: 0–2 quiet knocks, only on fast turns (a first version allowed 3 and averaged 2.5 per
+  turn in fast sequences — busy over a long solve);
+- **snap** at the commit — the instant the layer lands — louder and brighter for faster turns;
+- **double turns** add a faint detent tick when the layer passes the intermediate quarter;
+- **slices** a shade darker; **x y z rotations silent** (a re-grip in the hand);
+- **drags**: a continuous friction voice follows the drag's smoothed (40 ms), clamped angular velocity
+  and ticks faintly when dragged past a magnet; release hands the flick's speed to the release turn;
+  cancel springs back with a soft slide and only a faint settle (≤ 0.07) — never a full snap;
+- **instant turns** (reduced motion, skipped scramble): one compact sound, at most one per 50 ms, so a
+  skipped scramble is one sound; scramble/solver playback are quieter (0.5 / 0.75);
+- variation: random friction loop and offset, snap variant and ±3 % rate per turn.
+
+**Mix & safety**: master gain = volume² → limiter (−10 dB, 12:1) → output; demo peak −7.6 dBFS at
+70 %, no clipped samples. Voices are capped (24 soft: optional detail dropped; 40 hard: oldest slide
+stopped), counted from their scheduled end on the audio clock — a first version counted until each
+`ended` event, which arrives late on a busy main thread, and wrongly hit the cap in fast bursts
+(peak 40 → now 3 for 40 rapid turns, nothing dropped). Nodes disconnect on end. The context is created
+only when sound is enabled and resumed on the next pointer/key gesture; without Web Audio the player
+is a silent no-op.
+
+**Controls**: Sound on/off (header + Settings), **Volume** slider (persisted `soundVolume`, 0–1, default
+0.7; old settings load at 0.7) and **Preview** (plays slow R, normal U, fast R U R' U', R2, M without
+touching the cube).
+
+**Listening — honest status**: I cannot hear audio in this environment. The sound was evaluated by
+signal inspection only: offline renders of the demonstration through the real player code (Chromium
+OfflineAudioContext), spectrograms, level/centroid measurements and automated checks. Measured (demo,
+70 %): slide centroid 2.4 kHz (slow) → 3.4–3.6 kHz (fast), slide RMS 0.027 → 0.071, snaps 12–16 dB
+above the slide level, M slice darker (2.7 kHz), spectral flatness of the friction 0.35 (noise-like,
+not tonal; an earlier version had ringing bands and was fixed). Whether it *sounds* like a real cube
+still needs a human ear: listen to `artifacts/audio/turn-demo.wav` or press Preview.
+
+**If real recordings become available** (the better long-term source): a quiet room, a small-diaphragm
+condenser 20–30 cm from a magnetic 3×3, 48 kHz/24-bit; per sample type 10–20 takes — slow, normal and
+fast quarter turns, double turns, slices, isolated magnet snaps, light rattles — trimmed to the
+transient, normalised to −6 dBFS peak, no reverb. The planner's voice kinds map one-to-one onto those
+takes; only `toBuffers` would change from synthesis to decoding.
+
+### Problems found in this pass and fixed
+
+1. **Disposal vs background shader compile (latent since the fifth pass)**: the idle pre-warm uses
+   three's `compileAsync`, which polls its materials until their programs are ready. A quality/finish
+   change disposed those materials mid-poll and three threw `Cannot read properties of undefined
+   (reading 'isReady')`. The longer-compiling stickerless variants widened the window enough for the
+   stress spec to catch it. `CubeVisuals.trackCompile` now makes disposal wait for any in-flight
+   compile (unit-tested, incl. a rejected compile; stress + style specs passed 3× in a row).
+2. Voice counting by `ended` events (see Mix & safety) — now by scheduled end time.
+3. Tonal friction (ringing modal bands) in the first synthesis — spread over three jittered banks with
+   shorter decays plus broadband noise; friction peaks soft-limited below 1.
+4. The stickered `envMapIntensity` no-op (see above).
+
+### Tests added
+
+- `tests/unit/audio.test.ts` (25): synthesis (determinism, finiteness, no clipping, friction is
+  noise-like not tonal, seamless loop, sharp snap onset and fast decay); planner (slide from first frame
+  / snap at landing, speed → level & brightness, envelope follows easing, rattles only on fast turns,
+  double-turn detent, slices darker, rotations silent, source levels, instant batch → one sound, drag
+  smoothing and clamp, cancel never snaps, flick hand-over, replace stops all, 300-turn stress);
+  player against a fake Web Audio context (no context until enabled, mute, voice caps and release,
+  volume clamp and squaring, suspended resume, missing Web Audio, preview, determinism).
+- `tests/unit/studio.test.ts` (+7): the player sees turn/undo/redo starts and landings, drag phases,
+  cancel without commit, instant-scramble commits only; nothing from style/settings/preview or view
+  tumbling; sound settings persistence and sanitising.
+- `tests/unit/styles.test.ts` (+5): stickerless defines per tier vs stickered (honeycomb only, no
+  per-material reflection strength), stable per-piece variation within bounds, reflection map and
+  shared exposure; disposal waits for an in-flight compile (and still happens if it fails).
+- `tests/e2e/audio.spec.ts` (3): real click enables audio (context running); one slide + one snap per
+  turn; rotations, tumbling, style switch and mute silent; Preview plays without touching the cube; a
+  40-key burst sounds once per accepted turn, stays bounded and releases every voice; the offline demo
+  render never clips, the slide is audible, fast turns are louder and brighter than slow.
+
+### Verification (final tree)
+
+`npm run test:all`: typecheck ✓, lint ✓, unit **300 / 300** ✓ (13 files), build ✓, browser **34 / 34** ✓
+(Chromium desktop 30 incl. the new 3-test `audio.spec.ts`, phone emulation 2, Firefox smoke 1, WebKit
+smoke 1). Touch is Chromium emulation, not a physical phone.
+
+### Browser coverage and performance
+
+- Chromium (desktop + phone emulation): everything above. Firefox (ad-hoc): both styles render, live
+  audio context runs, one slide + one snap per turn, offline demo renders; no errors. Playwright's
+  Windows WebKit build has **no Web Audio API at all** — the player stays silent and nothing breaks
+  (verified); audio in real Safari is untested.
+- Frame time while turning continuously (RTX 3050, ANGLE/D3D11, high tier): stickerless sound off /
+  on and stickered sound on — median 16.7 ms, p95 ≤ 16.8 ms (vsync-bound) in all three. Enabling sound
+  (click → context running, including rendering the sound bank once): 0.2–0.35 s. During 60 rapid turns:
+  peak 8 voices, none dropped. Stickered resource counts unchanged; stickerless adds one reflection map
+  (256² PMREM on high, 128² otherwise).
+
+### Artifacts
+
+- `artifacts/stickerless-realism/before/` and `after/` — same views, same scramble: solved, scrambled,
+  macro, R/M/E/S mid-turn, internals close-up, upside-down.
+- `artifacts/styles/` regenerated (both styles, incl. low tier, desktop and mobile UI; selector with
+  the new stickerless preview); `artifacts/after/` regenerated.
+- `artifacts/audio/turn-demo.wav` (3.3 s) and `turn-demo-spectrogram.png`; regenerate the WAV with
+  `node scripts/render-audio-demo.mjs` (needs `npm run preview`).
+
+### Audio demonstration procedure
+
+1. `npm run dev`, open http://localhost:5317, click the speaker icon (top right) to enable sound.
+2. Settings → Display & sound → **Preview**: slow R, normal U, fast R U R' U', R2, M.
+3. On the cube: a slow drag of R (friction follows your finger, snap on landing), a normal `u`, a fast
+   `r u R U` (Shift = prime), `Shift+F` then `f` held, a double via the Move Pad, `m`, then Auto Solve.
+4. Drag a layer part-way and let go before it commits: a soft spring-back, no snap.
 
 ## Seventh pass — Classic Stickered as a premium GAN-style stickered cube
 
@@ -44,8 +231,8 @@ edges; a moulded honeycomb on the internal faces seen mid-turn; nothing reading 
 
 **Materials** (`pieceMaterial.ts` options; stickerless defaults unchanged):
 - Body: the piece shader with every cap black. Broad sheen (roughness 0.30) under a sharp clear coat
-  (0.85 / 0.06) and stronger studio reflections (`envMapIntensity` 1.9), so flat black reads as
-  polished plastic and the rims carry bright lines. Interior a deep charcoal (#1a1a1e) with a
+  (0.85 / 0.06), so flat black reads as polished plastic and the rims carry bright lines. (These notes
+  originally also listed `envMapIntensity` 1.9; that never took effect — see the eighth pass.) Interior a deep charcoal (#1a1a1e) with a
   procedural **honeycomb** on internal faces (bump-mapped in the shader, no textures, high/medium tiers).
 - **Turn-driven occlusion**: closed, seams stay fully shaded (no glints on any tier); while a layer is
   part-way round, a shared `uExposure` uniform (|sin 2θ| of the turn in flight, set each frame from
@@ -470,6 +657,10 @@ cards everywhere, lavender gradient button); no move list.
 | Rotation / free-view tests | `tests/unit/rotations.test.ts`, `tests/unit/gestures.test.ts`, `tests/e2e/rotations.spec.ts` |
 | Piece geometry / material tests | `tests/unit/pieces.test.ts` |
 | Cube style tests | `tests/unit/styles.test.ts`, `tests/unit/studio.test.ts`, `tests/e2e/cube-style.spec.ts` |
+| Turn audio: synthesis, planner, Web Audio player | `src/core/audio/synth.ts`, `turnPlanner.ts`, `sound.ts` |
+| Engine motion events (turn start, drag, commit) | `src/core/engine/cubeEngine.ts` |
+| Stickerless reflection map, reflector cards | `src/components/stage/studioEnvironment.ts`, `src/components/cube/styleReflections.ts` |
+| Audio tests | `tests/unit/audio.test.ts`, `tests/unit/studio.test.ts`, `tests/e2e/audio.spec.ts` |
 
 ## Known limitations and trade-offs
 

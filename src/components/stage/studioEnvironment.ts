@@ -12,10 +12,16 @@
  *
  * Values are linear HDR radiance (the target is half-float), so panels can be
  * many times brighter than the surroundings, like real lights.
+ *
+ * The Premium Stickerless cube also gets its own reflection map: the same
+ * studio plus large, soft-edged reflector cards where its front and right faces
+ * mirror from the home view (what a photographer does for coloured gloss), so
+ * the domed faces carry soft highlight bands. Only the stickerless materials
+ * use it; the shared scene lighting (and so the stickered cube) is unchanged.
  */
 import * as THREE from 'three';
 
-interface Panel {
+export interface Panel {
   /** Width × height in studio units (the cube is 3 wide). */
   readonly size: readonly [number, number];
   readonly position: readonly [number, number, number];
@@ -23,6 +29,8 @@ interface Panel {
   /** Slight warm/cool cast, like mixed real lamps. */
   readonly tint?: string;
   readonly round?: boolean;
+  /** Feathered edges (a soft scrim) instead of a hard-edged box. */
+  readonly soft?: boolean;
 }
 
 const PANELS: readonly Panel[] = [
@@ -46,11 +54,47 @@ const PANELS: readonly Panel[] = [
   { size: [10, 4.4], position: [5.6, -3.9, -7.4], radiance: 0.45, tint: '#f6f8ff' },
 ];
 
+/**
+ * Reflector cards for the stickerless cube's own reflection map, placed a little
+ * above where the F and R faces mirror from the home view, so each domed face
+ * reflects a soft card edge: a highlight fading down across the face. Kept
+ * dim — a coloured face must stay its colour, with only a sheen on top.
+ */
+export const STICKERLESS_REFLECTORS: readonly Panel[] = [
+  { size: [11, 5], position: [-6.2, -4.2, 7.8], radiance: 0.8, tint: '#fff9f2', soft: true },
+  { size: [11, 5], position: [6.2, -4.2, -7.8], radiance: 0.55, tint: '#f4f7ff', soft: true },
+  // A wide, dim scrim behind the camera: a faint sheen on every face turned toward the viewer.
+  { size: [18, 9], position: [5, 3, 11], radiance: 0.12, tint: '#fffaf4', soft: true },
+];
+
+/** A feathered card mask: 1 inside, easing to 0 over the outer `feather` of each side. */
+function softCardTexture(feather = 0.3, size = 64): THREE.DataTexture {
+  const data = new Uint8Array(size * size * 4);
+  const ramp = (t: number) => {
+    const u = Math.min(1, Math.max(0, t / feather));
+    return u * u * (3 - 2 * u);
+  };
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = (x + 0.5) / size;
+      const v = (y + 0.5) / size;
+      const k = ramp(Math.min(u, 1 - u)) * ramp(Math.min(v, 1 - v));
+      const i = (y * size + x) * 4;
+      data[i] = data[i + 1] = data[i + 2] = Math.round(k * 255);
+      data[i + 3] = 255;
+    }
+  }
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 const FLOOR = new THREE.Color('#050506');
 const HORIZON = new THREE.Color('#141417');
 const CEILING = new THREE.Color('#2b2a2d');
 
-function buildStudio(): THREE.Scene {
+function buildStudio(extra: readonly Panel[] = []): THREE.Scene {
   const scene = new THREE.Scene();
 
   // Cyclorama: a sphere graded by height, seen from inside.
@@ -67,10 +111,10 @@ function buildStudio(): THREE.Scene {
   dome.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   scene.add(new THREE.Mesh(dome, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
 
-  for (const panel of PANELS) {
+  for (const panel of [...PANELS, ...extra]) {
     const geometry = panel.round ? new THREE.CircleGeometry(panel.size[0] / 2, 48) : new THREE.PlaneGeometry(panel.size[0], panel.size[1]);
     const color = new THREE.Color(panel.tint ?? '#ffffff').multiplyScalar(panel.radiance);
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }));
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, map: panel.soft ? softCardTexture() : null }));
     mesh.position.set(...panel.position);
     mesh.lookAt(0, 0, 0);
     scene.add(mesh);
@@ -91,7 +135,9 @@ function disposeScene(scene: THREE.Scene): void {
   scene.traverse((object) => {
     if (object instanceof THREE.Mesh) {
       object.geometry.dispose();
-      (object.material as THREE.Material).dispose();
+      const material = object.material as THREE.MeshBasicMaterial;
+      material.map?.dispose();
+      material.dispose();
     }
   });
 }
@@ -101,6 +147,16 @@ function disposeScene(scene: THREE.Scene): void {
  * the scene's image-based lighting. Returns a cleanup that restores the scene
  * and frees the GPU texture.
  */
+/** Renders a studio (plus `extra` panels) into a prefiltered environment map. */
+export function renderEnvironment(renderer: THREE.WebGLRenderer, size: number, extra: readonly Panel[] = []): THREE.WebGLRenderTarget {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const studio = buildStudio(extra);
+  const target = pmrem.fromScene(studio, 0.02, 0.1, 60, { size });
+  disposeScene(studio);
+  pmrem.dispose();
+  return target;
+}
+
 export function installStudioEnvironment(renderer: THREE.WebGLRenderer, scene: THREE.Scene, intensity: number, size: number): () => void {
   const pmrem = new THREE.PMREMGenerator(renderer);
   const studio = buildStudio();

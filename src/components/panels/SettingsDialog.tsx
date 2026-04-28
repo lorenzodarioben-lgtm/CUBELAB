@@ -158,8 +158,26 @@ export function SettingsDialog() {
             ]}
           />
         </Row>
-        <Row title="Sound" description="Soft turn clicks and a solved chime. Off by default.">
+        <Row title="Sound" description="Speedcube turning sounds — sliding plastic and magnetic snaps — and a solved chime. Off by default.">
           <Switch label="Sound" checked={settings.sound} onChange={(sound) => set({ sound })} />
+        </Row>
+        <Row title="Volume" description={settings.sound ? `${Math.round(settings.soundVolume * 100)} %` : 'Turn sound on to adjust.'}>
+          <div className="sound-controls">
+            <input
+              className="slider"
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={settings.soundVolume}
+              disabled={!settings.sound}
+              aria-label="Sound volume"
+              onChange={(e) => set({ soundVolume: Number(e.target.value) })}
+            />
+            <Button size="sm" variant="quiet" disabled={!settings.sound} onClick={() => studio.previewSound()}>
+              Preview
+            </Button>
+          </div>
         </Row>
       </Group>
 

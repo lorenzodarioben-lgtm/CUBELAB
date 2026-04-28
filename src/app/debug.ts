@@ -1,11 +1,13 @@
 /**
  * Read-only inspection hooks on `window.__CUBELAB__`, used by the browser test
  * suite to compare the rendered stickers with the canonical model. Nothing
- * here can change state.
+ * here can change state (the audio demo renders offline: nothing is played).
  */
 import { isSolved, stateFacelets } from '../core/puzzle/cubeState';
 import { patternFacelets } from '../core/puzzle/kpattern';
 import { formatAlg } from '../core/puzzle/notation';
+import { renderDemo } from '../core/audio/sound';
+import type { SoundStats } from '../core/audio/sound';
 import type { Studio } from './studio';
 import type { OrbitRig } from '../components/stage/orbitRig';
 
@@ -30,6 +32,10 @@ export interface DebugApi {
   renderInfo?: () => { geometries: number; textures: number; programs: number };
   /** The cube style the 3D scene is actually showing (`null` before the stage mounts). */
   renderedStyle?: () => string | null;
+  /** Turn-audio state: context, voices started by kind, voices sounding now. */
+  audio(): SoundStats;
+  /** Renders the sound demonstration offline (same planner, voices and limiter as live). */
+  renderAudioDemo(): Promise<{ rate: number; samples: number[]; wav: string }>;
 }
 
 export function installDebugApi(studio: Studio, rig: OrbitRig): void {
@@ -48,6 +54,13 @@ export function installDebugApi(studio: Studio, rig: OrbitRig): void {
     scramble: () => studio.state.scramble.text,
     solver: () => ({ status: studio.state.solver.status, cursor: studio.state.solver.cursor, total: studio.state.solver.moves.length }),
     moveLog: () => formatAlg(studio.state.moveLog),
+    audio: () => studio.soundStats(),
+    renderAudioDemo: async () => {
+      const { rate, samples, wav } = await renderDemo(studio.state.settings.soundVolume);
+      let binary = '';
+      for (let i = 0; i < wav.length; i++) binary += String.fromCharCode(wav[i]!);
+      return { rate, samples: Array.from(samples), wav: btoa(binary) };
+    },
   };
   (window as unknown as { __CUBELAB__: DebugApi }).__CUBELAB__ = api;
 }

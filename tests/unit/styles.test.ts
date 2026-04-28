@@ -5,7 +5,7 @@
  * a style change is covered at controller level in studio.test.ts and in the
  * browser suite.)
  */
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { CUBIE_DEFS } from '../../src/core/puzzle/cubies';
 import { DEFAULT_SETTINGS, sanitizeSettings } from '../../src/core/persistence/settings';
@@ -241,5 +241,98 @@ describe('GPU resource ownership', () => {
     expect(high.pieces.center.getAttribute('position').count).toBeGreaterThan(low.pieces.center.getAttribute('position').count);
     high.dispose();
     low.dispose();
+  });
+});
+
+describe('Premium Stickerless realism', () => {
+  const definesOf = (m: THREE.Material) =>
+    Object.keys((m as THREE.MeshStandardMaterial).defines ?? {})
+      .filter((d) => d.startsWith('PIECE_'))
+      .sort();
+
+  it('stickerless pieces get the parting line, track, waviness and honeycomb; the stickered bodies only their honeycomb', () => {
+    const high = createStickerlessResources('high', 'gloss');
+    for (const m of high.materials) expect(definesOf(m)).toEqual(['PIECE_CAP_SEAM', 'PIECE_HONEYCOMB', 'PIECE_TRACK', 'PIECE_WAVY']);
+    // Low tier keeps the cheap parting line only (bump details need the physical tiers).
+    const low = createStickerlessResources('low', 'gloss');
+    for (const m of low.materials) expect(definesOf(m)).toEqual(['PIECE_CAP_SEAM']);
+    const stickered = createStickeredResources('high', 'gloss');
+    for (const m of Object.values(stickered.bodyMaterials)) {
+      expect(definesOf(m)).toEqual(['PIECE_HONEYCOMB']);
+      // No per-material reflection strength: it rides on the scene environment exactly as before.
+      expect((m as THREE.MeshStandardMaterial).envMapIntensity).toBe(1);
+    }
+    for (const r of [high, low, stickered]) r.dispose();
+  });
+
+  it('every piece has its own, stable finish (tiny deterministic variation)', () => {
+    const a = createStickerlessResources('medium', 'gloss');
+    const b = createStickerlessResources('medium', 'gloss');
+    const rough = (r: typeof a) => r.materials.map((m) => (m as THREE.MeshPhysicalMaterial).roughness);
+    const coat = (r: typeof a) => r.materials.map((m) => (m as THREE.MeshPhysicalMaterial).clearcoatRoughness);
+    expect(rough(a)).toEqual(rough(b)); // never changes between builds or renders
+    expect(new Set(rough(a)).size).toBeGreaterThan(20); // but differs piece to piece
+    for (const r of rough(a)) expect(Math.abs(r / 0.26 - 1)).toBeLessThanOrEqual(0.07 + 1e-9);
+    for (const c of coat(a)) expect(Math.abs(c / 0.07 - 1)).toBeLessThanOrEqual(0.2 + 1e-9);
+    a.dispose();
+    b.dispose();
+  });
+
+  it('uses its own reflection map when the stage provides one, and shares the turn exposure', () => {
+    const res = createStickerlessResources('high', 'gloss');
+    const texture = new THREE.Texture();
+    res.setEnvironment(texture);
+    for (const m of res.materials) expect((m as THREE.MeshStandardMaterial).envMap).toBe(texture);
+    res.setEnvironment(null);
+    for (const m of res.materials) expect((m as THREE.MeshStandardMaterial).envMap).toBeNull();
+    const lib = THREE.ShaderLib.physical;
+    const shader = { vertexShader: lib.vertexShader, fragmentShader: lib.fragmentShader, uniforms: {} as Record<string, { value: unknown }> };
+    res.materials[4]!.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
+    expect(shader.fragmentShader).toContain('uPieceHome');
+    expect(shader.fragmentShader).toContain('pieceTop');
+    res.setExposure(0.6);
+    expect(shader.uniforms.uExposure!.value).toBe(0.6);
+    res.dispose();
+  });
+});
+
+describe('resource disposal never races background shader compilation', () => {
+  // The face-letter textures draw on a canvas; a context-less stub is enough here.
+  beforeAll(() => {
+    (globalThis as Record<string, unknown>).document = { createElement: () => ({ width: 0, height: 0, getContext: () => null }) };
+  });
+  afterAll(() => {
+    delete (globalThis as Record<string, unknown>).document;
+  });
+
+  it('waits for an in-flight compile before freeing anything, then frees everything once', async () => {
+    const { CubeVisuals } = await import('../../src/components/cube/cubeResources');
+    const visuals = new CubeVisuals('medium', 'gloss');
+    const materials = visuals.stickerless.materials;
+    let disposed = 0;
+    for (const m of materials) m.addEventListener('dispose', () => disposed++);
+    let finish!: () => void;
+    visuals.trackCompile(new Promise<void>((resolve) => (finish = resolve)));
+    visuals.dispose();
+    await Promise.resolve();
+    expect(disposed).toBe(0); // still compiling: nothing freed yet
+    finish();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(disposed).toBe(materials.length);
+    visuals.dispose(); // idempotent
+    await new Promise((r) => setTimeout(r, 0));
+    expect(disposed).toBe(materials.length);
+  });
+
+  it('a failed compile still lets disposal happen', async () => {
+    const { CubeVisuals } = await import('../../src/components/cube/cubeResources');
+    const visuals = new CubeVisuals('low', 'matte');
+    const material = visuals.stickered.bodyMaterials.edge;
+    let freed = false;
+    material.addEventListener('dispose', () => (freed = true));
+    visuals.trackCompile(Promise.reject(new Error('lost context')));
+    visuals.dispose();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(freed).toBe(true);
   });
 });

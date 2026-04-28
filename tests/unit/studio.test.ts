@@ -15,6 +15,11 @@ import { formatAlg, invertAlg, mv, parseAlg } from '../../src/core/puzzle/notati
 import type { Move } from '../../src/core/puzzle/notation';
 import { createMemoryStore } from '../../src/core/persistence/storage';
 import type { KeyValueStore } from '../../src/core/persistence/storage';
+import { silentPlayer } from '../../src/core/audio/sound';
+import type { SoundPlayer } from '../../src/core/audio/sound';
+import type { EngineEvent } from '../../src/core/engine/cubeEngine';
+import { sanitizeSettings } from '../../src/core/persistence/settings';
+import { OrbitRig } from '../../src/components/stage/orbitRig';
 import { fakeClock } from './helpers';
 
 let kpuzzle: KPuzzle;
@@ -489,5 +494,108 @@ describe('cube style is a visual preference, never a puzzle event', () => {
     const second = setup({}, storage);
     expect(second.studio.state.settings.cubeStyle).toBe('stickered');
     expect(second.studio.state.history).toHaveLength(1);
+  });
+});
+
+describe('turn audio is driven by real cube motion only', () => {
+  /** A sound player that records every engine event it is shown and how it was configured. */
+  function recordingPlayer() {
+    const log: EngineEvent[] = [];
+    const calls: string[] = [];
+    const player: SoundPlayer = {
+      setEnabled: (v) => calls.push(`enabled:${v}`),
+      setVolume: (v) => calls.push(`volume:${v}`),
+      motion: (e) => log.push(e),
+      solved: () => calls.push('solved'),
+      arm: () => calls.push('arm'),
+      preview: () => calls.push('preview'),
+      stats: () => silentPlayer.stats(),
+    };
+    return { player, log, calls };
+  }
+  const kinds = (log: EngineEvent[]) => log.filter((e) => e.type === 'turn' || e.type === 'commit').map((e) => e.type);
+
+  it('each animated turn, undo and redo shows the audio one start and one landing', () => {
+    const rec = recordingPlayer();
+    const { studio, run } = setup({ sound: rec.player });
+    studio.turn(mv('R', 1));
+    run();
+    studio.undo();
+    run();
+    studio.redo();
+    run();
+    expect(kinds(rec.log)).toEqual(['turn', 'commit', 'turn', 'commit', 'turn', 'commit']);
+    const starts = rec.log.filter((e): e is Extract<EngineEvent, { type: 'turn' }> => e.type === 'turn');
+    expect(starts.map((e) => e.source)).toEqual(['manual', 'undo', 'redo']);
+    expect(starts.every((e) => e.durationMs > 0)).toBe(true);
+  });
+
+  it('style switches, settings changes and the solver preview add no motion', () => {
+    const rec = recordingPlayer();
+    const { studio } = setup({ sound: rec.player });
+    const before = rec.log.length;
+    studio.updateSettings({ cubeStyle: 'stickered' });
+    studio.updateSettings({ cubeStyle: 'stickerless', finish: 'matte', soundVolume: 0.4 });
+    studio.previewSound();
+    expect(rec.log.length).toBe(before);
+    expect(rec.calls).toContain('volume:0.4');
+    expect(rec.calls).toContain('preview');
+  });
+
+  it('tumbling the view never reaches the audio (the view is not part of the engine)', () => {
+    const rec = recordingPlayer();
+    const { studio } = setup({ sound: rec.player });
+    const rig = new OrbitRig();
+    rig.rotateBy(400, -900, 800);
+    rig.step(0, true);
+    studio.updateSettings({ orbitSensitivity: 1.6 });
+    expect(rec.log).toHaveLength(0);
+  });
+
+  it('a pointer twist reports its drag motion, then the release turn and its landing', () => {
+    const rec = recordingPlayer();
+    const { studio, run } = setup({ sound: rec.player });
+    expect(studio.beginTwist()).toBe(true);
+    studio.engine.updateDrag({ axis: 0, layer: 1, angle: -0.5 });
+    studio.engine.updateDrag({ axis: 0, layer: 1, angle: -1.1 });
+    studio.engine.endDrag({ move: mv('R', 1), fromAngle: -1.1, targetAngle: -Math.PI / 2, quarterDurationMs: 120 });
+    run();
+    const seq = rec.log.filter((e) => e.type !== 'activity').map((e) => (e.type === 'drag' ? `drag:${e.phase}` : e.type));
+    expect(seq).toEqual(['drag:begin', 'drag:move', 'drag:move', 'drag:release', 'turn', 'commit']);
+    const release = rec.log.find((e): e is Extract<EngineEvent, { type: 'turn' }> => e.type === 'turn')!;
+    expect(release.fromDrag).toBe(true);
+  });
+
+  it('a cancelled twist reports its spring-back and never commits', () => {
+    const rec = recordingPlayer();
+    const { studio, run } = setup({ sound: rec.player });
+    studio.beginTwist();
+    studio.engine.updateDrag({ axis: 1, layer: 1, angle: 0.4 });
+    studio.engine.endDrag(null);
+    run();
+    const cancel = rec.log.find((e): e is Extract<EngineEvent, { type: 'drag' }> => e.type === 'drag' && e.phase === 'cancel')!;
+    expect(cancel.settleMs).toBeGreaterThan(0);
+    expect(rec.log.some((e) => e.type === 'commit')).toBe(false);
+  });
+
+  it('a skipped scramble commits instantly (no turn starts): the player sees only commits', async () => {
+    const rec = recordingPlayer();
+    const { studio, settle } = setup({ sound: rec.player });
+    studio.updateSettings({ scrambleStyle: 'instant' });
+    await studio.newScramble();
+    await settle();
+    expect(rec.log.filter((e) => e.type === 'turn')).toHaveLength(0);
+    expect(rec.log.filter((e) => e.type === 'commit').length).toBe(parseAlg(SCRAMBLE).length);
+  });
+
+  it('sound settings persist; the volume is clamped and a corrupt value falls back', () => {
+    const storage = createMemoryStore();
+    const first = setup({}, storage);
+    first.studio.updateSettings({ sound: true, soundVolume: 0.35 });
+    const second = setup({}, storage);
+    expect(second.studio.state.settings.sound).toBe(true);
+    expect(second.studio.state.settings.soundVolume).toBe(0.35);
+    expect(sanitizeSettings({ soundVolume: 9 }).soundVolume).toBe(1);
+    expect(sanitizeSettings({ soundVolume: 'loud' }).soundVolume).toBe(0.7);
   });
 });

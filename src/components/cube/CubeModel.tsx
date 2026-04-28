@@ -26,6 +26,7 @@ import type { Face } from '../../core/puzzle/notation';
 import type { CubeStyle, Finish } from '../../core/persistence/settings';
 import { ANCHOR_OFFSET, CubeVisuals, SPACING } from './cubeResources';
 import type { RenderTier } from './cubeResources';
+import type { StyleReflections } from './styleReflections';
 import { PIECE_FRAMES } from './pieceFrames';
 import { TILE_SEATS, TILE_TOP } from './stickeredResources';
 import { STICKERLESS_SURFACE } from './stickerlessResources';
@@ -134,7 +135,7 @@ function useWarmOtherStyle(visuals: CubeVisuals, style: CubeStyle): void {
         const tile = Object.values(res.tiles)[0]!;
         Object.values(res.tileMaterials).flat().forEach((m) => add(tile, m));
       }
-      gl.compileAsync(staging, camera, scene).catch(() => undefined);
+      visuals.trackCompile(gl.compileAsync(staging, camera, scene));
     };
     const idle = window.requestIdleCallback?.(warm, { timeout: 4000 }) ?? window.setTimeout(warm, 1500);
     return () => {
@@ -152,9 +153,10 @@ interface CubeModelProps {
   readonly style: CubeStyle;
   readonly faceLabels: boolean;
   readonly registry: StickerRegistry;
+  readonly reflections: StyleReflections;
 }
 
-export function CubeModel({ engine, quality, finish, style, faceLabels, registry }: CubeModelProps) {
+export function CubeModel({ engine, quality, finish, style, faceLabels, registry, reflections }: CubeModelProps) {
   const invalidate = useThree((s) => s.invalidate);
   const groups = useRef<Array<THREE.Group | null>>([]);
   const visuals = useMemo(() => new CubeVisuals(quality, finish), [quality, finish]);
@@ -186,6 +188,7 @@ export function CubeModel({ engine, quality, finish, style, faceLabels, registry
         base[def.id]!.quaternion.setFromRotationMatrix(scratch.m);
       }
     }
+    visuals.setStickerlessEnvironment(reflections.stickerless);
     const visual = engine.getVisualTurn(now);
     // A layer part-way round opens the cube (whole-cube rotations open nothing).
     visuals.setTurnExposure(visual && visual.layer !== null ? Math.abs(Math.sin(2 * visual.angle)) : 0);

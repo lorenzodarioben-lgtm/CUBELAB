@@ -21,7 +21,8 @@ import { Interaction } from './Interaction';
 import type { PreviewSink } from './Interaction';
 import type { OrbitRig } from './orbitRig';
 import { Celebration } from './Celebration';
-import { installStudioEnvironment } from './studioEnvironment';
+import { STICKERLESS_REFLECTORS, installStudioEnvironment, renderEnvironment } from './studioEnvironment';
+import { StyleReflections } from '../cube/styleReflections';
 
 const FOV = 27;
 /** Bounding-sphere radius of the cube (half its space diagonal, in world units). */
@@ -146,16 +147,26 @@ function CameraRig({ rig, reduced, transportOpen, zen, frame, floor }: CameraRig
   return null;
 }
 
-/** Prefiltered studio reflections (see studioEnvironment.ts), rebuilt only when the tier changes. */
-function StudioEnvironment({ size, intensity }: { size: number; intensity: number }) {
+/**
+ * Prefiltered studio reflections (see studioEnvironment.ts), rebuilt only when
+ * the tier changes: the shared scene environment, and the stickerless cube's
+ * own map with its reflector cards.
+ */
+function StudioEnvironment({ size, intensity, reflections }: { size: number; intensity: number; reflections: StyleReflections }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const invalidate = useThree((s) => s.invalidate);
   useEffect(() => {
     const restore = installStudioEnvironment(gl, scene, intensity, size);
+    const stickerless = renderEnvironment(gl, size, STICKERLESS_REFLECTORS);
+    reflections.setStickerless(stickerless.texture);
     invalidate();
-    return restore;
-  }, [gl, scene, size, intensity, invalidate]);
+    return () => {
+      reflections.setStickerless(null);
+      stickerless.dispose();
+      restore();
+    };
+  }, [gl, scene, size, intensity, reflections, invalidate]);
   return null;
 }
 
@@ -165,7 +176,7 @@ function StudioEnvironment({ size, intensity }: { size: number; intensity: numbe
  * overhead box that casts soft shadows on the high tier, so turning layers and
  * seams shade each other, and a whisper of sky fill for the shadow sides.
  */
-function Lighting({ high, shadows }: { high: boolean; shadows: boolean }) {
+function Lighting({ high, shadows, reflections }: { high: boolean; shadows: boolean; reflections: StyleReflections }) {
   return (
     <>
       <hemisphereLight args={['#ffffff', '#1a1a1d', 0.38]} />
@@ -185,7 +196,7 @@ function Lighting({ high, shadows }: { high: boolean; shadows: boolean }) {
         shadow-camera-far={22}
       />
       <directionalLight position={[6.5, 2.5, 4.5]} intensity={1.05} color="#f4f6ff" />
-      <StudioEnvironment size={high ? 256 : 128} intensity={1} />
+      <StudioEnvironment size={high ? 256 : 128} intensity={1} reflections={reflections} />
     </>
   );
 }
@@ -294,6 +305,7 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
 
   const onReady = useCallback(() => ui.setState({ renderer: 'ready' }), [ui]);
   const hover = useMemo(() => new HoverState(), []);
+  const reflections = useMemo(() => new StyleReflections(), []);
   const frameRef = useRef<THREE.Group>(null);
   const floorRef = useRef<THREE.Group>(null);
 
@@ -317,9 +329,10 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
     >
       {settings.quality === 'auto' && <PerformanceMonitor onDecline={() => setAutoDegraded(true)} flipflops={2} />}
       <CameraRig rig={rig} reduced={reduced} transportOpen={transportOpen} zen={zen} frame={frameRef} floor={floorRef} />
-      <Lighting high={quality !== 'low'} shadows={quality === 'high'} />
+      <Lighting high={quality !== 'low'} shadows={quality === 'high'} reflections={reflections} />
       <group ref={frameRef} name="cube-frame">
         <CubeModel
+          reflections={reflections}
           engine={studio.engine}
           quality={quality}
           finish={settings.finish}

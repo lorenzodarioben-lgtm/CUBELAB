@@ -75,8 +75,10 @@ export class CubeVisuals {
   readonly labelMaterials: Readonly<Record<Face, THREE.Material>>;
   #stickered: StickeredResources | null = null;
   #stickerless: StickerlessResources | null = null;
+  #stickerlessEnv: THREE.Texture | null = null;
   #textures: THREE.Texture[] = [];
   #disposed = false;
+  #compiling: Promise<unknown> | null = null;
 
   constructor(tier: RenderTier, finish: Finish) {
     this.tier = tier;
@@ -106,25 +108,54 @@ export class CubeVisuals {
 
   /** The Premium Stickerless set, created on first use. */
   get stickerless(): StickerlessResources {
-    this.#stickerless ??= createStickerlessResources(this.tier, this.finish);
+    if (!this.#stickerless) {
+      this.#stickerless = createStickerlessResources(this.tier, this.finish);
+      this.#stickerless.setEnvironment(this.#stickerlessEnv);
+    }
     return this.#stickerless;
   }
 
   /**
    * How far the layer turn in flight has opened the cube: 0 when every layer
-   * is aligned, 1 at 45°. Only the stickered bodies use it (their seam shading).
+   * is aligned, 1 at 45°. Both styles light the faces a turn exposes by it.
    */
+  /** The stickerless cube's own reflection map (null: use the scene environment). */
+  setStickerlessEnvironment(texture: THREE.Texture | null): void {
+    if (texture === this.#stickerlessEnv) return;
+    this.#stickerlessEnv = texture;
+    this.#stickerless?.setEnvironment(texture);
+  }
+
   setTurnExposure(value: number): void {
     this.#stickered?.setExposure(value);
+    this.#stickerless?.setExposure(value);
+  }
+
+  /**
+   * Registers background shader compilation of these resources (the idle
+   * pre-warm). three.js keeps polling the compiling materials until they are
+   * ready, so disposal waits for it: freeing a material mid-poll would leave
+   * three dereferencing a program that no longer exists.
+   */
+  trackCompile(compiling: Promise<unknown>): void {
+    const settled = compiling.then(
+      () => undefined,
+      () => undefined,
+    );
+    this.#compiling = this.#compiling ? Promise.all([this.#compiling, settled]) : settled;
   }
 
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    this.#stickered?.dispose();
-    this.#stickerless?.dispose();
-    this.label.dispose();
-    for (const face of FACES) this.labelMaterials[face].dispose();
-    this.#textures.forEach((t) => t.dispose());
+    const free = () => {
+      this.#stickered?.dispose();
+      this.#stickerless?.dispose();
+      this.label.dispose();
+      for (const face of FACES) this.labelMaterials[face].dispose();
+      this.#textures.forEach((t) => t.dispose());
+    };
+    if (this.#compiling) void this.#compiling.then(free);
+    else free();
   }
 }

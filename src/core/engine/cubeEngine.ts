@@ -54,7 +54,39 @@ export interface ActivityEvent {
   readonly type: 'activity';
 }
 
-export type EngineEvent = CommitEvent | ReplaceEvent | ActivityEvent;
+/** How a turn's angle progresses over its duration. */
+export type TurnEasing = 'snap' | 'smooth';
+
+/**
+ * An animated turn has started moving (instant turns emit only their commit).
+ * Its commit follows at `at + durationMs` unless the turn is abandoned.
+ */
+export interface TurnStartEvent {
+  readonly type: 'turn';
+  readonly move: Move;
+  readonly source: MoveSource;
+  readonly at: number;
+  readonly durationMs: number;
+  /** Start and end angle about +axis (radians). */
+  readonly from: number;
+  readonly to: number;
+  readonly easing: TurnEasing;
+  /** True for the release of a pointer twist (the layer was already moving). */
+  readonly fromDrag: boolean;
+}
+
+/** A pointer twist: its layer follows the finger, then commits (`release`) or springs back (`cancel`). */
+export interface DragMotionEvent {
+  readonly type: 'drag';
+  readonly phase: 'begin' | 'move' | 'release' | 'cancel';
+  readonly at: number;
+  /** Current twist angle (radians), 0 before the layer is chosen. */
+  readonly angle: number;
+  /** Duration of the spring-back animation (cancel only). */
+  readonly settleMs?: number;
+}
+
+export type EngineEvent = CommitEvent | ReplaceEvent | ActivityEvent | TurnStartEvent | DragMotionEvent;
 
 export interface VisualTurn {
   readonly axis: Axis;
@@ -96,18 +128,18 @@ export interface EngineOptions {
   readonly maxPendingUserTurns?: number;
 }
 
-type Easing = (t: number) => number;
+export type Easing = (t: number) => number;
 const easeOutCubic: Easing = (t) => 1 - (1 - t) ** 3;
 /**
  * User turns: a quick settle with a ~1.5 % overshoot — the small mechanical
  * "snap" of a layer clicking into place. Ends exactly at 1 (the commit angle).
  */
-const easeSnap: Easing = (t) => {
+export const easeSnap: Easing = (t) => {
   const s = 0.42;
   const u = t - 1;
   return 1 + (s + 1) * u * u * u + s * u * u;
 };
-const easeInOutCubic: Easing = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+export const easeInOutCubic: Easing = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
 interface Op {
   readonly kind: 'turn' | 'undo' | 'redo';
@@ -403,6 +435,7 @@ export class CubeEngine {
     if (this.#active || this.#queue.length > 0 || this.#settle) this.fastForward();
     this.#drag = { preview: null };
     this.#emit({ type: 'activity' });
+    this.#emit({ type: 'drag', phase: 'begin', at: this.#now(), angle: 0 });
     return true;
   }
 
@@ -411,6 +444,7 @@ export class CubeEngine {
     this.#drag.preview = preview
       ? { ...preview, cubies: cubiesInLayer(this.#state.cubies, preview.axis, preview.layer) }
       : null;
+    this.#emit({ type: 'drag', phase: 'move', at: this.#now(), angle: preview?.angle ?? 0 });
     this.#requestFrame();
   }
 
@@ -420,6 +454,7 @@ export class CubeEngine {
     if (!drag) return;
     this.#drag = null;
     const now = this.#now();
+    const angle = drag.preview?.angle ?? 0;
     if (release) {
       const remaining = Math.abs(release.targetAngle - release.fromAngle) / (Math.PI / 2);
       this.#queue.unshift({
@@ -431,9 +466,13 @@ export class CubeEngine {
         fromAngle: release.fromAngle,
         targetAngle: release.targetAngle,
       });
+      this.#emit({ type: 'drag', phase: 'release', at: now, angle });
     } else if (drag.preview && Math.abs(drag.preview.angle) > 1e-4 && !this.#instant) {
       const p = drag.preview;
       this.#settle = { axis: p.axis, layer: p.layer, cubies: p.cubies, from: p.angle, startedAt: now, duration: SETTLE_MS };
+      this.#emit({ type: 'drag', phase: 'cancel', at: now, angle, settleMs: SETTLE_MS });
+    } else {
+      this.#emit({ type: 'drag', phase: 'cancel', at: now, angle, settleMs: 0 });
     }
     this.#pump(now);
     this.#emit({ type: 'activity' });
@@ -521,7 +560,8 @@ export class CubeEngine {
           continue;
         }
         const { axis, layer } = MOVE_AXIS[move.family];
-        this.#active = {
+        const snap = isUserSource(op.source);
+        const active: ActiveTurn = {
           move,
           source: op.source,
           tag: op.tag,
@@ -532,8 +572,20 @@ export class CubeEngine {
           to: op.targetAngle ?? moveAngle(move),
           startedAt: now,
           duration,
-          easing: isUserSource(op.source) ? easeSnap : easeInOutCubic,
+          easing: snap ? easeSnap : easeInOutCubic,
         };
+        this.#active = active;
+        this.#emit({
+          type: 'turn',
+          move,
+          source: op.source,
+          at: now,
+          durationMs: duration,
+          from: active.from,
+          to: active.to,
+          easing: snap ? 'snap' : 'smooth',
+          fromDrag: op.fromAngle !== null,
+        });
         this.#requestFrame();
       }
     } finally {
