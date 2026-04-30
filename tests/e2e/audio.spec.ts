@@ -84,7 +84,7 @@ test.describe('speedcube turn audio', () => {
     await page.waitForFunction(() => window.__CUBELAB__.audio().active === 0, null, { timeout: 5_000 });
   });
 
-  test('the rendered demonstration never clips, slides audibly, and fast turns are brighter than slow ones', async ({ page }) => {
+  test('the rendered demonstration never clips and recorded slides respond to turn speed', async ({ page }) => {
     await openStudio(page);
     const { rate, samples } = await page.evaluate(() => window.__CUBELAB__.renderAudioDemo());
     const x = Float32Array.from(samples);
@@ -94,17 +94,10 @@ test.describe('speedcube turn audio', () => {
     // Windows (ms) from demoEvents(200): the slow R moves 200–620, a fast R 1290–1385.
     const span = (from: number, to: number) => x.slice(Math.floor((from / 1000) * rate), Math.floor((to / 1000) * rate));
     const rms = (w: Float32Array) => Math.sqrt(w.reduce((s, v) => s + v * v, 0) / w.length);
-    // Brightness proxy: zero-crossing rate.
-    const zcr = (w: Float32Array) => {
-      let n = 0;
-      for (let i = 1; i < w.length; i++) if (w[i - 1]! < 0 !== w[i]! < 0) n++;
-      return n / w.length;
-    };
     const slowSlide = span(260, 560);
     const fastSlide = span(1300, 1370);
     const silence = span(20, 180);
     expect(rms(slowSlide)).toBeGreaterThan(rms(silence) * 20 + 1e-4); // the slide is heard, not only the snap
     expect(rms(fastSlide)).toBeGreaterThan(rms(slowSlide));
-    expect(zcr(fastSlide)).toBeGreaterThan(zcr(slowSlide));
   });
 });

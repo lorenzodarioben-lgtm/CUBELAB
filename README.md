@@ -249,15 +249,15 @@ only while something moves.
 
 ### Sound
 
-Turning sounds are synthesised (`src/core/audio/`; no recordings): dry plastic friction from micro
-stick-slip impacts on damped plastic modes, quiet rattle on fast turns, and a magnetic snap when the
-layer lands. The engine reports each turn's start (duration, angle, easing), drag motion and commit;
+Turning sounds use real Rubik's cube recordings ([source and CC0 licence](src/assets/audio/README.md)):
+plastic friction while a layer moves, quiet real contact ticks on fast turns, and a recorded alignment
+click when the layer lands. The engine reports each turn's start (duration, angle, easing), drag motion and commit;
 a pure planner (`turnPlanner.ts`) turns those into voices whose level and brightness follow the layer's
-actual angular speed, and the Web Audio player (`sound.ts`) schedules them from a sound bank rendered
-once, through a volume control and limiter. Double turns tick faintly at the half-way magnet, slices
+actual angular speed, and the Web Audio player (`sound.ts`) schedules them from an embedded sound bank
+through a volume control and limiter. Double turns tick faintly at the half-way magnet, slices
 are a shade darker, whole-cube rotations and camera moves are silent, a drag's friction follows your
 finger and a cancelled drag springs back without a snap. Off by default; Settings has volume and
-Preview. Details, measurements and the honest listening status: `CUBELAB_HANDOFF.md`.
+Preview. The bank can be rebuilt with `node scripts/build-cube-samples.mjs`.
 
 ### Bundling cubing.js's worker
 

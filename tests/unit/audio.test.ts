@@ -1,5 +1,5 @@
 /**
- * Turn audio: the procedural sources (synth), the event → sound rules
+ * Turn audio: the recorded sample bank, the event → sound rules
  * (planner), and the real Web Audio player driven against a minimal fake
  * AudioContext (mute, voice caps, volume, failure handling). Subjective sound
  * quality is not something a unit test can judge; these pin the physical and
@@ -9,96 +9,55 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { EngineEvent, TurnStartEvent } from '../../src/core/engine/cubeEngine';
 import { mv } from '../../src/core/puzzle/notation';
 import type { Move } from '../../src/core/puzzle/notation';
-import { BANK_SIZES, frictionLoop, prng, rattleGrain, renderSoundBank, snapSample } from '../../src/core/audio/synth';
+import { BANK_SIZES, prng, renderSoundBank } from '../../src/core/audio/synth';
 import { TurnPlanner, detentCrossings, intensityOf, slideEnvelope } from '../../src/core/audio/turnPlanner';
 import type { Voice } from '../../src/core/audio/turnPlanner';
 import { HARD_VOICE_CAP, createSoundPlayer, demoEvents } from '../../src/core/audio/sound';
 
 const RATE = 48000;
 
-/** Magnitude spectrum by direct DFT over a few bands (enough for band-energy checks). */
-function bandEnergies(x: Float32Array, rate: number, edges: readonly number[]): number[] {
-  const n = x.length;
-  return edges.slice(0, -1).map((lo, b) => {
-    const hi = edges[b + 1]!;
-    let e = 0;
-    const steps = 12;
-    for (let s = 0; s < steps; s++) {
-      const f = lo + ((hi - lo) * (s + 0.5)) / steps;
-      let re = 0;
-      let im = 0;
-      for (let i = 0; i < n; i++) {
-        const w = (2 * Math.PI * f * i) / rate;
-        re += x[i]! * Math.cos(w);
-        im -= x[i]! * Math.sin(w);
-      }
-      e += re * re + im * im;
-    }
-    return e / steps;
-  });
-}
-
 const peak = (x: Float32Array) => x.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
 const rms = (x: Float32Array) => Math.sqrt(x.reduce((s, v) => s + v * v, 0) / x.length);
 
-describe('synthesised sources', () => {
-  it('are deterministic per seed, distinct across seeds, finite and never clip', () => {
-    const a = snapSample(RATE, 5);
-    expect(snapSample(RATE, 5)).toEqual(a);
-    expect(snapSample(RATE, 6)).not.toEqual(a);
+describe('recorded cube samples', () => {
+  it('load at the requested sample rate, contain distinct takes and stay below clipping', () => {
     const bank = renderSoundBank(RATE);
+    expect(bank.rate).toBe(RATE);
     expect(bank.friction).toHaveLength(BANK_SIZES.friction);
     expect(bank.snaps).toHaveLength(BANK_SIZES.snaps);
     expect(bank.rattles).toHaveLength(BANK_SIZES.rattles);
     for (const x of [...bank.friction, ...bank.snaps, ...bank.rattles]) {
       expect(x.every(Number.isFinite)).toBe(true);
       expect(peak(x)).toBeLessThanOrEqual(1);
+      expect(peak(x)).toBeGreaterThan(0.05);
+    }
+    expect(bank.snaps[0]).not.toEqual(bank.snaps[1]);
+    expect(renderSoundBank(RATE).snaps[0]).toEqual(bank.snaps[0]);
+  });
+
+  it('has audible sliding texture without a hard loop seam', () => {
+    for (const x of renderSoundBank(RATE).friction) {
+      expect(x.length / RATE).toBeGreaterThan(0.4);
+      expect(rms(x)).toBeGreaterThan(0.08);
+      // The quiet slide remains present between contacts instead of a few
+      // dry peaks carrying most of the sound.
+      expect(peak(x) / rms(x)).toBeLessThan(7);
+      let typical = 0;
+      for (let i = 1; i < x.length; i++) typical += Math.abs(x[i]! - x[i - 1]!);
+      typical /= x.length - 1;
+      expect(Math.abs(x[0]! - x[x.length - 1]!)).toBeLessThan(typical * 6);
     }
   });
 
-  it('friction is a dry broadband texture, not a tone', () => {
-    const x = frictionLoop(RATE, 0.1, 42).slice(0, 4096);
-    expect(rms(x)).toBeCloseTo(0.25, 1);
-    // Spectral flatness over 1.2–6 kHz in 40 Hz steps: a ringing mode would drive
-    // it toward 0 (a pure tone is ~0.01); noise-like texture sits around 0.3–0.6.
-    const bins: number[] = [];
-    for (let f = 1200; f <= 6000; f += 40) bins.push(bandEnergies(x, RATE, [f, f + 1])[0]!);
-    const geometric = Math.exp(bins.reduce((s, v) => s + Math.log(v + 1e-12), 0) / bins.length);
-    const arithmetic = bins.reduce((s, v) => s + v, 0) / bins.length;
-    expect(geometric / arithmetic).toBeGreaterThan(0.25);
-    // Every part of the band is present (no gaps), and there is little rumble below 250 Hz.
-    const bands = bandEnergies(x, RATE, [1000, 1800, 3000, 4500, 6500]);
-    expect(Math.max(...bands) / Math.min(...bands)).toBeLessThan(30);
-    const [low] = bandEnergies(x, RATE, [40, 250]);
-    expect(low!).toBeLessThan(Math.min(...bands));
-  });
-
-  it('friction loops seamlessly (no click at the loop point)', () => {
-    const x = frictionLoop(RATE, 0.5, 9);
-    let typical = 0;
-    for (let i = 1; i < x.length; i++) typical += Math.abs(x[i]! - x[i - 1]!);
-    typical /= x.length - 1;
-    expect(Math.abs(x[0]! - x[x.length - 1]!)).toBeLessThan(typical * 6);
-  });
-
-  it('a snap is a sharp transient that is over within ~60 ms; a rattle is shorter still', () => {
-    for (let seed = 1; seed <= 6; seed++) {
-      const s = snapSample(RATE, seed);
-      let at = 0;
-      s.forEach((v, i) => {
-        if (Math.abs(v) > Math.abs(s[at]!)) at = i;
-      });
-      // A hard contact: 10 % of the peak within half a millisecond, the peak
-      // itself at the first or the second (settling) contact.
-      const onset = s.findIndex((v) => Math.abs(v) > 0.1 * Math.abs(s[at]!));
-      expect(onset / RATE).toBeLessThan(0.0005);
-      expect(at / RATE).toBeLessThan(0.008);
-      const head = rms(s.slice(0, Math.floor(RATE * 0.01)));
-      const tail = rms(s.slice(Math.floor(RATE * 0.05)));
-      expect(tail / head).toBeLessThan(0.08);
-      const r = rattleGrain(RATE, seed);
-      expect(r.length / RATE).toBeLessThan(0.015);
+  it('keeps contact clicks short and varied', () => {
+    const bank = renderSoundBank(RATE);
+    for (const s of bank.snaps) {
+      expect(s.length / RATE).toBeGreaterThan(0.1);
+      expect(s.length / RATE).toBeLessThan(0.14);
+      expect(peak(s)).toBeGreaterThan(0.5);
+      expect(rms(s.slice(0, Math.floor(RATE * 0.08)))).toBeGreaterThan(rms(s.slice(Math.floor(RATE * 0.105))));
     }
+    for (const r of bank.rattles) expect(r.length / RATE).toBeLessThan(0.025);
   });
 });
 

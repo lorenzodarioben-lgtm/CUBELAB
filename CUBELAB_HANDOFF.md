@@ -1,6 +1,9 @@
 # CUBELAB — Handoff
 
-Status (2026-10-13): eighth pass complete — **photoreal stickerless plastic** (its own studio
+Status (2026-10-13): turn audio now uses [CC0 recordings of a real cube](src/assets/audio/README.md),
+replacing the procedural sources described in the historical eighth-pass notes below. The current
+listening demo is `artifacts/audio/turn-demo.wav`; the old spectrogram is retained with a `-before` suffix.
+Eighth pass — **photoreal stickerless plastic** (its own studio
 reflections, per-piece finish, parting line, lit honeycomb/track interior mid-turn) and **speedcube turn
 audio** (synthesised sliding friction, rattle and magnetic snaps, driven by real turn motion and speed).
 Seventh pass: the **Classic Stickered cube rebuilt as a premium GAN-style stickered cube** (moulded

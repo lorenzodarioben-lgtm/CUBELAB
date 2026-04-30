@@ -27,7 +27,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } }, testIgnore: /mobile\.spec/ },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'], channel: process.env.CUBELAB_USE_CHROME === '1' ? 'chrome' : undefined, viewport: { width: 1440, height: 900 } }, testIgnore: /mobile\.spec/ },
     { name: 'mobile', use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } }, testMatch: /mobile\.spec/ },
     // Cross-browser smoke (Firefox / WebKit run only the smoke spec, without Chromium GPU flags).
     {

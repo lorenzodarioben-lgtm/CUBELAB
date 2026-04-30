@@ -10,7 +10,7 @@ import { chromium } from '@playwright/test';
 const BASE = process.env.CUBELAB_URL ?? 'http://localhost:4317/';
 const OUT = process.argv[2] ?? 'artifacts/audio/turn-demo.wav';
 mkdirSync(dirname(OUT), { recursive: true });
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.CUBELAB_USE_CHROME === '1' ? { channel: 'chrome' } : {});
 const page = await browser.newPage();
 await page.goto(BASE);
 await page.waitForFunction(() => typeof window.__CUBELAB__?.renderAudioDemo === 'function', null, { timeout: 60000 });

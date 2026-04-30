@@ -4,8 +4,8 @@
  * The engine's motion events (turn start, drag motion, commit) go through the
  * pure `TurnPlanner`, and the resulting voices are scheduled here on the audio
  * clock: friction loops shaped by gain curves and a low-pass, rattle pings
- * and magnetic snaps, all drawn from a sound bank rendered once by `synth.ts`
- * (no network, no per-turn decoding or synthesis). Everything mixes into one
+ * and magnetic snaps, all drawn from real cube recordings loaded once by
+ * `synth.ts` (no network or per-turn decoding). Everything mixes into one
  * master gain (the volume setting) and a limiter, so rapid sequences can never
  * clip.
  *
@@ -66,7 +66,9 @@ function toBuffers(ctx: BaseAudioContext): Bank {
   return { friction: bank.friction.map(make), rattles: bank.rattles.map(make), snaps: bank.snaps.map(make) };
 }
 
-const cutoffFor = (brightness: number) => 1700 * 4 ** Math.min(1, Math.max(0, brightness));
+const cutoffFor = (brightness: number) => 2800 * 2.6 ** Math.min(1, Math.max(0, brightness));
+// Lift the plastic contact slightly without raising the noisy rattle or filter cutoff.
+const TURN_CONTACT_PITCH = 1.04;
 
 /**
  * Schedules planner voices on any audio context — the live one, or an
@@ -147,6 +149,7 @@ export class VoiceExecutor {
         const src = ctx.createBufferSource();
         src.buffer = this.#bank.friction[voice.texture]!;
         src.loop = true;
+        src.playbackRate.value = TURN_CONTACT_PITCH;
         const filter = ctx.createBiquadFilter();
         filter.type = 'lowpass';
         filter.frequency.value = cutoffFor(voice.brightness);
@@ -167,13 +170,13 @@ export class VoiceExecutor {
         if (!this.#roomFor(voice.kind, optional)) return;
         const src = ctx.createBufferSource();
         src.buffer = voice.kind === 'snap' ? this.#bank.snaps[voice.variant]! : this.#bank.rattles[voice.variant]!;
-        src.playbackRate.value = voice.rate;
+        src.playbackRate.value = voice.rate * (voice.kind === 'snap' ? TURN_CONTACT_PITCH : 1);
         const gain = ctx.createGain();
         gain.gain.value = voice.gain;
         if (voice.kind === 'snap') {
           const filter = ctx.createBiquadFilter();
           filter.type = 'lowpass';
-          filter.frequency.value = 3600 * (1 + 2 * voice.brightness);
+          filter.frequency.value = 3000 * (1 + 1.4 * voice.brightness);
           filter.Q.value = 0.4;
           src.connect(filter).connect(gain).connect(this.#out);
         } else {
@@ -189,6 +192,7 @@ export class VoiceExecutor {
         const src = ctx.createBufferSource();
         src.buffer = this.#bank.friction[voice.texture]!;
         src.loop = true;
+        src.playbackRate.value = TURN_CONTACT_PITCH;
         const filter = ctx.createBiquadFilter();
         filter.type = 'lowpass';
         filter.frequency.value = cutoffFor(0.3);

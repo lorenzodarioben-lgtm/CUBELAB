@@ -173,10 +173,10 @@ export class TurnPlanner {
         at: e.at,
         durationMs: e.durationMs + 25,
         envelope: slideEnvelope(e.easing, e.fromDrag),
-        gain: g * (0.27 + 0.3 * intensity) * (slice ? 0.95 : 1),
+        gain: g * (0.29 + 0.3 * intensity) * (slice ? 0.95 : 1),
         brightness: Math.min(1, (0.25 + 0.75 * intensity) * (slice ? 0.85 : 1)),
         texture: this.#pick(BANK_SIZES.friction),
-        offset: this.#rand() * 0.8,
+        offset: this.#rand() * 0.3,
       },
     ];
     // Passing a magnet half-way through a double turn.
@@ -191,7 +191,7 @@ export class TurnPlanner {
         voices.push({
           kind: 'rattle',
           at: e.at + (0.15 + 0.65 * this.#rand()) * e.durationMs,
-          gain: g * (0.05 + 0.07 * this.#rand()) * intensity,
+          gain: g * (0.04 + 0.055 * this.#rand()) * intensity,
           variant: this.#pick(BANK_SIZES.rattles),
           rate: 0.92 + 0.16 * this.#rand(),
         });
@@ -211,7 +211,7 @@ export class TurnPlanner {
         {
           kind: 'snap',
           at,
-          gain: g * (0.21 + 0.22 * s),
+          gain: g * (0.19 + 0.19 * s),
           variant: this.#pick(BANK_SIZES.snaps),
           rate: 0.96 + 0.06 * this.#rand() + 0.03 * s,
           brightness: s,
@@ -230,9 +230,9 @@ export class TurnPlanner {
         gain: g * 0.24,
         brightness: 0.6,
         texture: this.#pick(BANK_SIZES.friction),
-        offset: this.#rand() * 0.8,
+        offset: this.#rand() * 0.3,
       },
-      { kind: 'snap', at: at + 45, gain: g * 0.36, variant: this.#pick(BANK_SIZES.snaps), rate: 1, brightness: 0.5 },
+      { kind: 'snap', at: at + 45, gain: g * 0.32, variant: this.#pick(BANK_SIZES.snaps), rate: 1, brightness: 0.5 },
     ];
   }
 
@@ -250,7 +250,7 @@ export class TurnPlanner {
           d.active = true;
           d.lastAngle = e.angle;
           d.lastAt = e.at;
-          voices.push({ kind: 'drag-start', at: e.at, texture: this.#pick(BANK_SIZES.friction), offset: this.#rand() * 0.8 });
+          voices.push({ kind: 'drag-start', at: e.at, texture: this.#pick(BANK_SIZES.friction), offset: this.#rand() * 0.3 });
         }
         const dt = Math.max(1, e.at - d.lastAt);
         const raw = ((e.angle - d.lastAngle) / dt) * 1000;
@@ -292,7 +292,7 @@ export class TurnPlanner {
             gain: 0.14 * displacement,
             brightness: 0.3,
             texture: this.#pick(BANK_SIZES.friction),
-            offset: this.#rand() * 0.8,
+            offset: this.#rand() * 0.3,
           });
           voices.push({ kind: 'snap', at: e.at + settle, gain: 0.07 * displacement, variant: this.#pick(BANK_SIZES.snaps), rate: 1.1, brightness: 0.2 });
         }
