@@ -8,6 +8,7 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/layout.css';
 import './styles/components.css';
+import './styles/nxn.css';
 import { App } from './app/App';
 import { ServicesContext } from './app/context';
 import type { AppServices } from './app/context';

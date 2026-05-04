@@ -3,8 +3,10 @@ import { useServices, useStudio, useUi } from '../app/context';
 import { toggleZen } from '../app/actions';
 import { LogoMark } from './ui/Logo';
 import { IconButton, Segmented } from './ui/primitives';
+import { CUBE_EVENTS } from '../core/nxn/catalog';
+import type { CubeEventId } from '../core/nxn/catalog';
 
-export function Header() {
+export function Header({ puzzle, onPuzzleChange }: { readonly puzzle: CubeEventId; readonly onPuzzleChange: (puzzle: CubeEventId) => void }) {
   const services = useServices();
   const { studio, ui } = services;
   const zen = useUi((s) => s.zen);
@@ -35,11 +37,15 @@ export function Header() {
         <span className="brand__word">CUBELAB</span>
         <span className="brand__rule" aria-hidden />
         <span className="brand__meta">
-          Studio <span aria-hidden>/</span> 3×3×3
+          Studio <span aria-hidden>/</span> {CUBE_EVENTS.find((event) => event.id === puzzle)?.label}
         </span>
       </a>
       <p className="topbar__tagline">The interactive cubing studio.</p>
       <nav className="topbar__actions" aria-label="Studio controls">
+        <select className="puzzle-select" aria-label="Puzzle" value={puzzle} onChange={(event) => onPuzzleChange(event.target.value as CubeEventId)}>
+          {CUBE_EVENTS.map((event) => <option key={event.id} value={event.id}>{event.shortLabel}</option>)}
+        </select>
+        {puzzle === '333' && <>
         <Segmented
           className="topbar__mode"
           label="Timer mode"
@@ -68,6 +74,7 @@ export function Header() {
         <IconButton label={zen ? 'Exit zen mode (`)' : 'Zen mode (`)'} active={zen} onClick={() => toggleZen(services)} className="topbar__zen">
           {zen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
         </IconButton>
+        </>}
       </nav>
     </header>
   );

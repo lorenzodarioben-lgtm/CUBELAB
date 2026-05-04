@@ -23,8 +23,9 @@ function inComposite(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && Boolean(target.closest('[role="radiogroup"], input[type="range"]'));
 }
 
-export function useKeyboard(services: AppServices): void {
+export function useKeyboard(services: AppServices, enabled = true): void {
   useEffect(() => {
+    if (!enabled) return;
     const { studio, ui, rig } = services;
     const timerOwnsSpace = () => {
       const t = studio.state.timer;
@@ -135,5 +136,5 @@ export function useKeyboard(services: AppServices): void {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [services]);
+  }, [services, enabled]);
 }

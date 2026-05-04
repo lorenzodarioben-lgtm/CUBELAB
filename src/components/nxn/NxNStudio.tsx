@@ -1,0 +1,179 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Copy, Redo2, RotateCcw, Shuffle, Undo2 } from 'lucide-react';
+import type { Face } from '../../core/puzzle/notation';
+import { formatTime } from '../../core/stats/format';
+import { cubeEvent } from '../../core/nxn/catalog';
+import type { CubeEventId } from '../../core/nxn/catalog';
+import { isNxSolved } from '../../core/nxn/model';
+import type { NxMove } from '../../core/nxn/model';
+import { formatNxMove } from '../../core/nxn/notation';
+import { generateNxScramble } from '../../core/nxn/scramble';
+import { bestNxSingle, createNxSession, redoNxSession, resetNxSession, scrambleNxSession, turnNxSession, undoNxSession } from '../../core/nxn/session';
+import { loadNxHistory, saveNxHistory } from '../../core/nxn/storage';
+import { browserStore } from '../../core/persistence/storage';
+import { Button, IconButton, Spinner } from '../ui/primitives';
+import { NxNCanvas } from './NxNCanvas';
+
+const FACE_ORDER = ['U', 'R', 'F', 'D', 'L', 'B'] as const;
+
+function canUseWebGL(): boolean {
+  try {
+    const canvas = document.createElement('canvas');
+    return Boolean(canvas.getContext('webgl2') ?? canvas.getContext('webgl'));
+  } catch { return false; }
+}
+
+export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
+  const event = cubeEvent(eventId)!;
+  const storage = useMemo(() => browserStore(), []);
+  const [session, setSession] = useState(() => createNxSession(event.size, loadNxHistory(storage, eventId)));
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [width, setWidth] = useState(1);
+  const [now, setNow] = useState(() => performance.now());
+  const [copied, setCopied] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const request = useRef(0);
+  const webgl = useMemo(() => canUseWebGL(), []);
+
+  useEffect(() => () => { request.current++; document.body.style.cursor = ''; }, []);
+  useEffect(() => { saveNxHistory(storage, eventId, session.solves); }, [storage, eventId, session.solves]);
+  useEffect(() => {
+    if (session.phase !== 'running') return;
+    const id = window.setInterval(() => setNow(performance.now()), 40);
+    return () => window.clearInterval(id);
+  }, [session.phase]);
+
+  const commit = useCallback((move: NxMove) => {
+    if (loading) return;
+    const at = performance.now();
+    const wallClock = Date.now();
+    const id = crypto.randomUUID();
+    setNow(at);
+    setSession((current) => turnNxSession(current, move, at, wallClock, id));
+  }, [loading]);
+
+  const turn = useCallback((face: Face, inverse: boolean) => {
+    commit({ face, width, turns: inverse ? 3 : 1 });
+  }, [commit, width]);
+
+  const newScramble = useCallback(async () => {
+    const id = ++request.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const scramble = await generateNxScramble(eventId);
+      if (request.current === id) setSession((current) => scrambleNxSession(current, scramble));
+    } catch (cause) {
+      if (request.current === id) setError(cause instanceof Error ? cause.message : 'Scramble failed. Try again.');
+    } finally {
+      if (request.current === id) setLoading(false);
+    }
+  }, [eventId]);
+
+  const undo = useCallback(() => setSession((current) => undoNxSession(current, performance.now())), []);
+  const redo = useCallback(() => {
+    const at = performance.now();
+    setSession((current) => redoNxSession(current, at, Date.now(), crypto.randomUUID()));
+  }, []);
+
+  useEffect(() => {
+    const onKey = (key: KeyboardEvent) => {
+      const target = key.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return;
+      if ((key.ctrlKey || key.metaKey) && key.code === 'KeyZ') {
+        key.preventDefault();
+        if (key.shiftKey) redo(); else undo();
+        return;
+      }
+      if (key.ctrlKey || key.metaKey || key.altKey || key.repeat) return;
+      if (key.code === 'KeyN') { key.preventDefault(); void newScramble(); return; }
+      const face = key.key.toUpperCase();
+      if (FACE_ORDER.includes(face as Face)) {
+        key.preventDefault();
+        turn(face as Face, key.shiftKey);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [newScramble, redo, turn, undo]);
+
+  const duration = session.phase === 'running' && session.startedAt !== null
+    ? Math.max(0, now - session.startedAt)
+    : session.phase === 'ready' ? 0 : session.lastDurationMs;
+  const best = bestNxSingle(session.solves);
+  const cleanCount = session.solves.filter((solve) => !solve.assisted).length;
+  const maxWidth = Math.floor(event.size / 2);
+
+  const copy = async () => {
+    if (!session.scramble) return;
+    try {
+      await navigator.clipboard.writeText(session.scramble);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch { setError('Clipboard unavailable. Select the scramble text to copy it.'); }
+  };
+
+  return (
+    <main className="nxn-layout" aria-label={`${event.label} practice studio`}>
+      <section className="nxn-readouts" aria-label="Practice readouts">
+        <div className="nxn-clock">
+          <span className="nxn-label">{session.phase === 'running' ? 'SOLVING' : session.phase === 'ready' ? 'READY' : session.phase === 'solved' ? 'SOLVED' : 'PRACTICE TIMER'}</span>
+          <strong className="nxn-clock__time" role="timer">{formatTime(duration)}</strong>
+          <span className="nxn-clock__note">{session.phase === 'ready' ? 'First turn starts the clock' : session.phase === 'running' ? 'Solve the puzzle to stop' : 'Use New Scramble for a timed attempt'}</span>
+        </div>
+        <div className="nxn-readout">
+          <div className="nxn-readout__head"><h2>Scramble</h2><IconButton label="Copy scramble" size="sm" disabled={!session.scramble} onClick={() => void copy()}>{copied ? <Check size={15} /> : <Copy size={15} />}</IconButton></div>
+          <p className="nxn-scramble">{session.scramble ?? 'Generate a scramble to begin.'}</p>
+          {error && <p className="nxn-error" role="alert">{error}</p>}
+        </div>
+        <div className="nxn-readout nxn-records">
+          <h2>Session</h2>
+          <dl><div><dt>Best single</dt><dd>{formatTime(best)}</dd></div><div><dt>Clean solves</dt><dd>{cleanCount}</dd></div><div><dt>Moves</dt><dd>{session.moves.length}</dd></div></dl>
+          <button type="button" className="nxn-history-toggle" onClick={() => setShowHistory((value) => !value)} aria-expanded={showHistory}>
+            {showHistory ? 'Hide' : 'Show'} recent solves
+          </button>
+          {showHistory && <ol className="nxn-history">{session.solves.slice(-8).reverse().map((solve) => <li key={solve.id}><span>{new Date(solve.at).toLocaleDateString()}</span><strong>{formatTime(solve.durationMs)}</strong>{solve.assisted && <small>practice</small>}</li>)}</ol>}
+        </div>
+      </section>
+
+      <section className="nxn-stage" aria-label={`${event.label} interactive cube`}>
+        {webgl ? <NxNCanvas state={session.cube} onTurn={turn} /> : <div className="nxn-no-webgl">3D is unavailable here. Use the face buttons to turn the cube.</div>}
+        <p className="nxn-stage__hint">Tap a coloured face to turn · Shift + tap for inverse · Drag the background to orbit</p>
+      </section>
+
+      <section className="nxn-controls" aria-label="Puzzle controls">
+        <div className="nxn-controls__actions">
+          <Button variant="primary" size="lg" icon={loading ? <Spinner /> : <Shuffle size={17} />} busy={loading} onClick={() => void newScramble()}>
+            {loading ? 'Generating…' : 'New Scramble'}
+          </Button>
+          <div className="nxn-controls__row">
+            <Button variant="ghost" size="lg" icon={<RotateCcw size={16} />} onClick={() => { request.current++; setLoading(false); setError(null); setSession(resetNxSession); }}>Reset</Button>
+            <IconButton label="Undo" disabled={!session.undo.length} onClick={undo}><Undo2 size={17} /></IconButton>
+            <IconButton label="Redo" disabled={!session.redo.length} onClick={redo}><Redo2 size={17} /></IconButton>
+          </div>
+        </div>
+        <div className="nxn-turns">
+          <h2>Turn layers</h2>
+          <div className="nxn-width" role="group" aria-label="Layer width">
+            {Array.from({ length: maxWidth }, (_, index) => index + 1).map((value) => (
+              <button key={value} type="button" className={value === width ? 'is-active' : ''} onClick={() => setWidth(value)} aria-pressed={value === width}>
+                {value === 1 ? 'Outer' : value === 2 ? 'Wide 2' : `Wide ${value}`}
+              </button>
+            ))}
+          </div>
+          <div className="nxn-move-grid">
+            {FACE_ORDER.map((face) => (
+              <div className="nxn-move-pair" key={face}>
+                <button type="button" onClick={() => turn(face, false)} title={`Turn ${face} clockwise`} disabled={loading}>{formatNxMove({ face, width, turns: 1 })}</button>
+                <button type="button" onClick={() => turn(face, true)} title={`Turn ${face} counter-clockwise`} disabled={loading}>{formatNxMove({ face, width, turns: 3 })}</button>
+              </div>
+            ))}
+          </div>
+          <p className="nxn-controls__tip">Keyboard: U R F D L B · hold Shift for inverse · N for scramble · Ctrl+Z to undo</p>
+        </div>
+        <p className="nxn-solved-indicator" aria-live="polite">{isNxSolved(session.cube) ? 'Puzzle solved' : `${event.shortLabel} in progress`}</p>
+      </section>
+    </main>
+  );
+}

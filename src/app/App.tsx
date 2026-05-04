@@ -1,3 +1,4 @@
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Minimize2 } from 'lucide-react';
 import { useServices, useUi } from './context';
 import { toggleZen } from './actions';
@@ -18,17 +19,42 @@ import { PlaybackPanel } from '../components/controls/PlaybackPanel';
 import { ConfirmDialog, LiveRegion, Toast } from '../components/ui/Overlays';
 import { Button } from '../components/ui/primitives';
 import { cx } from '../components/ui/cx';
+import { cubeEvent } from '../core/nxn/catalog';
+import type { CubeEventId } from '../core/nxn/catalog';
+
+const NxNStudio = lazy(() => import('../components/nxn/NxNStudio').then((module) => ({ default: module.NxNStudio })));
+
+function puzzleFromUrl(): CubeEventId {
+  return cubeEvent(new URLSearchParams(window.location.search).get('puzzle') ?? '')?.id ?? '333';
+}
 
 export function App() {
   const services = useServices();
   const zen = useUi((s) => s.zen);
-  useKeyboard(services);
+  const [puzzle, setPuzzle] = useState<CubeEventId>(puzzleFromUrl);
+  useKeyboard(services, puzzle === '333');
   useEnvironmentSync(services);
 
+  useEffect(() => {
+    const onPopState = () => setPuzzle(puzzleFromUrl());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  const choosePuzzle = (id: CubeEventId) => {
+    if (id === puzzle) return;
+    const url = new URL(window.location.href);
+    if (id === '333') url.searchParams.delete('puzzle');
+    else url.searchParams.set('puzzle', id);
+    window.history.pushState(null, '', url);
+    setPuzzle(id);
+  };
+
   return (
-    <div className={cx('app', zen && 'is-zen')}>
+    <div className={cx('app', puzzle === '333' && zen && 'is-zen')}>
       <div className="backdrop" aria-hidden />
-      <Header />
+      <Header puzzle={puzzle} onPuzzleChange={choosePuzzle} />
+      {puzzle === '333' ? <>
       <main className="studio" id="studio">
         <h1 className="sr-only">CUBELAB — interactive 3×3×3 cube studio</h1>
         <section className="studio__stage" aria-label="3D cube. Drag stickers to twist, drag the background to orbit.">
@@ -59,6 +85,9 @@ export function App() {
       <ConfirmDialog />
       <Toast />
       <LiveRegion />
+      </> : <Suspense fallback={<div className="nxn-loading" role="status">Preparing {cubeEvent(puzzle)?.shortLabel}…</div>}>
+        <NxNStudio key={puzzle} eventId={puzzle} />
+      </Suspense>}
     </div>
   );
 }
