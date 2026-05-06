@@ -4,6 +4,7 @@ import { ContactShadows, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Face } from '../../core/puzzle/notation';
 import type { NxState } from '../../core/nxn/model';
+import type { NxMove } from '../../core/nxn/model';
 import { installStudioEnvironment } from '../stage/studioEnvironment';
 import { NxNCube } from './NxNCube';
 
@@ -17,7 +18,12 @@ function StudioLight() {
   return null;
 }
 
-export function NxNCanvas({ state, onTurn }: { readonly state: NxState; readonly onTurn: (face: Face, inverse: boolean) => void }) {
+export function NxNCanvas({ state, active, onTurn, onTurnComplete }: {
+  readonly state: NxState;
+  readonly active: { readonly token: number; readonly move: NxMove; readonly durationMs: number } | null;
+  readonly onTurn: (face: Face, inverse: boolean) => void;
+  readonly onTurnComplete: (token: number) => void;
+}) {
   return (
     <Canvas
       className="nxn-canvas"
@@ -36,7 +42,7 @@ export function NxNCanvas({ state, onTurn }: { readonly state: NxState; readonly
       <directionalLight position={[-5, 8, 5]} intensity={2.2} color="#fff4e9" />
       <directionalLight position={[5, 3, -3]} intensity={1.25} color="#ecf3ff" />
       <StudioLight />
-      <NxNCube state={state} onTurn={onTurn} />
+      <NxNCube state={state} active={active} onTurn={onTurn} onTurnComplete={onTurnComplete} />
       <ContactShadows position={[0, -1.75, 0]} opacity={0.38} scale={5.4} blur={2.6} far={3} resolution={256} frames={1} />
       <OrbitControls enablePan={false} minDistance={5.5} maxDistance={12} enableDamping dampingFactor={0.09} />
     </Canvas>

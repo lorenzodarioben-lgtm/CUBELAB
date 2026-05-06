@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import * as THREE from 'three';
 import { FACE_COLORS } from '../../core/puzzle/colors';
@@ -6,7 +7,10 @@ import { faceFromNormal, mulVec } from '../../core/puzzle/geometry';
 import type { Vec3 } from '../../core/puzzle/geometry';
 import type { Face } from '../../core/puzzle/notation';
 import { piecePosition } from '../../core/nxn/model';
+import { isPieceInMove, moveAxis, moveQuarterTurns } from '../../core/nxn/model';
 import type { NxState } from '../../core/nxn/model';
+import type { NxMove } from '../../core/nxn/model';
+import { easeSnap } from '../../core/engine/cubeEngine';
 
 const FACES = ['U', 'R', 'F', 'D', 'L', 'B'] as const;
 const FRONT = new THREE.Vector3(0, 0, 1);
@@ -27,12 +31,19 @@ function normalQuaternion(normal: Vec3): THREE.Quaternion {
 
 export interface NxNCubeProps {
   readonly state: NxState;
+  readonly active: { readonly token: number; readonly move: NxMove; readonly durationMs: number } | null;
   readonly onTurn: (face: Face, inverse: boolean) => void;
+  readonly onTurnComplete: (token: number) => void;
 }
 
 /** Rounded, separate injection-moulded caps over a dark moving mechanism. */
-export function NxNCube({ state, onTurn }: NxNCubeProps) {
+export function NxNCube({ state, active, onTurn, onTurnComplete }: NxNCubeProps) {
   const cell = 3.24 / state.size;
+  const invalidate = useThree((scene) => scene.invalidate);
+  const pieceGroups = useRef<Array<THREE.Group | null>>([]);
+  const motion = useRef({ token: -1, startedAt: 0, completed: false });
+  const turnRotation = useMemo(() => new THREE.Quaternion(), []);
+  const axisVector = useMemo(() => new THREE.Vector3(), []);
   const resources = useMemo(() => {
     const body = new RoundedBoxGeometry(cell * 0.91, cell * 0.91, cell * 0.91, 3, cell * 0.075);
     const cap = new RoundedBoxGeometry(cell * 0.94, cell * 0.94, cell * 0.18, 4, cell * 0.065);
@@ -66,10 +77,52 @@ export function NxNCube({ state, onTurn }: NxNCubeProps) {
     };
   }), [state, cell]);
 
+  useEffect(() => { if (active) invalidate(); }, [active, invalidate]);
+  useEffect(() => {
+    if (active) return;
+    state.pieces.forEach((piece) => {
+      const group = pieceGroups.current[piece.id];
+      const base = transforms[piece.id];
+      if (!group || !base) return;
+      group.position.set(...base.position);
+      group.quaternion.copy(base.rotation);
+    });
+    invalidate();
+  }, [active, state, transforms, invalidate]);
+
+  useFrame(() => {
+    if (!active) return;
+    if (motion.current.token !== active.token) {
+      motion.current = { token: active.token, startedAt: performance.now(), completed: false };
+    }
+    const progress = active.durationMs === 0 ? 1 : Math.min(1, (performance.now() - motion.current.startedAt) / active.durationMs);
+    const axis = moveAxis(active.move);
+    axisVector.set(axis === 0 ? 1 : 0, axis === 1 ? 1 : 0, axis === 2 ? 1 : 0);
+    turnRotation.setFromAxisAngle(axisVector, easeSnap(progress) * moveQuarterTurns(active.move) * Math.PI / 2);
+    for (const piece of state.pieces) {
+      if (!isPieceInMove(state, piece.id, active.move)) continue;
+      const group = pieceGroups.current[piece.id];
+      if (!group) continue;
+      const base = transforms[piece.id]!;
+      group.position.set(...base.position).applyQuaternion(turnRotation);
+      group.quaternion.copy(turnRotation).multiply(base.rotation);
+    }
+    if (progress < 1) invalidate();
+    else if (!motion.current.completed) {
+      motion.current.completed = true;
+      queueMicrotask(() => onTurnComplete(active.token));
+    }
+  });
+
   return (
     <group name={`nxn-${state.size}`}>
       {state.pieces.map((piece) => (
-        <group key={piece.id} position={transforms[piece.id]!.position} quaternion={transforms[piece.id]!.rotation}>
+        <group
+          key={piece.id}
+          ref={(group) => { pieceGroups.current[piece.id] = group; }}
+          position={transforms[piece.id]!.position}
+          quaternion={transforms[piece.id]!.rotation}
+        >
           <mesh geometry={resources.body} material={resources.core} castShadow receiveShadow />
           {piece.stickers.map((sticker) => (
             <mesh

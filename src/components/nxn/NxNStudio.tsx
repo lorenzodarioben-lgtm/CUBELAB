@@ -4,7 +4,7 @@ import type { Face } from '../../core/puzzle/notation';
 import { formatTime } from '../../core/stats/format';
 import { cubeEvent } from '../../core/nxn/catalog';
 import type { CubeEventId } from '../../core/nxn/catalog';
-import { isNxSolved } from '../../core/nxn/model';
+import { invertNxMove, isNxSolved } from '../../core/nxn/model';
 import type { NxMove } from '../../core/nxn/model';
 import { formatNxMove } from '../../core/nxn/notation';
 import { generateNxScramble } from '../../core/nxn/scramble';
@@ -15,6 +15,7 @@ import { Button, IconButton, Spinner } from '../ui/primitives';
 import { NxNCanvas } from './NxNCanvas';
 
 const FACE_ORDER = ['U', 'R', 'F', 'D', 'L', 'B'] as const;
+type ActiveTurn = { readonly token: number; readonly move: NxMove; readonly kind: 'manual' | 'undo' | 'redo'; readonly durationMs: number };
 
 function canUseWebGL(): boolean {
   try {
@@ -33,6 +34,9 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
   const [now, setNow] = useState(() => performance.now());
   const [copied, setCopied] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [active, setActive] = useState<ActiveTurn | null>(null);
+  const activeRef = useRef<ActiveTurn | null>(null);
+  const turnSerial = useRef(0);
   const request = useRef(0);
   const webgl = useMemo(() => canUseWebGL(), []);
 
@@ -44,20 +48,44 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
     return () => window.clearInterval(id);
   }, [session.phase]);
 
-  const commit = useCallback((move: NxMove) => {
-    if (loading) return;
+  const applyTurn = useCallback((entry: ActiveTurn) => {
     const at = performance.now();
     const wallClock = Date.now();
     const id = crypto.randomUUID();
     setNow(at);
-    setSession((current) => turnNxSession(current, move, at, wallClock, id));
-  }, [loading]);
+    setSession((current) => {
+      if (entry.kind === 'undo') return undoNxSession(current, at);
+      if (entry.kind === 'redo') return redoNxSession(current, at, wallClock, id);
+      return turnNxSession(current, entry.move, at, wallClock, id);
+    });
+  }, []);
+
+  const beginTurn = useCallback((move: NxMove, kind: ActiveTurn['kind']) => {
+    if (loading || activeRef.current) return;
+    const entry: ActiveTurn = { token: ++turnSerial.current, move, kind, durationMs: 175 + 25 * (move.width - 1) };
+    if (!webgl || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      applyTurn(entry);
+      return;
+    }
+    activeRef.current = entry;
+    setActive(entry);
+  }, [loading, webgl, applyTurn]);
+
+  const finishTurn = useCallback((token: number) => {
+    const entry = activeRef.current;
+    if (!entry || entry.token !== token) return;
+    activeRef.current = null;
+    setActive(null);
+    applyTurn(entry);
+  }, [applyTurn]);
 
   const turn = useCallback((face: Face, inverse: boolean) => {
-    commit({ face, width, turns: inverse ? 3 : 1 });
-  }, [commit, width]);
+    beginTurn({ face, width, turns: inverse ? 3 : 1 }, 'manual');
+  }, [beginTurn, width]);
 
   const newScramble = useCallback(async () => {
+    activeRef.current = null;
+    setActive(null);
     const id = ++request.current;
     setLoading(true);
     setError(null);
@@ -71,11 +99,14 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
     }
   }, [eventId]);
 
-  const undo = useCallback(() => setSession((current) => undoNxSession(current, performance.now())), []);
+  const undo = useCallback(() => {
+    const move = session.undo.at(-1);
+    if (move) beginTurn(invertNxMove(move), 'undo');
+  }, [session.undo, beginTurn]);
   const redo = useCallback(() => {
-    const at = performance.now();
-    setSession((current) => redoNxSession(current, at, Date.now(), crypto.randomUUID()));
-  }, []);
+    const move = session.redo.at(-1);
+    if (move) beginTurn(move, 'redo');
+  }, [session.redo, beginTurn]);
 
   useEffect(() => {
     const onKey = (key: KeyboardEvent) => {
@@ -138,7 +169,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
       </section>
 
       <section className="nxn-stage" aria-label={`${event.label} interactive cube`}>
-        {webgl ? <NxNCanvas state={session.cube} onTurn={turn} /> : <div className="nxn-no-webgl">3D is unavailable here. Use the face buttons to turn the cube.</div>}
+        {webgl ? <NxNCanvas state={session.cube} active={active} onTurn={turn} onTurnComplete={finishTurn} /> : <div className="nxn-no-webgl">3D is unavailable here. Use the face buttons to turn the cube.</div>}
         <p className="nxn-stage__hint">Tap a coloured face to turn · Shift + tap for inverse · Drag the background to orbit</p>
       </section>
 
@@ -148,9 +179,9 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
             {loading ? 'Generating…' : 'New Scramble'}
           </Button>
           <div className="nxn-controls__row">
-            <Button variant="ghost" size="lg" icon={<RotateCcw size={16} />} onClick={() => { request.current++; setLoading(false); setError(null); setSession(resetNxSession); }}>Reset</Button>
-            <IconButton label="Undo" disabled={!session.undo.length} onClick={undo}><Undo2 size={17} /></IconButton>
-            <IconButton label="Redo" disabled={!session.redo.length} onClick={redo}><Redo2 size={17} /></IconButton>
+            <Button variant="ghost" size="lg" icon={<RotateCcw size={16} />} onClick={() => { request.current++; activeRef.current = null; setActive(null); setLoading(false); setError(null); setSession(resetNxSession); }}>Reset</Button>
+            <IconButton label="Undo" disabled={!session.undo.length || !!active || loading} onClick={undo}><Undo2 size={17} /></IconButton>
+            <IconButton label="Redo" disabled={!session.redo.length || !!active || loading} onClick={redo}><Redo2 size={17} /></IconButton>
           </div>
         </div>
         <div className="nxn-turns">
@@ -165,8 +196,8 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
           <div className="nxn-move-grid">
             {FACE_ORDER.map((face) => (
               <div className="nxn-move-pair" key={face}>
-                <button type="button" onClick={() => turn(face, false)} title={`Turn ${face} clockwise`} disabled={loading}>{formatNxMove({ face, width, turns: 1 })}</button>
-                <button type="button" onClick={() => turn(face, true)} title={`Turn ${face} counter-clockwise`} disabled={loading}>{formatNxMove({ face, width, turns: 3 })}</button>
+                <button type="button" onClick={() => turn(face, false)} title={`Turn ${face} clockwise`} disabled={loading || !!active}>{formatNxMove({ face, width, turns: 1 })}</button>
+                <button type="button" onClick={() => turn(face, true)} title={`Turn ${face} counter-clockwise`} disabled={loading || !!active}>{formatNxMove({ face, width, turns: 3 })}</button>
               </div>
             ))}
           </div>
