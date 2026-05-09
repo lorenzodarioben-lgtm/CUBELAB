@@ -31,6 +31,22 @@ test.describe('NxN practice studio', () => {
     expect(errors()).toEqual([]);
   });
 
+  test('dragging a 2×2 sticker turns the row under the pointer', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=222');
+    const canvas = page.locator('.nxn-canvas canvas');
+    await expect(canvas).toBeVisible();
+    const box = (await canvas.boundingBox())!;
+    const x = box.x + box.width * 0.35;
+    const y = box.y + box.height * 0.5;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x - 110, y, { steps: 9 });
+    await page.mouse.up();
+    await expect(page.locator('.nxn-last-turn strong')).toHaveText('U');
+    expect(errors()).toEqual([]);
+  });
+
   test('2×2 event generator produces a playable scramble', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('/?puzzle=222');

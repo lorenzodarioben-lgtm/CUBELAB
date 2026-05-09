@@ -11,6 +11,7 @@ import { isPieceInMove, moveAxis, moveQuarterTurns } from '../../core/nxn/model'
 import type { NxState } from '../../core/nxn/model';
 import type { NxMove } from '../../core/nxn/model';
 import { easeSnap } from '../../core/engine/cubeEngine';
+import { moveForNxDrag } from '../../core/nxn/gesture';
 
 const FACES = ['U', 'R', 'F', 'D', 'L', 'B'] as const;
 const FRONT = new THREE.Vector3(0, 0, 1);
@@ -33,15 +34,28 @@ export interface NxNCubeProps {
   readonly state: NxState;
   readonly active: { readonly token: number; readonly move: NxMove; readonly durationMs: number } | null;
   readonly onTurn: (face: Face, inverse: boolean) => void;
+  readonly onGestureTurn: (move: NxMove) => void;
+  readonly onDragState: (dragging: boolean) => void;
   readonly onTurnComplete: (token: number) => void;
 }
 
 /** Rounded, separate injection-moulded caps over a dark moving mechanism. */
-export function NxNCube({ state, active, onTurn, onTurnComplete }: NxNCubeProps) {
+export function NxNCube({ state, active, onTurn, onGestureTurn, onDragState, onTurnComplete }: NxNCubeProps) {
   const cell = 3.24 / state.size;
   const invalidate = useThree((scene) => scene.invalidate);
   const pieceGroups = useRef<Array<THREE.Group | null>>([]);
   const motion = useRef({ token: -1, startedAt: 0, completed: false });
+  const drag = useRef<{
+    pointer: number;
+    piece: number;
+    normal: Vec3;
+    start: THREE.Vector3;
+    plane: THREE.Plane;
+    candidate: NxMove | null;
+  } | null>(null);
+  const suppressClick = useRef(false);
+  const dragPoint = useMemo(() => new THREE.Vector3(), []);
+  const dragDelta = useMemo(() => new THREE.Vector3(), []);
   const turnRotation = useMemo(() => new THREE.Quaternion(), []);
   const axisVector = useMemo(() => new THREE.Vector3(), []);
   const resources = useMemo(() => {
@@ -135,8 +149,63 @@ export function NxNCube({ state, active, onTurn, onTurnComplete }: NxNCubeProps)
               receiveShadow
               onClick={(event) => {
                 event.stopPropagation();
+                if (suppressClick.current) {
+                  suppressClick.current = false;
+                  return;
+                }
                 const currentNormal = mulVec(state.orientations[piece.id]!, sticker.normal);
                 onTurn(faceFromNormal(currentNormal), event.shiftKey);
+              }}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                if (active) return;
+                const normal = mulVec(state.orientations[piece.id]!, sticker.normal);
+                const vector = new THREE.Vector3(...normal);
+                const start = event.point.clone();
+                drag.current = {
+                  pointer: event.pointerId,
+                  piece: piece.id,
+                  normal,
+                  start,
+                  plane: new THREE.Plane().setFromNormalAndCoplanarPoint(vector, start),
+                  candidate: null,
+                };
+                (event.target as (EventTarget & { setPointerCapture?: (id: number) => void }) | null)?.setPointerCapture?.(event.pointerId);
+                onDragState(true);
+              }}
+              onPointerMove={(event) => {
+                const current = drag.current;
+                if (!current || current.pointer !== event.pointerId) return;
+                event.stopPropagation();
+                if (!event.ray.intersectPlane(current.plane, dragPoint)) return;
+                dragDelta.copy(dragPoint).sub(current.start);
+                current.candidate = moveForNxDrag(
+                  state.size,
+                  piecePosition(state, current.piece),
+                  current.normal,
+                  [dragDelta.x, dragDelta.y, dragDelta.z],
+                  cell * 0.17,
+                );
+                document.body.style.cursor = current.candidate ? 'grabbing' : 'pointer';
+              }}
+              onPointerUp={(event) => {
+                const current = drag.current;
+                if (!current || current.pointer !== event.pointerId) return;
+                event.stopPropagation();
+                (event.target as (EventTarget & { releasePointerCapture?: (id: number) => void }) | null)?.releasePointerCapture?.(event.pointerId);
+                drag.current = null;
+                onDragState(false);
+                document.body.style.cursor = 'pointer';
+                if (current.candidate) {
+                  suppressClick.current = true;
+                  onGestureTurn(current.candidate);
+                  window.setTimeout(() => { suppressClick.current = false; }, 0);
+                }
+              }}
+              onPointerCancel={() => {
+                drag.current = null;
+                onDragState(false);
+                document.body.style.cursor = '';
               }}
               onPointerOver={(event) => {
                 event.stopPropagation();

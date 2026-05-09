@@ -169,7 +169,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
       </section>
 
       <section className="nxn-stage" aria-label={`${event.label} interactive cube`}>
-        {webgl ? <NxNCanvas state={session.cube} active={active} onTurn={turn} onTurnComplete={finishTurn} /> : <div className="nxn-no-webgl">3D is unavailable here. Use the face buttons to turn the cube.</div>}
+        {webgl ? <NxNCanvas state={session.cube} active={active} onTurn={turn} onGestureTurn={(move) => beginTurn(move, 'manual')} onTurnComplete={finishTurn} /> : <div className="nxn-no-webgl">3D is unavailable here. Use the face buttons to turn the cube.</div>}
         <p className="nxn-stage__hint">Tap a coloured face to turn · Shift + tap for inverse · Drag the background to orbit</p>
       </section>
 
@@ -201,6 +201,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
               </div>
             ))}
           </div>
+          <p className="nxn-last-turn" aria-live="polite">Last turn <strong>{session.moves.length ? formatNxMove(session.moves.at(-1)!) : '—'}</strong></p>
           <p className="nxn-controls__tip">Keyboard: U R F D L B · hold Shift for inverse · N for scramble · Ctrl+Z to undo</p>
         </div>
         <p className="nxn-solved-indicator" aria-live="polite">{isNxSolved(session.cube) ? 'Puzzle solved' : `${event.shortLabel} in progress`}</p>

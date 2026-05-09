@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { ContactShadows, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -18,12 +18,14 @@ function StudioLight() {
   return null;
 }
 
-export function NxNCanvas({ state, active, onTurn, onTurnComplete }: {
+export function NxNCanvas({ state, active, onTurn, onGestureTurn, onTurnComplete }: {
   readonly state: NxState;
   readonly active: { readonly token: number; readonly move: NxMove; readonly durationMs: number } | null;
   readonly onTurn: (face: Face, inverse: boolean) => void;
+  readonly onGestureTurn: (move: NxMove) => void;
   readonly onTurnComplete: (token: number) => void;
 }) {
+  const [dragging, setDragging] = useState(false);
   return (
     <Canvas
       className="nxn-canvas"
@@ -42,9 +44,9 @@ export function NxNCanvas({ state, active, onTurn, onTurnComplete }: {
       <directionalLight position={[-5, 8, 5]} intensity={2.2} color="#fff4e9" />
       <directionalLight position={[5, 3, -3]} intensity={1.25} color="#ecf3ff" />
       <StudioLight />
-      <NxNCube state={state} active={active} onTurn={onTurn} onTurnComplete={onTurnComplete} />
+      <NxNCube state={state} active={active} onTurn={onTurn} onGestureTurn={onGestureTurn} onDragState={setDragging} onTurnComplete={onTurnComplete} />
       <ContactShadows position={[0, -1.75, 0]} opacity={0.38} scale={5.4} blur={2.6} far={3} resolution={256} frames={1} />
-      <OrbitControls enablePan={false} minDistance={5.5} maxDistance={12} enableDamping dampingFactor={0.09} />
+      <OrbitControls enabled={!dragging} enablePan={false} minDistance={5.5} maxDistance={12} enableDamping dampingFactor={0.09} />
     </Canvas>
   );
 }
