@@ -13,6 +13,7 @@ import { loadNxHistory, saveNxHistory } from '../../core/nxn/storage';
 import { browserStore } from '../../core/persistence/storage';
 import { Button, IconButton, Spinner } from '../ui/primitives';
 import { NxNCanvas } from './NxNCanvas';
+import { NxNNet } from './NxNNet';
 
 const FACE_ORDER = ['U', 'R', 'F', 'D', 'L', 'B'] as const;
 type ActiveTurn = { readonly token: number; readonly move: NxMove; readonly kind: 'manual' | 'undo' | 'redo'; readonly durationMs: number };
@@ -169,8 +170,8 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
       </section>
 
       <section className="nxn-stage" aria-label={`${event.label} interactive cube`}>
-        {webgl ? <NxNCanvas state={session.cube} active={active} onTurn={turn} onGestureTurn={(move) => beginTurn(move, 'manual')} onTurnComplete={finishTurn} /> : <div className="nxn-no-webgl">3D is unavailable here. Use the face buttons to turn the cube.</div>}
-        <p className="nxn-stage__hint">Tap a coloured face to turn · Shift + tap for inverse · Drag the background to orbit</p>
+        {webgl ? <NxNCanvas state={session.cube} active={active} onTurn={turn} onGestureTurn={(move) => beginTurn(move, 'manual')} onTurnComplete={finishTurn} /> : <div className="nxn-no-webgl"><NxNNet state={session.cube} onTurn={turn} /><p>3D is unavailable here. The net and turn controls remain playable.</p></div>}
+        <p className="nxn-stage__hint">{webgl ? 'Tap a coloured face to turn · Shift + tap for inverse · Drag the background to orbit' : 'Tap a face to turn · Shift + tap for inverse'}</p>
       </section>
 
       <section className="nxn-controls" aria-label="Puzzle controls">

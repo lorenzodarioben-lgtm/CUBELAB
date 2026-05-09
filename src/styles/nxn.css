@@ -128,7 +128,19 @@
   font: 11px/1.4 var(--font-ui);
   pointer-events: none;
 }
-.nxn-no-webgl { display: grid; place-items: center; height: 100%; color: var(--text-2); text-align: center; font: 14px/1.5 var(--font-ui); }
+.nxn-no-webgl { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 24px; height: 100%; color: var(--text-2); text-align: center; font: 12px/1.5 var(--font-ui); }
+.nxn-no-webgl > p { margin: 0; }
+.nxn-net { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); width: min(100%, 520px); aspect-ratio: 4 / 3; gap: 6px; }
+.nxn-net__face { display: grid; min-width: 0; min-height: 0; gap: 2px; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.nxn-net__face:focus-visible { outline: none; box-shadow: var(--focus); }
+.nxn-net__face:hover { filter: brightness(1.16); }
+.nxn-net__face--U { grid-area: 1 / 2; }
+.nxn-net__face--L { grid-area: 2 / 1; }
+.nxn-net__face--F { grid-area: 2 / 2; }
+.nxn-net__face--R { grid-area: 2 / 3; }
+.nxn-net__face--B { grid-area: 2 / 4; }
+.nxn-net__face--D { grid-area: 3 / 2; }
+.nxn-net__sticker { min-width: 0; min-height: 0; border-radius: 3px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.38), 0 1px 0 rgba(255, 255, 255, 0.18) inset; }
 
 .nxn-controls {
   align-self: start;
@@ -187,7 +199,8 @@
 
 @media (max-width: 900px) {
   .nxn-layout { position: relative; inset: auto; display: flex; flex-direction: column; padding: 0 var(--gutter) 60px; }
-  .nxn-stage { order: 0; width: calc(100% + 2 * var(--gutter)); margin: 0 calc(-1 * var(--gutter)); height: min(62svh, 600px); min-height: 360px; }
+  .nxn-stage { order: 0; width: calc(100% + 2 * var(--gutter)); margin: 0 calc(-1 * var(--gutter)) 24px; height: min(62svh, 600px); min-height: 360px; }
+  .nxn-stage__hint { bottom: -23px; background: transparent; border: 0; }
   .nxn-readouts { order: 1; overflow: visible; }
   .nxn-controls { order: 2; align-self: stretch; overflow: visible; margin-top: 14px; }
   .nxn-clock { padding-top: 18px; }
