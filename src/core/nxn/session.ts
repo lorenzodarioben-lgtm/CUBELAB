@@ -105,3 +105,20 @@ export function bestNxSingle(solves: readonly NxSolve[]): number | null {
   const clean = solves.filter((solve) => !solve.assisted);
   return clean.length ? Math.min(...clean.map((solve) => solve.durationMs)) : null;
 }
+
+/** Apply verified solver moves as practice, without manufacturing a timed PB. */
+export function applyNxSolution(session: NxSession, solution: readonly NxMove[]): NxSession {
+  const cube = applyNxMoves(session.cube, solution);
+  if (!isNxSolved(cube)) throw new Error('The solution does not solve this cube.');
+  return {
+    ...session,
+    cube,
+    phase: 'solved',
+    startedAt: null,
+    lastDurationMs: null,
+    assisted: true,
+    moves: [...session.moves, ...solution],
+    undo: [],
+    redo: [],
+  };
+}

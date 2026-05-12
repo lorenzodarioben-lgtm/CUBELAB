@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isNxSolved } from '../../src/core/nxn/model';
 import { parseNxAlg } from '../../src/core/nxn/notation';
-import { bestNxSingle, createNxSession, redoNxSession, scrambleNxSession, turnNxSession, undoNxSession } from '../../src/core/nxn/session';
+import { applyNxSolution, bestNxSingle, createNxSession, redoNxSession, scrambleNxSession, turnNxSession, undoNxSession } from '../../src/core/nxn/session';
 
 describe('NxN practice session', () => {
   it('starts on the first move and records a completed solve', () => {
@@ -23,5 +23,14 @@ describe('NxN practice session', () => {
     expect(session.phase).toBe('solved');
     expect(session.solves.at(-1)?.assisted).toBe(true);
     expect(bestNxSingle(session.solves)).toBeNull();
+  });
+
+  it('auto solution solves without adding a timed record', () => {
+    const session = scrambleNxSession(createNxSession(2), { text: 'R U', moves: parseNxAlg('R U', 2) });
+    const solved = applyNxSolution(session, parseNxAlg("U' R'", 2));
+    expect(isNxSolved(solved.cube)).toBe(true);
+    expect(solved.phase).toBe('solved');
+    expect(solved.solves).toHaveLength(0);
+    expect(solved.assisted).toBe(true);
   });
 });

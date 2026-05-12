@@ -57,4 +57,17 @@ test.describe('NxN practice studio', () => {
     await expect(page.getByText('Solve the puzzle to stop')).toBeVisible();
     expect(errors()).toEqual([]);
   });
+
+  test('2×2 solution applies without creating a timed record', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=222');
+    await page.locator('[title="Turn R clockwise"]').click();
+    await expect(page.getByText('2×2 in progress')).toBeVisible();
+    await page.getByRole('button', { name: 'Find Solution' }).click();
+    await expect(page.getByRole('button', { name: 'Apply solution' })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Apply solution' }).click();
+    await expect(page.getByText('Puzzle solved')).toBeVisible();
+    await expect(page.locator('.nxn-records dd').nth(1)).toHaveText('0');
+    expect(errors()).toEqual([]);
+  });
 });

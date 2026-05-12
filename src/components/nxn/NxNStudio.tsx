@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Copy, Redo2, RotateCcw, Shuffle, Undo2 } from 'lucide-react';
+import { Check, Copy, Redo2, RotateCcw, Shuffle, Sparkles, Undo2 } from 'lucide-react';
 import type { Face } from '../../core/puzzle/notation';
 import { formatTime } from '../../core/stats/format';
 import { cubeEvent } from '../../core/nxn/catalog';
 import type { CubeEventId } from '../../core/nxn/catalog';
 import { invertNxMove, isNxSolved } from '../../core/nxn/model';
 import type { NxMove } from '../../core/nxn/model';
-import { formatNxMove } from '../../core/nxn/notation';
+import { formatNxAlg, formatNxMove } from '../../core/nxn/notation';
 import { generateNxScramble } from '../../core/nxn/scramble';
-import { bestNxSingle, createNxSession, redoNxSession, resetNxSession, scrambleNxSession, turnNxSession, undoNxSession } from '../../core/nxn/session';
+import { applyNxSolution, bestNxSingle, createNxSession, redoNxSession, resetNxSession, scrambleNxSession, turnNxSession, undoNxSession } from '../../core/nxn/session';
+import { solveTwoByTwo } from '../../core/nxn/solver';
 import { loadNxHistory, saveNxHistory } from '../../core/nxn/storage';
 import { browserStore } from '../../core/persistence/storage';
 import { Button, IconButton, Spinner } from '../ui/primitives';
@@ -35,13 +36,16 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
   const [now, setNow] = useState(() => performance.now());
   const [copied, setCopied] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [solving, setSolving] = useState(false);
+  const [solution, setSolution] = useState<readonly NxMove[] | null>(null);
   const [active, setActive] = useState<ActiveTurn | null>(null);
   const activeRef = useRef<ActiveTurn | null>(null);
   const turnSerial = useRef(0);
   const request = useRef(0);
+  const solveRequest = useRef(0);
   const webgl = useMemo(() => canUseWebGL(), []);
 
-  useEffect(() => () => { request.current++; document.body.style.cursor = ''; }, []);
+  useEffect(() => () => { request.current++; solveRequest.current++; document.body.style.cursor = ''; }, []);
   useEffect(() => { saveNxHistory(storage, eventId, session.solves); }, [storage, eventId, session.solves]);
   useEffect(() => {
     if (session.phase !== 'running') return;
@@ -63,6 +67,9 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
 
   const beginTurn = useCallback((move: NxMove, kind: ActiveTurn['kind']) => {
     if (loading || activeRef.current) return;
+    solveRequest.current++;
+    setSolving(false);
+    setSolution(null);
     const entry: ActiveTurn = { token: ++turnSerial.current, move, kind, durationMs: 175 + 25 * (move.width - 1) };
     if (!webgl || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       applyTurn(entry);
@@ -87,6 +94,9 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
   const newScramble = useCallback(async () => {
     activeRef.current = null;
     setActive(null);
+    solveRequest.current++;
+    setSolving(false);
+    setSolution(null);
     const id = ++request.current;
     setLoading(true);
     setError(null);
@@ -99,6 +109,22 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
       if (request.current === id) setLoading(false);
     }
   }, [eventId]);
+
+  const findSolution = async () => {
+    if (event.size !== 2 || isNxSolved(session.cube) || active || loading) return;
+    const id = ++solveRequest.current;
+    setSolving(true);
+    setSolution(null);
+    setError(null);
+    try {
+      const answer = await solveTwoByTwo(session.cube, session.scramble, session.moves);
+      if (solveRequest.current === id) setSolution(answer);
+    } catch (cause) {
+      if (solveRequest.current === id) setError(cause instanceof Error ? cause.message : 'Could not solve this 2×2.');
+    } finally {
+      if (solveRequest.current === id) setSolving(false);
+    }
+  };
 
   const undo = useCallback(() => {
     const move = session.undo.at(-1);
@@ -180,10 +206,14 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
             {loading ? 'Generating…' : 'New Scramble'}
           </Button>
           <div className="nxn-controls__row">
-            <Button variant="ghost" size="lg" icon={<RotateCcw size={16} />} onClick={() => { request.current++; activeRef.current = null; setActive(null); setLoading(false); setError(null); setSession(resetNxSession); }}>Reset</Button>
+            <Button variant="ghost" size="lg" icon={<RotateCcw size={16} />} onClick={() => { request.current++; solveRequest.current++; activeRef.current = null; setActive(null); setLoading(false); setSolving(false); setSolution(null); setError(null); setSession(resetNxSession); }}>Reset</Button>
             <IconButton label="Undo" disabled={!session.undo.length || !!active || loading} onClick={undo}><Undo2 size={17} /></IconButton>
             <IconButton label="Redo" disabled={!session.redo.length || !!active || loading} onClick={redo}><Redo2 size={17} /></IconButton>
           </div>
+          {event.size === 2 && <Button variant="accent" size="lg" icon={solving ? <Spinner /> : <Sparkles size={16} />} busy={solving} disabled={isNxSolved(session.cube) || loading || !!active} onClick={() => void findSolution()}>
+            {solving ? 'Solving…' : 'Find Solution'}
+          </Button>}
+          {solution && <div className="nxn-solution"><p>{formatNxAlg(solution)}</p><Button variant="ghost" size="sm" onClick={() => { setSession((current) => applyNxSolution(current, solution)); setSolution(null); }}>Apply solution</Button></div>}
         </div>
         <div className="nxn-turns">
           <h2>Turn layers</h2>
