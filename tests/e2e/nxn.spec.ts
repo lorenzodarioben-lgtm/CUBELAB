@@ -70,4 +70,17 @@ test.describe('NxN practice studio', () => {
     await expect(page.locator('.nxn-records dd').nth(1)).toHaveText('0');
     expect(errors()).toEqual([]);
   });
+
+  test('every large cube accepts its actual event scramble', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=444');
+    for (const event of ['444', '555', '666', '777']) {
+      await page.getByRole('combobox', { name: 'Puzzle' }).selectOption(event);
+      await page.getByRole('button', { name: 'New Scramble' }).click();
+      await expect(page.getByText('First turn starts the clock')).toBeVisible({ timeout: 60_000 });
+      await expect(page.locator('.nxn-scramble')).not.toContainText('Generate a scramble to begin.');
+      await expect(page.getByText('Puzzle solved')).toHaveCount(0);
+    }
+    expect(errors()).toEqual([]);
+  });
 });

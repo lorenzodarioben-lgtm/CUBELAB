@@ -1,9 +1,9 @@
 # CUBELAB
 
-**The interactive cubing studio.** A photoreal 3×3×3 — a modern stickerless speedcube or a classic
-stickered cube, your choice — that you can turn with your fingers, mouse or keyboard — all six faces *and* the M / E / S middle slices — scramble with real random-state WCA
-scrambles, time against an accurate clock, and auto-solve from whatever state it is in, with the
-solution played back move by move.
+**The interactive cubing studio.** The original photoreal 3×3×3 remains the full-featured studio:
+stickerless or stickered, face and M/E/S slice turns, WCA-style random-state practice scrambles,
+timing, and move-by-move solve playback. The puzzle selector now adds playable stickerless 2×2,
+4×4, 5×5, 6×6, and 7×7 cubes with their own scrambles, timers, and solve histories.
 
 Everything runs locally in the browser. There are no accounts, no servers, no analytics; solves and
 settings live in this browser's `localStorage` only.
@@ -60,6 +60,29 @@ npm run test:e2e     # Playwright against the production build (builds + preview
 First Playwright run on a new machine: `npx playwright install chromium firefox webkit`.
 
 ## Using the studio
+
+### Choosing a cube size
+
+Use the puzzle selector in the top bar. The 3×3 keeps its existing solver, playback, styles,
+settings, and statistics. The other sizes use a shared exact-piece model with rounded plastic caps,
+a dark internal mechanism, animated turns, and a playable 2D net when WebGL is unavailable.
+
+| Size | Practice features |
+| --- | --- |
+| 2×2 | Event scramble, timer, undo/redo, local history, verified solution |
+| 4×4–7×7 | Event scramble, outer and wide turns, timer, undo/redo, local history |
+
+In these new modes, tap a coloured face to turn it, drag a sticker along a row or column to turn
+that layer, or use the face buttons and keyboard (`U R F D L B`; hold Shift for inverse). Drag the
+background to orbit. For larger cubes, choose **Outer**, **Wide 2**, or **Wide 3** where available.
+The first turn after a scramble starts the timer; solving stops it. Undo and redo mark an attempt
+as practice, so it cannot become a clean best single. Results are stored separately for each size.
+The **Find Solution** button on 2×2 verifies the returned algorithm against the physical model
+before offering to apply it; applying it never creates a timed result.
+
+These are practice scrambles generated locally by cubing.js, not official competition scrambles.
+
+### 3×3 turning and controls
 
 ### Turning the cube
 
@@ -274,6 +297,7 @@ read from the three.js scene graph, `project(point)`, `moveLog()`, `renderInfo()
 
 ## Known limitations
 
-See `CUBELAB_HANDOFF.md`. In short: wide moves are not part of the notation;
-the timer is a training tool, not WCA-certified; history is per-browser; touch was verified with
+See `CUBELAB_HANDOFF.md`. In short: wide moves are not part of the 3×3 notation;
+4×4–7×7 do not yet have auto-solvers; the timer is a training tool, not WCA-certified;
+history is per-browser; touch was verified with
 Chromium touch emulation (not physical devices); Firefox/WebKit are covered by a smoke test only.

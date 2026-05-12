@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "CUBELAB — the interactive cubing studio. A 3x3x3 cube you can turn, scramble, time and auto-solve from any state.",
+  "description": "CUBELAB — an offline twisty-puzzle practice studio for 2x2 through 7x7 cubes.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
