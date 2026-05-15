@@ -3,7 +3,7 @@ import { createMemoryStore } from '../../src/core/persistence/storage';
 import { loadNxHistory, nxHistoryKey, saveNxHistory } from '../../src/core/nxn/storage';
 
 describe('event-scoped NxN history', () => {
-  const solve = { id: 'one', at: 12, durationMs: 1234, scramble: 'R U', moves: 8, assisted: false };
+  const solve = { id: 'one', at: 12, durationMs: 1234, scramble: 'R U', moves: 8, assisted: false, penalty: 'none' as const, source: 'virtual' as const };
 
   it('keeps puzzle records in separate versioned keys', () => {
     const store = createMemoryStore();
@@ -21,9 +21,16 @@ describe('event-scoped NxN history', () => {
 
   it('rejects records with invalid notation', () => {
     const store = createMemoryStore({
-      [nxHistoryKey('222')]: JSON.stringify({ v: 1, data: [solve, { ...solve, id: 'bad', scramble: 'Rw' }] }),
+      [nxHistoryKey('222')]: JSON.stringify({ v: 2, data: [solve, { ...solve, id: 'bad', scramble: 'Rw' }] }),
     });
     expect(loadNxHistory(store, '222')).toEqual([solve]);
+    expect(store.getItem('cubelab.backup.nxn.222.history')).not.toBeNull();
+  });
+
+  it('migrates old results and keeps the original payload', () => {
+    const legacy = { id: 'old', at: 10, durationMs: 950, scramble: 'R U', moves: 7, assisted: false };
+    const store = createMemoryStore({ [nxHistoryKey('222')]: JSON.stringify({ v: 1, data: [legacy] }) });
+    expect(loadNxHistory(store, '222')).toEqual([{ ...legacy, source: 'virtual', penalty: 'none' }]);
     expect(store.getItem('cubelab.backup.nxn.222.history')).not.toBeNull();
   });
 });

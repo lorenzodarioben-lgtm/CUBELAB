@@ -3,6 +3,7 @@ import { Check, Copy, Redo2, RotateCcw, Shuffle, Sparkles, Undo2 } from 'lucide-
 import { mv } from '../../core/puzzle/notation';
 import type { Face } from '../../core/puzzle/notation';
 import { formatTime } from '../../core/stats/format';
+import { effectiveMs } from '../../core/stats/stats';
 import { cubeEvent } from '../../core/nxn/catalog';
 import type { CubeEventId } from '../../core/nxn/catalog';
 import { invertNxMove, isNxSolved } from '../../core/nxn/model';
@@ -166,7 +167,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
     ? Math.max(0, now - session.startedAt)
     : session.phase === 'ready' ? 0 : session.lastDurationMs;
   const best = bestNxSingle(session.solves);
-  const cleanCount = session.solves.filter((solve) => !solve.assisted).length;
+  const cleanCount = session.solves.filter((solve) => !solve.assisted && solve.penalty !== 'DNF').length;
   const maxWidth = Math.floor(event.size / 2);
 
   const copy = async () => {
@@ -197,7 +198,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
           <button type="button" className="nxn-history-toggle" onClick={() => setShowHistory((value) => !value)} aria-expanded={showHistory}>
             {showHistory ? 'Hide' : 'Show'} recent solves
           </button>
-          {showHistory && <ol className="nxn-history">{session.solves.slice(-8).reverse().map((solve) => <li key={solve.id}><span>{new Date(solve.at).toLocaleDateString()}</span><strong>{formatTime(solve.durationMs)}</strong>{solve.assisted && <small>practice</small>}</li>)}</ol>}
+          {showHistory && <ol className="nxn-history">{session.solves.slice(-8).reverse().map((solve) => <li key={solve.id}><span>{new Date(solve.at).toLocaleDateString()}</span><strong>{formatTime(effectiveMs(solve))}</strong>{solve.penalty === '+2' && <small>+2</small>}{solve.assisted && <small>practice</small>}</li>)}</ol>}
         </div>
       </section>
 

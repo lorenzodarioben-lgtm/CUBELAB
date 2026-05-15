@@ -1,6 +1,8 @@
 import { applyNxMove, applyNxMoves, createNxState, invertNxMove, isNxSolved } from './model';
 import type { NxMove, NxState } from './model';
 import type { NxScramble } from './scramble';
+import { effectiveMs } from '../stats/stats';
+import type { Penalty } from '../timing/timerMachine';
 
 export interface NxSolve {
   readonly id: string;
@@ -10,6 +12,8 @@ export interface NxSolve {
   readonly moves: number;
   /** Undo or redo was used while timing. Practice solves do not count as PBs. */
   readonly assisted: boolean;
+  readonly penalty: Penalty;
+  readonly source: 'virtual' | 'manual';
 }
 
 export interface NxSession {
@@ -50,7 +54,7 @@ function finishIfSolved(session: NxSession, at: number, wallClock: number, id: s
   const durationMs = Math.max(0, at - session.startedAt);
   const record: NxSolve = {
     id, at: wallClock, durationMs, scramble: session.scramble ?? '',
-    moves: session.moves.length, assisted: session.assisted,
+    moves: session.moves.length, assisted: session.assisted, penalty: 'none', source: 'virtual',
   };
   return {
     ...session, phase: 'solved', startedAt: null, lastDurationMs: durationMs,
@@ -102,8 +106,8 @@ export function redoNxSession(session: NxSession, at: number, wallClock: number,
 }
 
 export function bestNxSingle(solves: readonly NxSolve[]): number | null {
-  const clean = solves.filter((solve) => !solve.assisted);
-  return clean.length ? Math.min(...clean.map((solve) => solve.durationMs)) : null;
+  const clean = solves.filter((solve) => !solve.assisted && solve.penalty !== 'DNF');
+  return clean.length ? Math.min(...clean.map(effectiveMs)) : null;
 }
 
 /** Apply verified solver moves as practice, without manufacturing a timed PB. */
