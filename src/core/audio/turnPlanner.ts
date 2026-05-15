@@ -150,6 +150,11 @@ export class TurnPlanner {
     }
   }
 
+  /** Complete a turn from another puzzle renderer using the same tactile bank. */
+  complete(move: Move, source: MoveSource, at: number): Voice[] {
+    return this.#commit(move, source, at);
+  }
+
   #pick(n: number): number {
     return Math.min(n - 1, Math.floor(this.#rand() * n));
   }

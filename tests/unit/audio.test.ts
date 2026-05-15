@@ -347,6 +347,16 @@ describe('Web Audio player', () => {
     expect(FakeContext.instances).toHaveLength(1);
   });
 
+  it('reuses the recorded turn bank for other cube sizes with restrained pitch', () => {
+    const player = createSoundPlayer();
+    player.setEnabled(true);
+    player.practiceTurn?.(mv('R', 1), 175, 1.065);
+    expect(player.stats().started.slide).toBe(1);
+    expect(player.stats().started.snap).toBe(1);
+    const slide = FakeContext.instances[0]!.sources.find((source) => source.loop)!;
+    expect(slide.playbackRate.value).toBeCloseTo(1.04 * 1.065);
+  });
+
   it('caps simultaneous voices during a frantic burst, and frees nodes as they end', () => {
     const player = createSoundPlayer();
     player.setEnabled(true);

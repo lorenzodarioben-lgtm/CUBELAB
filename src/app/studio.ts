@@ -208,6 +208,11 @@ export class Studio {
     this.#sound.preview();
   }
 
+  /** The NxN studio shares this player's recording, volume and mute setting. */
+  playPracticeTurn(move: Move, durationMs: number, pitch = 1): void {
+    this.#sound.practiceTurn?.(move, durationMs, pitch);
+  }
+
   soundStats(): SoundStats {
     return this.#sound.stats();
   }

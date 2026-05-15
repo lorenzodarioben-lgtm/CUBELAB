@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Copy, Redo2, RotateCcw, Shuffle, Sparkles, Undo2 } from 'lucide-react';
+import { mv } from '../../core/puzzle/notation';
 import type { Face } from '../../core/puzzle/notation';
 import { formatTime } from '../../core/stats/format';
 import { cubeEvent } from '../../core/nxn/catalog';
@@ -15,6 +16,7 @@ import { browserStore } from '../../core/persistence/storage';
 import { Button, IconButton, Spinner } from '../ui/primitives';
 import { NxNCanvas } from './NxNCanvas';
 import { NxNNet } from './NxNNet';
+import { useServices } from '../../app/context';
 
 const FACE_ORDER = ['U', 'R', 'F', 'D', 'L', 'B'] as const;
 type ActiveTurn = { readonly token: number; readonly move: NxMove; readonly kind: 'manual' | 'undo' | 'redo'; readonly durationMs: number };
@@ -27,6 +29,7 @@ function canUseWebGL(): boolean {
 }
 
 export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
+  const { studio } = useServices();
   const event = cubeEvent(eventId)!;
   const storage = useMemo(() => browserStore(), []);
   const [session, setSession] = useState(() => createNxSession(event.size, loadNxHistory(storage, eventId)));
@@ -71,13 +74,16 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
     setSolving(false);
     setSolution(null);
     const entry: ActiveTurn = { token: ++turnSerial.current, move, kind, durationMs: 175 + 25 * (move.width - 1) };
-    if (!webgl || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const instant = !webgl || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const pitch = (event.size === 2 ? 1.065 : 1 - Math.max(0, event.size - 3) * 0.018) - (move.width - 1) * 0.012;
+    studio.playPracticeTurn(mv(move.face, move.turns), instant ? 0 : entry.durationMs, pitch);
+    if (instant) {
       applyTurn(entry);
       return;
     }
     activeRef.current = entry;
     setActive(entry);
-  }, [loading, webgl, applyTurn]);
+  }, [loading, webgl, applyTurn, event.size, studio]);
 
   const finishTurn = useCallback((token: number) => {
     const entry = activeRef.current;

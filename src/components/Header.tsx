@@ -45,7 +45,7 @@ export function Header({ puzzle, onPuzzleChange }: { readonly puzzle: CubeEventI
         <select className="puzzle-select" aria-label="Puzzle" value={puzzle} onChange={(event) => onPuzzleChange(event.target.value as CubeEventId)}>
           {CUBE_EVENTS.map((event) => <option key={event.id} value={event.id}>{event.shortLabel}</option>)}
         </select>
-        {puzzle === '333' && <>
+        {puzzle === '333' &&
         <Segmented
           className="topbar__mode"
           label="Timer mode"
@@ -57,6 +57,7 @@ export function Header({ puzzle, onPuzzleChange }: { readonly puzzle: CubeEventI
             { value: 'spacebar', label: 'Spacebar', title: 'Hold and release Space to start' },
           ]}
         />
+        }
         <IconButton
           label={sound ? 'Mute sound' : 'Enable sound'}
           active={sound}
@@ -65,6 +66,7 @@ export function Header({ puzzle, onPuzzleChange }: { readonly puzzle: CubeEventI
         >
           {sound ? <Volume2 size={17} /> : <VolumeX size={17} />}
         </IconButton>
+        {puzzle === '333' && <>
         <IconButton label="Help & shortcuts (?)" onClick={() => ui.setState({ helpOpen: true })}>
           <CircleHelp size={17} />
         </IconButton>

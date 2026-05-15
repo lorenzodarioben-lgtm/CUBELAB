@@ -83,4 +83,17 @@ test.describe('NxN practice studio', () => {
     }
     expect(errors()).toEqual([]);
   });
+
+  test('NxN turns use the recorded cube sound when enabled', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=222');
+    await page.getByRole('button', { name: 'Enable sound' }).click();
+    await page.waitForFunction(() => window.__CUBELAB__.audio().context === 'running');
+    await page.locator('[title="Turn R clockwise"]').click();
+    await expect(page.locator('.nxn-last-turn strong')).toHaveText('R');
+    const started = await page.evaluate(() => window.__CUBELAB__.audio().started);
+    expect(started.slide).toBe(1);
+    expect(started.snap).toBe(1);
+    expect(errors()).toEqual([]);
+  });
 });

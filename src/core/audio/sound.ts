@@ -14,9 +14,10 @@
  * browser started it suspended. Voices are capped; every node is released
  * when its source ends.
  */
-import type { EngineEvent } from '../engine/cubeEngine';
+import type { EngineEvent, TurnStartEvent } from '../engine/cubeEngine';
 import { mv } from '../puzzle/notation';
 import type { Move } from '../puzzle/notation';
+import { moveQuarterTurns } from '../puzzle/geometry';
 import { renderSoundBank } from './synth';
 import { TurnPlanner } from './turnPlanner';
 import type { Voice } from './turnPlanner';
@@ -38,6 +39,8 @@ export interface SoundPlayer {
   setVolume(volume: number): void;
   /** Every engine event; the player decides what is audible. */
   motion(event: EngineEvent): void;
+  /** Reuse the recorded turn bank for a different cube size. */
+  practiceTurn?(move: Move, durationMs: number, pitch?: number): void;
   solved(): void;
   arm(): void;
   /** Plays a short demonstration sequence without touching the cube. */
@@ -139,7 +142,7 @@ export class VoiceExecutor {
     return kind !== 'stop-all';
   }
 
-  play(voice: Voice): void {
+  play(voice: Voice, pitch = 1): void {
     const ctx = this.#ctx;
     const t = Math.max(ctx.currentTime, this.#timeOf(voice.at));
     switch (voice.kind) {
@@ -149,7 +152,7 @@ export class VoiceExecutor {
         const src = ctx.createBufferSource();
         src.buffer = this.#bank.friction[voice.texture]!;
         src.loop = true;
-        src.playbackRate.value = TURN_CONTACT_PITCH;
+        src.playbackRate.value = TURN_CONTACT_PITCH * pitch;
         const filter = ctx.createBiquadFilter();
         filter.type = 'lowpass';
         filter.frequency.value = cutoffFor(voice.brightness);
@@ -170,7 +173,7 @@ export class VoiceExecutor {
         if (!this.#roomFor(voice.kind, optional)) return;
         const src = ctx.createBufferSource();
         src.buffer = voice.kind === 'snap' ? this.#bank.snaps[voice.variant]! : this.#bank.rattles[voice.variant]!;
-        src.playbackRate.value = voice.rate * (voice.kind === 'snap' ? TURN_CONTACT_PITCH : 1);
+        src.playbackRate.value = voice.rate * (voice.kind === 'snap' ? TURN_CONTACT_PITCH : 1) * pitch;
         const gain = ctx.createGain();
         gain.gain.value = voice.gain;
         if (voice.kind === 'snap') {
@@ -183,7 +186,7 @@ export class VoiceExecutor {
           src.connect(gain).connect(this.#out);
         }
         src.start(t);
-        this.#track(src, voice.kind, gain, t + src.buffer.duration / voice.rate);
+        this.#track(src, voice.kind, gain, t + src.buffer.duration / src.playbackRate.value);
         this.started[voice.kind]++;
         return;
       }
@@ -396,6 +399,21 @@ export function createSoundPlayer(): SoundPlayer {
       const l = live();
       if (!l) return;
       for (const voice of planner.plan(event)) l.executor.play(voice);
+    },
+    practiceTurn(move, durationMs, pitch = 1) {
+      const l = live();
+      if (!l) return;
+      const at = performance.now();
+      const source = 'manual' as const;
+      const turn: TurnStartEvent = {
+        type: 'turn', move, source, at, durationMs, from: 0,
+        to: moveQuarterTurns(move) * Math.PI / 2,
+        easing: 'snap', fromDrag: false,
+      };
+      const voices = durationMs > 0
+        ? [...planner.plan(turn), ...planner.complete(move, source, at + durationMs)]
+        : planner.complete(move, source, at);
+      for (const voice of voices) l.executor.play(voice, pitch);
     },
     solved() {
       [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, 'sine', i * 0.07, 0.09, 0.9));
