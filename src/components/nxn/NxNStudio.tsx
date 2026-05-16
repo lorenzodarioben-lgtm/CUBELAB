@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Copy, Redo2, RotateCcw, Shuffle, Sparkles, Undo2 } from 'lucide-react';
 import { mv } from '../../core/puzzle/notation';
 import type { Face } from '../../core/puzzle/notation';
-import { formatTime } from '../../core/stats/format';
+import { formatAverage, formatTime } from '../../core/stats/format';
 import { effectiveMs } from '../../core/stats/stats';
 import { cubeEvent } from '../../core/nxn/catalog';
 import type { CubeEventId } from '../../core/nxn/catalog';
@@ -21,6 +21,7 @@ import { useServices } from '../../app/context';
 import { parseManualTime } from '../../core/nxn/manualTime';
 import { addManualNxSolve } from '../../core/nxn/session';
 import type { Penalty } from '../../core/timing/timerMachine';
+import { summarizeNx } from '../../core/nxn/stats';
 
 const FACE_ORDER = ['U', 'R', 'F', 'D', 'L', 'B'] as const;
 type ActiveTurn = { readonly token: number; readonly move: NxMove; readonly kind: 'manual' | 'undo' | 'redo'; readonly durationMs: number };
@@ -173,6 +174,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
     ? Math.max(0, now - session.startedAt)
     : session.phase === 'ready' ? 0 : session.lastDurationMs;
   const best = bestNxSingle(session.solves);
+  const statistics = useMemo(() => summarizeNx(eventId, session.solves), [eventId, session.solves]);
   const cleanCount = session.solves.filter((solve) => !solve.assisted && solve.penalty !== 'DNF').length;
   const maxWidth = Math.floor(event.size / 2);
 
@@ -215,7 +217,14 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
         </div>
         <div className="nxn-readout nxn-records">
           <h2>Session</h2>
-          <dl><div><dt>Best single</dt><dd>{formatTime(best)}</dd></div><div><dt>Clean solves</dt><dd>{cleanCount}</dd></div><div><dt>Moves</dt><dd>{session.moves.length}</dd></div></dl>
+          <dl>
+            <div><dt>Best single</dt><dd>{formatTime(best)}</dd></div>
+            <div><dt>{statistics.currentLabel}</dt><dd>{formatAverage(statistics.current)}</dd></div>
+            <div><dt>{statistics.secondaryLabel}</dt><dd>{formatAverage(statistics.secondary)}</dd></div>
+            <div><dt>Session mean</dt><dd>{formatAverage(statistics.mean)}</dd></div>
+            <div><dt>Clean solves</dt><dd>{cleanCount}</dd></div>
+            <div><dt>Moves</dt><dd>{session.moves.length}</dd></div>
+          </dl>
           <button type="button" className="nxn-history-toggle" onClick={() => setShowHistory((value) => !value)} aria-expanded={showHistory}>
             {showHistory ? 'Hide' : 'Show'} recent solves
           </button>

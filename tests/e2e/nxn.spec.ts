@@ -67,7 +67,7 @@ test.describe('NxN practice studio', () => {
     await expect(page.getByRole('button', { name: 'Apply solution' })).toBeVisible({ timeout: 30_000 });
     await page.getByRole('button', { name: 'Apply solution' }).click();
     await expect(page.getByText('Puzzle solved')).toBeVisible();
-    await expect(page.locator('.nxn-records dd').nth(1)).toHaveText('0');
+    await expect(page.locator('.nxn-records dl > div').filter({ hasText: 'Clean solves' }).locator('dd')).toHaveText('0');
     expect(errors()).toEqual([]);
   });
 
@@ -110,6 +110,22 @@ test.describe('NxN practice studio', () => {
     await expect(page.locator('.nxn-records dd').first()).toHaveText('—');
     await page.getByRole('combobox', { name: 'Puzzle' }).selectOption('444');
     await expect(page.locator('.nxn-records dd').first()).toHaveText('34.47');
+    expect(errors()).toEqual([]);
+  });
+
+  test('event statistics use ao5 for 2×2 and mo3 for 6×6', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=222');
+    const add = async (seconds: string) => {
+      await page.getByRole('button', { name: 'Add physical solve' }).click();
+      await page.getByRole('textbox', { name: 'Time' }).fill(seconds);
+      await page.getByRole('button', { name: 'Save result' }).click();
+    };
+    for (const seconds of ['10.00', '11.00', '12.00', '13.00', '14.00']) await add(seconds);
+    await expect(page.locator('.nxn-records dl > div').filter({ hasText: 'Current ao5' }).locator('dd')).toHaveText('12.00');
+    await page.getByRole('combobox', { name: 'Puzzle' }).selectOption('666');
+    for (const seconds of ['20.00', '21.00', '22.00']) await add(seconds);
+    await expect(page.locator('.nxn-records dl > div').filter({ hasText: 'Current mo3' }).locator('dd')).toHaveText('21.00');
     expect(errors()).toEqual([]);
   });
 });
