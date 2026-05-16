@@ -96,4 +96,20 @@ test.describe('NxN practice studio', () => {
     expect(started.snap).toBe(1);
     expect(errors()).toEqual([]);
   });
+
+  test('physical solve times persist only for their puzzle event', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=444');
+    await page.getByRole('button', { name: 'Add physical solve' }).click();
+    await page.getByRole('textbox', { name: 'Time' }).fill('32.47');
+    await page.getByRole('combobox', { name: 'Penalty' }).selectOption('+2');
+    await page.getByRole('button', { name: 'Save result' }).click();
+    await expect(page.locator('.nxn-records dd').first()).toHaveText('34.47');
+    await expect(page.locator('.nxn-history small').filter({ hasText: 'physical' })).toBeVisible();
+    await page.getByRole('combobox', { name: 'Puzzle' }).selectOption('222');
+    await expect(page.locator('.nxn-records dd').first()).toHaveText('—');
+    await page.getByRole('combobox', { name: 'Puzzle' }).selectOption('444');
+    await expect(page.locator('.nxn-records dd').first()).toHaveText('34.47');
+    expect(errors()).toEqual([]);
+  });
 });

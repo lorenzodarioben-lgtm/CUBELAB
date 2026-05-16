@@ -18,6 +18,9 @@ import { Button, IconButton, Spinner } from '../ui/primitives';
 import { NxNCanvas } from './NxNCanvas';
 import { NxNNet } from './NxNNet';
 import { useServices } from '../../app/context';
+import { parseManualTime } from '../../core/nxn/manualTime';
+import { addManualNxSolve } from '../../core/nxn/session';
+import type { Penalty } from '../../core/timing/timerMachine';
 
 const FACE_ORDER = ['U', 'R', 'F', 'D', 'L', 'B'] as const;
 type ActiveTurn = { readonly token: number; readonly move: NxMove; readonly kind: 'manual' | 'undo' | 'redo'; readonly durationMs: number };
@@ -40,6 +43,9 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
   const [now, setNow] = useState(() => performance.now());
   const [copied, setCopied] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualTime, setManualTime] = useState('');
+  const [manualPenalty, setManualPenalty] = useState<Penalty>('none');
   const [solving, setSolving] = useState(false);
   const [solution, setSolution] = useState<readonly NxMove[] | null>(null);
   const [active, setActive] = useState<ActiveTurn | null>(null);
@@ -179,6 +185,21 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
     } catch { setError('Clipboard unavailable. Select the scramble text to copy it.'); }
   };
 
+  const saveManualTime = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const duration = manualPenalty === 'DNF' && !manualTime.trim() ? 0 : parseManualTime(manualTime);
+    if (duration === null) {
+      setError('Enter a time like 12.34 or 1:02.34.');
+      return;
+    }
+    setSession((current) => addManualNxSolve(current, duration, manualPenalty, Date.now(), crypto.randomUUID()));
+    setManualOpen(false);
+    setManualTime('');
+    setManualPenalty('none');
+    setShowHistory(true);
+    setError(null);
+  };
+
   return (
     <main className="nxn-layout" aria-label={`${event.label} practice studio`}>
       <section className="nxn-readouts" aria-label="Practice readouts">
@@ -198,7 +219,15 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
           <button type="button" className="nxn-history-toggle" onClick={() => setShowHistory((value) => !value)} aria-expanded={showHistory}>
             {showHistory ? 'Hide' : 'Show'} recent solves
           </button>
-          {showHistory && <ol className="nxn-history">{session.solves.slice(-8).reverse().map((solve) => <li key={solve.id}><span>{new Date(solve.at).toLocaleDateString()}</span><strong>{formatTime(effectiveMs(solve))}</strong>{solve.penalty === '+2' && <small>+2</small>}{solve.assisted && <small>practice</small>}</li>)}</ol>}
+          <button type="button" className="nxn-history-toggle nxn-add-time" onClick={() => setManualOpen((value) => !value)} aria-expanded={manualOpen}>
+            {manualOpen ? 'Cancel entry' : 'Add physical solve'}
+          </button>
+          {manualOpen && <form className="nxn-manual-form" onSubmit={saveManualTime}>
+            <label>Time <input type="text" inputMode="decimal" placeholder="12.34" value={manualTime} onChange={(event) => setManualTime(event.target.value)} /></label>
+            <label>Penalty <select value={manualPenalty} onChange={(event) => setManualPenalty(event.target.value as Penalty)}><option value="none">None</option><option value="+2">+2</option><option value="DNF">DNF</option></select></label>
+            <button type="submit">Save result</button>
+          </form>}
+          {showHistory && <ol className="nxn-history">{session.solves.slice(-8).reverse().map((solve) => <li key={solve.id}><span>{new Date(solve.at).toLocaleDateString()}</span><strong>{formatTime(effectiveMs(solve))}</strong>{solve.penalty === '+2' && <small>+2</small>}{solve.assisted && <small>practice</small>}{solve.source === 'manual' && <small>physical</small>}</li>)}</ol>}
         </div>
       </section>
 

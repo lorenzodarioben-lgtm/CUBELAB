@@ -110,6 +110,17 @@ export function bestNxSingle(solves: readonly NxSolve[]): number | null {
   return clean.length ? Math.min(...clean.map(effectiveMs)) : null;
 }
 
+/** Physical-cube times share the event history but never change the virtual cube. */
+export function addManualNxSolve(session: NxSession, durationMs: number, penalty: Penalty, at: number, id: string): NxSession {
+  if (!Number.isFinite(durationMs) || durationMs < 0 || durationMs > 86_400_000 || (durationMs === 0 && penalty !== 'DNF')) {
+    throw new RangeError('Manual solve time is invalid.');
+  }
+  const record: NxSolve = {
+    id, at, durationMs, penalty, source: 'manual', scramble: '', moves: 0, assisted: false,
+  };
+  return { ...session, solves: [...session.solves, record].slice(-500) };
+}
+
 /** Apply verified solver moves as practice, without manufacturing a timed PB. */
 export function applyNxSolution(session: NxSession, solution: readonly NxMove[]): NxSession {
   const cube = applyNxMoves(session.cube, solution);
