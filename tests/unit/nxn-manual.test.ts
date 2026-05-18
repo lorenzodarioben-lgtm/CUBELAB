@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseManualTime } from '../../src/core/nxn/manualTime';
-import { addManualNxSolve, bestNxSingle, createNxSession } from '../../src/core/nxn/session';
+import { addManualNxSolve, bestNxSingle, createNxSession, setNxPenalty } from '../../src/core/nxn/session';
 
 describe('physical solve entry', () => {
   it('accepts seconds and minute notation without rounding away precision', () => {
@@ -20,5 +20,11 @@ describe('physical solve entry', () => {
     expect(after.phase).toBe('idle');
     expect(after.solves[0]).toMatchObject({ source: 'manual', penalty: '+2', scramble: '', durationMs: 35_200 });
     expect(bestNxSingle(after.solves)).toBe(37_200);
+  });
+
+  it('recomputes the best single after a penalty correction', () => {
+    const before = addManualNxSolve(createNxSession(2), 20_000, 'none', 1234, 'one');
+    expect(bestNxSingle(setNxPenalty(before, 'one', '+2').solves)).toBe(22_000);
+    expect(bestNxSingle(setNxPenalty(before, 'one', 'DNF').solves)).toBeNull();
   });
 });

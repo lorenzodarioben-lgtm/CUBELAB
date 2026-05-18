@@ -19,7 +19,7 @@ import { NxNCanvas } from './NxNCanvas';
 import { NxNNet } from './NxNNet';
 import { useServices } from '../../app/context';
 import { parseManualTime } from '../../core/nxn/manualTime';
-import { addManualNxSolve } from '../../core/nxn/session';
+import { addManualNxSolve, setNxPenalty } from '../../core/nxn/session';
 import type { Penalty } from '../../core/timing/timerMachine';
 import { summarizeNx } from '../../core/nxn/stats';
 
@@ -236,7 +236,14 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
             <label>Penalty <select value={manualPenalty} onChange={(event) => setManualPenalty(event.target.value as Penalty)}><option value="none">None</option><option value="+2">+2</option><option value="DNF">DNF</option></select></label>
             <button type="submit">Save result</button>
           </form>}
-          {showHistory && <ol className="nxn-history">{session.solves.slice(-8).reverse().map((solve) => <li key={solve.id}><span>{new Date(solve.at).toLocaleDateString()}</span><strong>{formatTime(effectiveMs(solve))}</strong>{solve.penalty === '+2' && <small>+2</small>}{solve.assisted && <small>practice</small>}{solve.source === 'manual' && <small>physical</small>}</li>)}</ol>}
+          {showHistory && <ol className="nxn-history">{session.solves.slice(-8).reverse().map((solve) => <li key={solve.id}>
+            <span>{new Date(solve.at).toLocaleDateString()}</span>
+            <strong>{formatTime(effectiveMs(solve))}</strong>
+            {solve.assisted && <small>practice</small>}{solve.source === 'manual' && <small>physical</small>}
+            <select aria-label={`Penalty for solve ${solve.id}`} value={solve.penalty} onChange={(event) => setSession((current) => setNxPenalty(current, solve.id, event.target.value as Penalty))}>
+              <option value="none">OK</option><option value="+2">+2</option><option value="DNF">DNF</option>
+            </select>
+          </li>)}</ol>}
         </div>
       </section>
 

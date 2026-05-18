@@ -117,6 +117,8 @@
 .nxn-history li { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; padding: 7px 0; border-top: 1px solid var(--line); font: 11px var(--font-ui); color: var(--text-2); }
 .nxn-history strong { margin-left: auto; color: var(--text); font: 12px var(--font-mono); }
 .nxn-history small { color: var(--hold); }
+.nxn-history select { max-width: 48px; padding: 3px 0; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--line-2); border-radius: var(--r-xs); font: 10px var(--font-ui); }
+.nxn-history select:focus-visible { outline: none; box-shadow: var(--focus); }
 
 .nxn-stage { position: relative; min-width: 0; min-height: 350px; }
 .nxn-canvas { position: absolute !important; inset: 0; }

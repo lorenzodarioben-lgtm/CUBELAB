@@ -128,4 +128,20 @@ test.describe('NxN practice studio', () => {
     await expect(page.locator('.nxn-records dl > div').filter({ hasText: 'Current mo3' }).locator('dd')).toHaveText('21.00');
     expect(errors()).toEqual([]);
   });
+
+  test('penalty corrections update a saved personal best', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=222');
+    await page.getByRole('button', { name: 'Add physical solve' }).click();
+    await page.getByRole('textbox', { name: 'Time' }).fill('20.00');
+    await page.getByRole('button', { name: 'Save result' }).click();
+    const best = page.locator('.nxn-records dd').first();
+    await expect(best).toHaveText('20.00');
+    const penalty = page.locator('.nxn-history select');
+    await penalty.selectOption('+2');
+    await expect(best).toHaveText('22.00');
+    await penalty.selectOption('DNF');
+    await expect(best).toHaveText('—');
+    expect(errors()).toEqual([]);
+  });
 });

@@ -121,6 +121,11 @@ export function addManualNxSolve(session: NxSession, durationMs: number, penalty
   return { ...session, solves: [...session.solves, record].slice(-500) };
 }
 
+export function setNxPenalty(session: NxSession, id: string, penalty: Penalty): NxSession {
+  if (!session.solves.some((solve) => solve.id === id)) return session;
+  return { ...session, solves: session.solves.map((solve) => solve.id === id ? { ...solve, penalty } : solve) };
+}
+
 /** Apply verified solver moves as practice, without manufacturing a timed PB. */
 export function applyNxSolution(session: NxSession, solution: readonly NxMove[]): NxSession {
   const cube = applyNxMoves(session.cube, solution);
