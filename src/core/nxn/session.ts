@@ -127,6 +127,11 @@ export function setNxPenalty(session: NxSession, id: string, penalty: Penalty): 
   return { ...session, solves: session.solves.map((solve) => solve.id === id ? { ...solve, penalty } : solve) };
 }
 
+export function deleteNxSolve(session: NxSession, id: string): NxSession {
+  if (!session.solves.some((solve) => solve.id === id)) return session;
+  return { ...session, solves: session.solves.filter((solve) => solve.id !== id) };
+}
+
 /** Apply verified solver moves as practice, without manufacturing a timed PB. */
 export function applyNxSolution(session: NxSession, solution: readonly NxMove[]): NxSession {
   const cube = applyNxMoves(session.cube, solution);

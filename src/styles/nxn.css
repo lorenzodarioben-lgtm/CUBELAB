@@ -119,6 +119,12 @@
 .nxn-history small { color: var(--hold); }
 .nxn-history select { max-width: 48px; padding: 3px 0; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--line-2); border-radius: var(--r-xs); font: 10px var(--font-ui); }
 .nxn-history select:focus-visible { outline: none; box-shadow: var(--focus); }
+.nxn-history__delete { display: grid; place-items: center; width: 25px; height: 25px; flex: none; padding: 0; color: var(--text-3); background: transparent; border: 0; border-radius: var(--r-xs); cursor: pointer; }
+.nxn-history__delete:hover { color: var(--fault); background: var(--surface-3); }
+.nxn-history__confirm { display: flex; gap: 4px; }
+.nxn-history__confirm button { padding: 4px 5px; color: var(--text); background: var(--surface-3); border: 1px solid var(--line-2); border-radius: var(--r-xs); cursor: pointer; font: 10px var(--font-ui); }
+.nxn-history__confirm button:first-child { color: var(--fault); }
+.nxn-history__delete:focus-visible, .nxn-history__confirm button:focus-visible { outline: none; box-shadow: var(--focus); }
 
 .nxn-stage { position: relative; min-width: 0; min-height: 350px; }
 .nxn-canvas { position: absolute !important; inset: 0; }

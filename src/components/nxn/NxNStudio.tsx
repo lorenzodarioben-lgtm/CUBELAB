@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Copy, Redo2, RotateCcw, Shuffle, Sparkles, Undo2 } from 'lucide-react';
+import { Check, Copy, Redo2, RotateCcw, Shuffle, Sparkles, Trash2, Undo2 } from 'lucide-react';
 import { mv } from '../../core/puzzle/notation';
 import type { Face } from '../../core/puzzle/notation';
 import { formatAverage, formatTime } from '../../core/stats/format';
@@ -19,7 +19,7 @@ import { NxNCanvas } from './NxNCanvas';
 import { NxNNet } from './NxNNet';
 import { useServices } from '../../app/context';
 import { parseManualTime } from '../../core/nxn/manualTime';
-import { addManualNxSolve, setNxPenalty } from '../../core/nxn/session';
+import { addManualNxSolve, deleteNxSolve, setNxPenalty } from '../../core/nxn/session';
 import type { Penalty } from '../../core/timing/timerMachine';
 import { summarizeNx } from '../../core/nxn/stats';
 
@@ -44,6 +44,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
   const [now, setNow] = useState(() => performance.now());
   const [copied, setCopied] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [deletePending, setDeletePending] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualTime, setManualTime] = useState('');
   const [manualPenalty, setManualPenalty] = useState<Penalty>('none');
@@ -243,6 +244,10 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
             <select aria-label={`Penalty for solve ${solve.id}`} value={solve.penalty} onChange={(event) => setSession((current) => setNxPenalty(current, solve.id, event.target.value as Penalty))}>
               <option value="none">OK</option><option value="+2">+2</option><option value="DNF">DNF</option>
             </select>
+            {deletePending === solve.id ? <span className="nxn-history__confirm">
+              <button type="button" onClick={() => { setSession((current) => deleteNxSolve(current, solve.id)); setDeletePending(null); }}>Delete</button>
+              <button type="button" onClick={() => setDeletePending(null)}>Cancel</button>
+            </span> : <button type="button" className="nxn-history__delete" aria-label={`Remove solve ${solve.id}`} title="Remove solve" onClick={() => setDeletePending(solve.id)}><Trash2 size={13} /></button>}
           </li>)}</ol>}
         </div>
       </section>

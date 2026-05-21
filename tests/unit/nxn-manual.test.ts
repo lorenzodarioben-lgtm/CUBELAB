@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseManualTime } from '../../src/core/nxn/manualTime';
-import { addManualNxSolve, bestNxSingle, createNxSession, setNxPenalty } from '../../src/core/nxn/session';
+import { addManualNxSolve, bestNxSingle, createNxSession, deleteNxSolve, setNxPenalty } from '../../src/core/nxn/session';
 
 describe('physical solve entry', () => {
   it('accepts seconds and minute notation without rounding away precision', () => {
@@ -26,5 +26,12 @@ describe('physical solve entry', () => {
     const before = addManualNxSolve(createNxSession(2), 20_000, 'none', 1234, 'one');
     expect(bestNxSingle(setNxPenalty(before, 'one', '+2').solves)).toBe(22_000);
     expect(bestNxSingle(setNxPenalty(before, 'one', 'DNF').solves)).toBeNull();
+  });
+
+  it('deletes one result and recomputes the best single', () => {
+    let session = addManualNxSolve(createNxSession(2), 20_000, 'none', 1234, 'one');
+    session = addManualNxSolve(session, 30_000, 'none', 2345, 'two');
+    expect(bestNxSingle(deleteNxSolve(session, 'one').solves)).toBe(30_000);
+    expect(deleteNxSolve(session, 'missing')).toBe(session);
   });
 });
