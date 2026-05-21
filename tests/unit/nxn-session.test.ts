@@ -33,4 +33,26 @@ describe('NxN practice session', () => {
     expect(solved.solves).toHaveLength(0);
     expect(solved.assisted).toBe(true);
   });
+
+  it('leaves solved status when a solved cube is turned again', () => {
+    const move = parseNxAlg('R', 2)[0]!;
+    let session = scrambleNxSession(createNxSession(2), { text: 'R', moves: parseNxAlg('R', 2) });
+    session = turnNxSession(session, parseNxAlg("R'", 2)[0]!, 200, 2, 'b');
+    expect(session.phase).toBe('solved');
+    session = turnNxSession(session, move, 300, 3, 'c');
+    expect(session.phase).toBe('idle');
+    expect(isNxSolved(session.cube)).toBe(false);
+    session = undoNxSession(session, 400);
+    expect(session.phase).toBe('idle');
+    expect(isNxSolved(session.cube)).toBe(true);
+  });
+
+  it('leaves solved status after undoing a completed attempt', () => {
+    let session = scrambleNxSession(createNxSession(2), { text: 'R', moves: parseNxAlg('R', 2) });
+    session = turnNxSession(session, parseNxAlg("R'", 2)[0]!, 100, 2, 'a');
+    expect(session.phase).toBe('solved');
+    session = undoNxSession(session, 120);
+    expect(session.phase).toBe('idle');
+    expect(isNxSolved(session.cube)).toBe(false);
+  });
 });

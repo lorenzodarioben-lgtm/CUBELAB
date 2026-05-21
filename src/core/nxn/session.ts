@@ -66,7 +66,7 @@ export function turnNxSession(session: NxSession, move: NxMove, at: number, wall
   const next: NxSession = {
     ...session,
     cube: applyNxMove(session.cube, move),
-    phase: session.phase === 'ready' ? 'running' : session.phase,
+    phase: session.phase === 'ready' ? 'running' : session.phase === 'solved' ? 'idle' : session.phase,
     startedAt: session.phase === 'ready' ? at : session.startedAt,
     moves: [...session.moves, move],
     undo: [...session.undo, move],
@@ -81,6 +81,7 @@ export function undoNxSession(session: NxSession, at: number): NxSession {
   return {
     ...session,
     cube: applyNxMove(session.cube, invertNxMove(move)),
+    phase: session.phase === 'solved' ? 'idle' : session.phase,
     undo: session.undo.slice(0, -1),
     redo: [...session.redo, move],
     moves: session.moves.slice(0, -1),
@@ -95,7 +96,7 @@ export function redoNxSession(session: NxSession, at: number, wallClock: number,
   const next: NxSession = {
     ...session,
     cube: applyNxMove(session.cube, move),
-    phase: session.phase === 'ready' ? 'running' : session.phase,
+    phase: session.phase === 'ready' ? 'running' : session.phase === 'solved' ? 'idle' : session.phase,
     startedAt: session.phase === 'ready' ? at : session.startedAt,
     undo: [...session.undo, move],
     redo: session.redo.slice(0, -1),
