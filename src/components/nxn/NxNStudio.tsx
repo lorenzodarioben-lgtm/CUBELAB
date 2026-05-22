@@ -22,6 +22,7 @@ import { parseManualTime } from '../../core/nxn/manualTime';
 import { addManualNxSolve, deleteNxSolve, setNxPenalty } from '../../core/nxn/session';
 import type { Penalty } from '../../core/timing/timerMachine';
 import { summarizeNx } from '../../core/nxn/stats';
+import { exportNxHistory, importNxHistory, mergeNxHistory } from '../../core/nxn/transfer';
 
 const FACE_ORDER = ['U', 'R', 'F', 'D', 'L', 'B'] as const;
 type ActiveTurn = { readonly token: number; readonly move: NxMove; readonly kind: 'manual' | 'undo' | 'redo'; readonly durationMs: number };
@@ -45,6 +46,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
   const [copied, setCopied] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [deletePending, setDeletePending] = useState<string | null>(null);
+  const [transferMessage, setTransferMessage] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualTime, setManualTime] = useState('');
   const [manualPenalty, setManualPenalty] = useState<Penalty>('none');
@@ -203,6 +205,32 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
     setError(null);
   };
 
+  const exportResults = () => {
+    const content = exportNxHistory(eventId, session.solves);
+    const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `cubelab-${eventId}-results-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTransferMessage(`Exported ${session.solves.length} ${event.shortLabel} results.`);
+  };
+
+  const importResults = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      if (file.size > 1_000_000) throw new Error('That results file is too large.');
+      const incoming = importNxHistory(await file.text(), eventId);
+      setSession((current) => ({ ...current, solves: mergeNxHistory(current.solves, incoming) }));
+      setShowHistory(true);
+      setTransferMessage(`Imported ${incoming.length} ${event.shortLabel} results.`);
+      setError(null);
+    } catch (cause) {
+      setTransferMessage(null);
+      setError(cause instanceof Error ? cause.message : 'Could not import results.');
+    }
+  };
+
   return (
     <main className="nxn-layout" aria-label={`${event.label} practice studio`}>
       <section className="nxn-readouts" aria-label="Practice readouts">
@@ -249,6 +277,11 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
               <button type="button" onClick={() => setDeletePending(null)}>Cancel</button>
             </span> : <button type="button" className="nxn-history__delete" aria-label={`Remove solve ${solve.id}`} title="Remove solve" onClick={() => setDeletePending(solve.id)}><Trash2 size={13} /></button>}
           </li>)}</ol>}
+          <div className="nxn-transfer">
+            <button type="button" onClick={exportResults}>Export results</button>
+            <label>Import results<input type="file" accept=".json,application/json" aria-label="Import results file" onChange={(event) => { void importResults(event.target.files?.[0]); event.target.value = ''; }} /></label>
+          </div>
+          {transferMessage && <p className="nxn-transfer__message" role="status">{transferMessage}</p>}
         </div>
       </section>
 

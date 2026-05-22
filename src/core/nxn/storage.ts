@@ -11,7 +11,7 @@ export function nxHistoryKey(eventId: CubeEventId): string {
   return `cubelab.nxn.${eventId}.history`;
 }
 
-function sanitizeSolve(value: unknown, size: number, version: number): NxSolve | null {
+export function sanitizeNxSolve(value: unknown, size: number, version = VERSION): NxSolve | null {
   if (typeof value !== 'object' || value === null) return null;
   const solve = value as Record<string, unknown>;
   if (typeof solve.id !== 'string' || !solve.id || solve.id.length > 80) return null;
@@ -51,7 +51,7 @@ export function loadNxHistory(store: KeyValueStore, eventId: CubeEventId): NxSol
     const seen = new Set<string>();
     const solves: NxSolve[] = [];
     for (const item of parsed.data as unknown[]) {
-      const record = sanitizeSolve(item, size, parsed.v);
+      const record = sanitizeNxSolve(item, size, parsed.v);
       if (!record || seen.has(record.id)) continue;
       seen.add(record.id);
       solves.push(record);

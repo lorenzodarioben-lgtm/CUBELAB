@@ -160,4 +160,23 @@ test.describe('NxN practice studio', () => {
     await expect(page.locator('.nxn-history li')).toHaveCount(0);
     expect(errors()).toEqual([]);
   });
+
+  test('exports and restores event results', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=222');
+    await page.getByRole('button', { name: 'Add physical solve' }).click();
+    await page.getByRole('textbox', { name: 'Time' }).fill('18.42');
+    await page.getByRole('button', { name: 'Save result' }).click();
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Export results' }).click(),
+    ]);
+    expect(download.suggestedFilename()).toMatch(/^cubelab-222-results-.*\.json$/);
+    await page.locator('.nxn-history__delete').click();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    await expect(page.locator('.nxn-records dd').first()).toHaveText('—');
+    await page.getByLabel('Import results file').setInputFiles(await download.path());
+    await expect(page.locator('.nxn-records dd').first()).toHaveText('18.42');
+    expect(errors()).toEqual([]);
+  });
 });
