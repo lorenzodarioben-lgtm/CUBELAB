@@ -19,19 +19,20 @@ import { PlaybackPanel } from '../components/controls/PlaybackPanel';
 import { ConfirmDialog, LiveRegion, Toast } from '../components/ui/Overlays';
 import { Button } from '../components/ui/primitives';
 import { cx } from '../components/ui/cx';
-import { cubeEvent } from '../core/nxn/catalog';
-import type { CubeEventId } from '../core/nxn/catalog';
+import { puzzleEvent } from '../core/puzzleCatalog';
+import type { PuzzleEventId } from '../core/puzzleCatalog';
 
 const NxNStudio = lazy(() => import('../components/nxn/NxNStudio').then((module) => ({ default: module.NxNStudio })));
+const ShapeStudio = lazy(() => import('../components/shapes/ShapeStudio').then((module) => ({ default: module.ShapeStudio })));
 
-function puzzleFromUrl(): CubeEventId {
-  return cubeEvent(new URLSearchParams(window.location.search).get('puzzle') ?? '')?.id ?? '333';
+function puzzleFromUrl(): PuzzleEventId {
+  return puzzleEvent(new URLSearchParams(window.location.search).get('puzzle') ?? '')?.id ?? '333';
 }
 
 export function App() {
   const services = useServices();
   const zen = useUi((s) => s.zen);
-  const [puzzle, setPuzzle] = useState<CubeEventId>(puzzleFromUrl);
+  const [puzzle, setPuzzle] = useState<PuzzleEventId>(puzzleFromUrl);
   useKeyboard(services, puzzle === '333');
   useEnvironmentSync(services);
 
@@ -41,7 +42,7 @@ export function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  const choosePuzzle = (id: CubeEventId) => {
+  const choosePuzzle = (id: PuzzleEventId) => {
     if (id === puzzle) return;
     const url = new URL(window.location.href);
     if (id === '333') url.searchParams.delete('puzzle');
@@ -85,8 +86,8 @@ export function App() {
       <ConfirmDialog />
       <Toast />
       <LiveRegion />
-      </> : <Suspense fallback={<div className="nxn-loading" role="status">Preparing {cubeEvent(puzzle)?.shortLabel}…</div>}>
-        <NxNStudio key={puzzle} eventId={puzzle} />
+      </> : <Suspense fallback={<div className="nxn-loading" role="status">Preparing {puzzleEvent(puzzle)?.shortLabel}…</div>}>
+        {puzzle === 'pyram' || puzzle === 'skewb' ? <ShapeStudio key={puzzle} eventId={puzzle} /> : <NxNStudio key={puzzle} eventId={puzzle} />}
       </Suspense>}
     </div>
   );

@@ -3,10 +3,10 @@ import { useServices, useStudio, useUi } from '../app/context';
 import { toggleZen } from '../app/actions';
 import { LogoMark } from './ui/Logo';
 import { IconButton, Segmented } from './ui/primitives';
-import { CUBE_EVENTS } from '../core/nxn/catalog';
-import type { CubeEventId } from '../core/nxn/catalog';
+import { PUZZLE_EVENTS, puzzleEvent } from '../core/puzzleCatalog';
+import type { PuzzleEventId } from '../core/puzzleCatalog';
 
-export function Header({ puzzle, onPuzzleChange }: { readonly puzzle: CubeEventId; readonly onPuzzleChange: (puzzle: CubeEventId) => void }) {
+export function Header({ puzzle, onPuzzleChange }: { readonly puzzle: PuzzleEventId; readonly onPuzzleChange: (puzzle: PuzzleEventId) => void }) {
   const services = useServices();
   const { studio, ui } = services;
   const zen = useUi((s) => s.zen);
@@ -37,13 +37,13 @@ export function Header({ puzzle, onPuzzleChange }: { readonly puzzle: CubeEventI
         <span className="brand__word">CUBELAB</span>
         <span className="brand__rule" aria-hidden />
         <span className="brand__meta">
-          Studio <span aria-hidden>/</span> {CUBE_EVENTS.find((event) => event.id === puzzle)?.label}
+          Studio <span aria-hidden>/</span> {puzzleEvent(puzzle)?.label}
         </span>
       </a>
       <p className="topbar__tagline">The interactive cubing studio.</p>
       <nav className="topbar__actions" aria-label="Studio controls">
-        <select className="puzzle-select" aria-label="Puzzle" value={puzzle} onChange={(event) => onPuzzleChange(event.target.value as CubeEventId)}>
-          {CUBE_EVENTS.map((event) => <option key={event.id} value={event.id}>{event.shortLabel}</option>)}
+        <select className="puzzle-select" aria-label="Puzzle" value={puzzle} onChange={(event) => onPuzzleChange(event.target.value as PuzzleEventId)}>
+          {PUZZLE_EVENTS.map((event) => <option key={event.id} value={event.id}>{event.shortLabel}</option>)}
         </select>
         {puzzle === '333' &&
         <Segmented

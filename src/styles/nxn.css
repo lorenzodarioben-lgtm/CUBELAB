@@ -217,6 +217,12 @@
 .nxn-controls__tip { margin: 17px 0 0; color: var(--text-3); font: 11px/1.55 var(--font-ui); }
 .nxn-solved-indicator { margin: 20px 0 0; padding-top: 13px; border-top: 1px solid var(--line-2); color: var(--text-2); font: 11px var(--font-mono); }
 
+.shape-stage { overflow: hidden; }
+.shape-player { position: absolute; inset: 0; }
+.shape-player twisty-player { display: grid; width: 100%; height: 100%; }
+.shape-loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-2); font: 13px var(--font-ui); }
+.shape-turn-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+
 @media (max-width: 1180px) {
   .nxn-layout { grid-template-columns: minmax(220px, 265px) minmax(0, 1fr) minmax(220px, 265px); gap: 12px; }
   .nxn-controls { padding: 13px; }
