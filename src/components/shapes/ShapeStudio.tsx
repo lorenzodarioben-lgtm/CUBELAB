@@ -69,15 +69,14 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
     return () => window.clearInterval(id);
   }, [session?.phase]);
 
-  const turn = useCallback((face: string, inverse = false) => {
+  const turn = useCallback((move: string, inverse = false) => {
     if (!session || loading) return;
-    const move = `${face}${inverse ? "'" : ''}`;
     try {
       const at = performance.now();
       setSession((current) => current ? turnShapeSession(current, move, at, Date.now(), crypto.randomUUID()) : current);
       player.current?.experimentalAddMove(move);
       setNow(at);
-      studio.playPracticeTurn(mv(face.toUpperCase() as Face, inverse ? 3 : 1), 175, eventId === 'pyram' ? 1.09 : 1.025);
+      studio.playPracticeTurn(mv(move.charAt(0).toUpperCase() as Face, inverse ? 3 : 1), 175, eventId === 'pyram' ? 1.09 : 1.025);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'This turn could not be applied.'); }
   }, [session, loading, studio, eventId]);
 
@@ -114,9 +113,8 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
       if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return;
       if (key.ctrlKey || key.metaKey || key.altKey || key.repeat) return;
       if (key.code === 'KeyN') { key.preventDefault(); void newScramble(); return; }
-      const typed = key.shiftKey ? key.key.toUpperCase() : key.key;
-      const face = event.turns.find((value) => value === typed || value === typed.toUpperCase());
-      if (face) { key.preventDefault(); turn(face, key.shiftKey); }
+      const pair = event.turns.find((value) => value.key && value.key === key.key.toLowerCase());
+      if (pair) { key.preventDefault(); turn(key.shiftKey ? pair.ccw : pair.cw, key.shiftKey); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -160,11 +158,11 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
       </div>
       <div className="nxn-turns">
         <h2>Turn puzzle</h2>
-        <div className="shape-turn-grid">{event.turns.map((face) => <div className="nxn-move-pair" key={face}>
-          <button type="button" title={`Turn ${face} clockwise`} disabled={!session || loading} onClick={() => turn(face)}>{face}</button>
-          <button type="button" title={`Turn ${face} counter-clockwise`} disabled={!session || loading} onClick={() => turn(face, true)}>{face}'</button>
+        <div className="shape-turn-grid">{event.turns.map((pair) => <div className="nxn-move-pair" key={pair.cw}>
+          <button type="button" title={`Turn ${pair.label} clockwise`} disabled={!session || loading} onClick={() => turn(pair.cw)}>{pair.cw}</button>
+          <button type="button" title={`Turn ${pair.label} counter-clockwise`} disabled={!session || loading} onClick={() => turn(pair.ccw, true)}>{pair.ccw}</button>
         </div>)}</div>
-        <p className="nxn-controls__tip">Keyboard: {event.turns.slice(0, 4).join(' ')} · hold Shift for inverse · N for scramble</p>
+        <p className="nxn-controls__tip">Keyboard: {event.turns.filter((pair) => pair.key).map((pair) => pair.label).join(' ')} · hold Shift for inverse · N for scramble</p>
       </div>
       <p className="nxn-solved-indicator" aria-live="polite">{solved ? 'Puzzle solved' : `${event.label} in progress`}</p>
     </section>
