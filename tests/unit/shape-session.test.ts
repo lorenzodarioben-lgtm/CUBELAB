@@ -3,7 +3,7 @@ import { puzzles } from 'cubing/puzzles';
 import { createShapeSession, isShapeSolved, scrambleShapeSession, turnShapeSession } from '../../src/core/shapes/session';
 import { generateShapeScramble } from '../../src/core/shapes/scramble';
 
-describe.each([['pyram', 'pyraminx', 'U', "U'"], ['skewb', 'skewb', 'R', "R'"]] as const)('%s puzzle model', (eventId, puzzleId, move, inverse) => {
+describe.each([['pyram', 'pyraminx', 'U', "U'"], ['skewb', 'skewb', 'R', "R'"], ['minx', 'megaminx', 'R++', 'R--']] as const)('%s puzzle model', (eventId, puzzleId, move, inverse) => {
   it('applies a scramble and times a solved attempt', async () => {
     const kpuzzle = await puzzles[puzzleId]!.kpuzzle();
     let session = scrambleShapeSession(createShapeSession(eventId, kpuzzle), move);

@@ -3,7 +3,7 @@ import type { TwistyPlayer } from 'cubing/twisty';
 import { trackErrors } from './helpers';
 
 test.describe('shape puzzles', () => {
-  for (const [event, name, face] of [['pyram', 'Pyraminx', 'U'], ['skewb', 'Skewb', 'R']] as const) {
+  for (const [event, name, face] of [['pyram', 'Pyraminx', 'U'], ['skewb', 'Skewb', 'R'], ['minx', 'Megaminx', 'R']] as const) {
     test(`${name} renders, turns, and generates its event scramble`, async ({ page }) => {
       const errors = trackErrors(page);
       await page.goto(`/?puzzle=${event}`);

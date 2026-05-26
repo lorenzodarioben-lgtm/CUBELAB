@@ -3,8 +3,8 @@
 **The interactive cubing studio.** The original photoreal 3×3×3 remains the full-featured studio:
 stickerless or stickered, face and M/E/S slice turns, WCA-style random-state practice scrambles,
 timing, and move-by-move solve playback. The puzzle selector now adds playable stickerless 2×2,
-4×4, 5×5, 6×6, and 7×7 cubes with their own scrambles, timers, and solve histories. Pyraminx
-and Skewb also have playable 3D puzzle views, event scrambles, and separate timing histories.
+4×4, 5×5, 6×6, and 7×7 cubes with their own scrambles, timers, and solve histories. Pyraminx,
+Skewb, and Megaminx also have playable 3D puzzle views, event scrambles, and separate timing histories.
 
 Everything runs locally in the browser. There are no accounts, no servers, no analytics; solves and
 settings live in this browser's `localStorage` only.
@@ -74,6 +74,7 @@ a dark internal mechanism, animated turns, and a playable 2D net when WebGL is u
 | 4×4–7×7 | Event scramble, outer and wide turns, timer, undo/redo, local history |
 | Pyraminx | Event scramble, face and tip turns, timer, local history |
 | Skewb | Event scramble, corner-axis turns, timer, local history |
+| Megaminx | Event scramble, R/D double turns and U turns, timer, local history |
 
 In these new modes, tap a coloured face to turn it, drag a sticker along a row or column to turn
 that layer, or use the face buttons and keyboard (`U R F D L B`; hold Shift for inverse). Drag the
@@ -85,7 +86,7 @@ before offering to apply it; applying it never creates a timed result.
 
 The non-3×3 cube modes also accept physical-cube times. Their result rows let you correct a
 penalty or remove a solve, and JSON export/import provides a per-event backup. Pyraminx and
-Skewb have shape-specific turn buttons beside their 3D views. Their turns and solved states use
+Skewb, and Megaminx have shape-specific turn buttons beside their 3D views. Their turns and solved states use
 the corresponding puzzle definitions rather than cube geometry.
 
 These are practice scrambles generated locally by cubing.js, not official competition scrambles.

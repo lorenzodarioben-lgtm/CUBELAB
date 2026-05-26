@@ -87,7 +87,7 @@ export function App() {
       <Toast />
       <LiveRegion />
       </> : <Suspense fallback={<div className="nxn-loading" role="status">Preparing {puzzleEvent(puzzle)?.shortLabel}…</div>}>
-        {puzzle === 'pyram' || puzzle === 'skewb' ? <ShapeStudio key={puzzle} eventId={puzzle} /> : <NxNStudio key={puzzle} eventId={puzzle} />}
+        {puzzle === 'pyram' || puzzle === 'skewb' || puzzle === 'minx' ? <ShapeStudio key={puzzle} eventId={puzzle} /> : <NxNStudio key={puzzle} eventId={puzzle} />}
       </Suspense>}
     </div>
   );

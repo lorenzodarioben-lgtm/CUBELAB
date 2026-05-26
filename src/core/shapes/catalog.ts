@@ -9,6 +9,10 @@ export const SHAPE_EVENTS = [
     { label: 'R', cw: 'R', ccw: "R'", key: 'r' }, { label: 'L', cw: 'L', ccw: "L'", key: 'l' },
     { label: 'U', cw: 'U', ccw: "U'", key: 'u' }, { label: 'B', cw: 'B', ccw: "B'", key: 'b' },
   ] },
+  { id: 'minx', puzzle: 'megaminx', label: 'Megaminx', shortLabel: 'Megaminx', turns: [
+    { label: 'R', cw: 'R++', ccw: 'R--', key: 'r' }, { label: 'D', cw: 'D++', ccw: 'D--', key: 'd' },
+    { label: 'U', cw: 'U', ccw: "U'", key: 'u' },
+  ] },
 ] as const;
 
 export type ShapeEventId = (typeof SHAPE_EVENTS)[number]['id'];
