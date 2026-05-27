@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { puzzles } from 'cubing/puzzles';
 import { createMemoryStore } from '../../src/core/persistence/storage';
-import { createShapeSession, scrambleShapeSession, turnShapeSession } from '../../src/core/shapes/session';
+import { addManualShapeSolve, createShapeSession, scrambleShapeSession, turnShapeSession } from '../../src/core/shapes/session';
 import { loadShapeHistory, saveShapeHistory, shapeHistoryKey } from '../../src/core/shapes/storage';
 
 describe('shape event history', () => {
@@ -16,5 +16,13 @@ describe('shape event history', () => {
     store.setItem(shapeHistoryKey('skewb'), store.getItem(shapeHistoryKey('pyram'))!);
     expect(loadShapeHistory(store, 'skewb', skewb)).toEqual([]);
     expect(store.getItem('cubelab.backup.shape.skewb.history')).not.toBeNull();
+  });
+
+  it('preserves a physical result and its penalty', async () => {
+    const store = createMemoryStore();
+    const kpuzzle = await puzzles.skewb!.kpuzzle();
+    const session = addManualShapeSolve(createShapeSession('skewb', kpuzzle), 12_340, '+2', 1234, 'physical');
+    saveShapeHistory(store, 'skewb', session.solves);
+    expect(loadShapeHistory(store, 'skewb', kpuzzle)).toEqual(session.solves);
   });
 });

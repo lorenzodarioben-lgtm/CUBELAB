@@ -6,15 +6,17 @@ import { useServices } from '../../app/context';
 import { mv } from '../../core/puzzle/notation';
 import type { Face } from '../../core/puzzle/notation';
 import { formatAverage, formatTime } from '../../core/stats/format';
-import { bestSingle, currentAverage, sessionMean } from '../../core/stats/stats';
+import { bestSingle, currentAverage, effectiveMs, sessionMean } from '../../core/stats/stats';
 import { browserStore } from '../../core/persistence/storage';
 import { shapeEvent } from '../../core/shapes/catalog';
 import type { ShapeEventId } from '../../core/shapes/catalog';
 import { generateShapeScramble } from '../../core/shapes/scramble';
-import { createShapeSession, isShapeSolved, resetShapeSession, scrambleShapeSession, turnShapeSession } from '../../core/shapes/session';
+import { addManualShapeSolve, createShapeSession, isShapeSolved, resetShapeSession, scrambleShapeSession, turnShapeSession } from '../../core/shapes/session';
 import type { ShapeSession } from '../../core/shapes/session';
 import { loadShapeHistory, saveShapeHistory } from '../../core/shapes/storage';
 import { Button, Spinner } from '../ui/primitives';
+import { parseManualTime } from '../../core/nxn/manualTime';
+import type { Penalty } from '../../core/timing/timerMachine';
 
 export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
   const event = shapeEvent(eventId)!;
@@ -28,6 +30,9 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualTime, setManualTime] = useState('');
+  const [manualPenalty, setManualPenalty] = useState<Penalty>('none');
   const solves = session?.solves;
 
   useEffect(() => {
@@ -107,6 +112,18 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
     if (player.current) { player.current.experimentalSetupAlg = ''; player.current.alg = ''; player.current.jumpToEnd({ flash: false }); }
   };
 
+  const saveManualTime = (form: React.FormEvent<HTMLFormElement>) => {
+    form.preventDefault();
+    const duration = manualPenalty === 'DNF' && !manualTime.trim() ? 0 : parseManualTime(manualTime);
+    if (duration === null) { setError('Enter a time like 12.34 or 1:02.34.'); return; }
+    setSession((current) => current ? addManualShapeSolve(current, duration, manualPenalty, Date.now(), crypto.randomUUID()) : current);
+    setManualOpen(false);
+    setManualTime('');
+    setManualPenalty('none');
+    setHistoryOpen(true);
+    setError(null);
+  };
+
   useEffect(() => {
     const onKey = (key: KeyboardEvent) => {
       const target = key.target;
@@ -143,7 +160,13 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
           <div><dt>Moves</dt><dd>{session?.moves.length ?? 0}</dd></div>
         </dl>
         <button type="button" className="nxn-history-toggle" onClick={() => setHistoryOpen((value) => !value)} aria-expanded={historyOpen}>{historyOpen ? 'Hide' : 'Show'} recent solves</button>
-        {historyOpen && <ol className="nxn-history">{session?.solves.slice(-8).reverse().map((solve) => <li key={solve.id}><span>{new Date(solve.at).toLocaleDateString()}</span><strong>{formatTime(solve.durationMs)}</strong><small>{solve.moves} moves</small></li>)}</ol>}
+        <button type="button" className="nxn-history-toggle nxn-add-time" onClick={() => setManualOpen((value) => !value)} aria-expanded={manualOpen}>{manualOpen ? 'Cancel entry' : 'Add physical solve'}</button>
+        {manualOpen && <form className="nxn-manual-form" onSubmit={saveManualTime}>
+          <label>Time <input type="text" inputMode="decimal" placeholder="12.34" value={manualTime} onChange={(change) => setManualTime(change.target.value)} /></label>
+          <label>Penalty <select value={manualPenalty} onChange={(change) => setManualPenalty(change.target.value as Penalty)}><option value="none">None</option><option value="+2">+2</option><option value="DNF">DNF</option></select></label>
+          <button type="submit">Save result</button>
+        </form>}
+        {historyOpen && <ol className="nxn-history">{session?.solves.slice(-8).reverse().map((solve) => <li key={solve.id}><span>{new Date(solve.at).toLocaleDateString()}</span><strong>{formatTime(effectiveMs(solve))}</strong><small>{solve.source === 'manual' ? 'physical' : `${solve.moves} moves`}</small></li>)}</ol>}
       </div>
     </section>
     <section className="nxn-stage shape-stage" aria-label={`${event.label} interactive puzzle`}>

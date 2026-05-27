@@ -33,4 +33,19 @@ test.describe('shape puzzles', () => {
       expect(errors()).toEqual([]);
     });
   }
+
+  test('physical shape results stay with their own event', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=skewb');
+    await page.getByRole('button', { name: 'Add physical solve' }).click();
+    await page.getByRole('textbox', { name: 'Time' }).fill('13.48');
+    await page.getByRole('combobox', { name: 'Penalty' }).selectOption('+2');
+    await page.getByRole('button', { name: 'Save result' }).click();
+    await expect(page.locator('.nxn-records dd').first()).toHaveText('15.48');
+    await page.getByRole('combobox', { name: 'Puzzle' }).selectOption('pyram');
+    await expect(page.locator('.nxn-records dd').first()).toHaveText('—');
+    await page.getByRole('combobox', { name: 'Puzzle' }).selectOption('skewb');
+    await expect(page.locator('.nxn-records dd').first()).toHaveText('15.48');
+    expect(errors()).toEqual([]);
+  });
 });

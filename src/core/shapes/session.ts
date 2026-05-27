@@ -55,3 +55,11 @@ export function turnShapeSession(session: ShapeSession, move: string, at: number
 export function resetShapeSession(session: ShapeSession): ShapeSession {
   return createShapeSession(session.eventId, session.kpuzzle, session.solves);
 }
+
+export function addManualShapeSolve(session: ShapeSession, durationMs: number, penalty: Penalty, at: number, id: string): ShapeSession {
+  if (!Number.isFinite(durationMs) || durationMs < 0 || durationMs > 86_400_000 || (durationMs === 0 && penalty !== 'DNF')) {
+    throw new RangeError('Manual solve time is invalid.');
+  }
+  const record: ShapeSolve = { id, at, durationMs, scramble: '', moves: 0, assisted: false, penalty, source: 'manual' };
+  return { ...session, solves: [...session.solves, record].slice(-500) };
+}

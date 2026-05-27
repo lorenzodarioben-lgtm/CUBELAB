@@ -14,9 +14,11 @@ function validSolve(value: unknown, kpuzzle: KPuzzle): value is ShapeSolve {
   if (typeof solve.at !== 'number' || !Number.isFinite(solve.at) || solve.at <= 0) return false;
   if (typeof solve.durationMs !== 'number' || !Number.isFinite(solve.durationMs) || solve.durationMs < 0 || solve.durationMs > 86_400_000) return false;
   if (typeof solve.moves !== 'number' || !Number.isInteger(solve.moves) || solve.moves < 0 || solve.moves > 100_000) return false;
-  if (solve.assisted !== false || solve.penalty !== 'none' || solve.source !== 'virtual') return false;
-  if (typeof solve.scramble !== 'string' || !solve.scramble || solve.scramble.length > 3000) return false;
-  try { kpuzzle.defaultPattern().applyAlg(solve.scramble); } catch { return false; }
+  if (typeof solve.assisted !== 'boolean') return false;
+  if (solve.penalty !== 'none' && solve.penalty !== '+2' && solve.penalty !== 'DNF') return false;
+  if (solve.source !== 'virtual' && solve.source !== 'manual') return false;
+  if (typeof solve.scramble !== 'string' || (solve.source === 'virtual' && !solve.scramble) || solve.scramble.length > 3000) return false;
+  try { if (solve.scramble) kpuzzle.defaultPattern().applyAlg(solve.scramble); } catch { return false; }
   return true;
 }
 
