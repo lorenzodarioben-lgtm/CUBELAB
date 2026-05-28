@@ -63,3 +63,8 @@ export function addManualShapeSolve(session: ShapeSession, durationMs: number, p
   const record: ShapeSolve = { id, at, durationMs, scramble: '', moves: 0, assisted: false, penalty, source: 'manual' };
   return { ...session, solves: [...session.solves, record].slice(-500) };
 }
+
+export function setShapePenalty(session: ShapeSession, id: string, penalty: Penalty): ShapeSession {
+  if (!session.solves.some((solve) => solve.id === id)) return session;
+  return { ...session, solves: session.solves.map((solve) => solve.id === id ? { ...solve, penalty } : solve) };
+}

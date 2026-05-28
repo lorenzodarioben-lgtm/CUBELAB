@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { puzzles } from 'cubing/puzzles';
 import { createMemoryStore } from '../../src/core/persistence/storage';
-import { addManualShapeSolve, createShapeSession, scrambleShapeSession, turnShapeSession } from '../../src/core/shapes/session';
+import { addManualShapeSolve, createShapeSession, scrambleShapeSession, setShapePenalty, turnShapeSession } from '../../src/core/shapes/session';
 import { loadShapeHistory, saveShapeHistory, shapeHistoryKey } from '../../src/core/shapes/storage';
 
 describe('shape event history', () => {
@@ -24,5 +24,12 @@ describe('shape event history', () => {
     const session = addManualShapeSolve(createShapeSession('skewb', kpuzzle), 12_340, '+2', 1234, 'physical');
     saveShapeHistory(store, 'skewb', session.solves);
     expect(loadShapeHistory(store, 'skewb', kpuzzle)).toEqual(session.solves);
+  });
+
+  it('recomputes a shape personal best after penalty correction', async () => {
+    const kpuzzle = await puzzles.skewb!.kpuzzle();
+    const session = addManualShapeSolve(createShapeSession('skewb', kpuzzle), 12_340, 'none', 1234, 'one');
+    expect(setShapePenalty(session, 'one', '+2').solves[0]?.penalty).toBe('+2');
+    expect(setShapePenalty(session, 'missing', 'DNF')).toBe(session);
   });
 });

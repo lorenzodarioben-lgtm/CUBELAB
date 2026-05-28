@@ -11,7 +11,7 @@ import { browserStore } from '../../core/persistence/storage';
 import { shapeEvent } from '../../core/shapes/catalog';
 import type { ShapeEventId } from '../../core/shapes/catalog';
 import { generateShapeScramble } from '../../core/shapes/scramble';
-import { addManualShapeSolve, createShapeSession, isShapeSolved, resetShapeSession, scrambleShapeSession, turnShapeSession } from '../../core/shapes/session';
+import { addManualShapeSolve, createShapeSession, isShapeSolved, resetShapeSession, scrambleShapeSession, setShapePenalty, turnShapeSession } from '../../core/shapes/session';
 import type { ShapeSession } from '../../core/shapes/session';
 import { loadShapeHistory, saveShapeHistory } from '../../core/shapes/storage';
 import { Button, Spinner } from '../ui/primitives';
@@ -166,7 +166,12 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
           <label>Penalty <select value={manualPenalty} onChange={(change) => setManualPenalty(change.target.value as Penalty)}><option value="none">None</option><option value="+2">+2</option><option value="DNF">DNF</option></select></label>
           <button type="submit">Save result</button>
         </form>}
-        {historyOpen && <ol className="nxn-history">{session?.solves.slice(-8).reverse().map((solve) => <li key={solve.id}><span>{new Date(solve.at).toLocaleDateString()}</span><strong>{formatTime(effectiveMs(solve))}</strong><small>{solve.source === 'manual' ? 'physical' : `${solve.moves} moves`}</small></li>)}</ol>}
+        {historyOpen && <ol className="nxn-history">{session?.solves.slice(-8).reverse().map((solve) => <li key={solve.id}>
+          <span>{new Date(solve.at).toLocaleDateString()}</span><strong>{formatTime(effectiveMs(solve))}</strong><small>{solve.source === 'manual' ? 'physical' : `${solve.moves} moves`}</small>
+          <select aria-label={`Penalty for solve ${solve.id}`} value={solve.penalty} onChange={(change) => setSession((current) => current ? setShapePenalty(current, solve.id, change.target.value as Penalty) : current)}>
+            <option value="none">OK</option><option value="+2">+2</option><option value="DNF">DNF</option>
+          </select>
+        </li>)}</ol>}
       </div>
     </section>
     <section className="nxn-stage shape-stage" aria-label={`${event.label} interactive puzzle`}>
