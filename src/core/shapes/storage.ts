@@ -7,7 +7,7 @@ export function shapeHistoryKey(eventId: ShapeEventId): string {
   return `cubelab.shape.${eventId}.history`;
 }
 
-function validSolve(value: unknown, kpuzzle: KPuzzle): value is ShapeSolve {
+export function validShapeSolve(value: unknown, kpuzzle: KPuzzle): value is ShapeSolve {
   if (typeof value !== 'object' || value === null) return false;
   const solve = value as Record<string, unknown>;
   if (typeof solve.id !== 'string' || !solve.id || solve.id.length > 80) return false;
@@ -30,7 +30,7 @@ export function loadShapeHistory(store: KeyValueStore, eventId: ShapeEventId, kp
     if (typeof parsed !== 'object' || parsed === null || !('v' in parsed) || parsed.v !== 1 || !('eventId' in parsed) || parsed.eventId !== eventId || !('data' in parsed) || !Array.isArray(parsed.data)) throw new Error('schema');
     const seen = new Set<string>();
     const solves = (parsed.data as unknown[]).filter((value): value is ShapeSolve => {
-      if (!validSolve(value, kpuzzle) || seen.has(value.id)) return false;
+      if (!validShapeSolve(value, kpuzzle) || seen.has(value.id)) return false;
       seen.add(value.id);
       return true;
     });

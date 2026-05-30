@@ -14,6 +14,7 @@ import { generateShapeScramble } from '../../core/shapes/scramble';
 import { addManualShapeSolve, createShapeSession, deleteShapeSolve, isShapeSolved, resetShapeSession, scrambleShapeSession, setShapePenalty, turnShapeSession } from '../../core/shapes/session';
 import type { ShapeSession } from '../../core/shapes/session';
 import { loadShapeHistory, saveShapeHistory } from '../../core/shapes/storage';
+import { exportShapeHistory, importShapeHistory, mergeShapeHistory } from '../../core/shapes/transfer';
 import { Button, Spinner } from '../ui/primitives';
 import { parseManualTime } from '../../core/nxn/manualTime';
 import type { Penalty } from '../../core/timing/timerMachine';
@@ -31,6 +32,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deletePending, setDeletePending] = useState<string | null>(null);
+  const [transferMessage, setTransferMessage] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualTime, setManualTime] = useState('');
   const [manualPenalty, setManualPenalty] = useState<Penalty>('none');
@@ -125,6 +127,33 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
     setError(null);
   };
 
+  const exportResults = () => {
+    if (!session) return;
+    const content = exportShapeHistory(eventId, session.solves);
+    const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `cubelab-${eventId}-results-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTransferMessage(`Exported ${session.solves.length} ${event.label} results.`);
+  };
+
+  const importResults = async (file: File | undefined) => {
+    if (!file || !session) return;
+    try {
+      if (file.size > 1_000_000) throw new Error('That results file is too large.');
+      const incoming = importShapeHistory(await file.text(), eventId, session.kpuzzle);
+      setSession((current) => current ? { ...current, solves: mergeShapeHistory(current.solves, incoming) } : current);
+      setHistoryOpen(true);
+      setTransferMessage(`Imported ${incoming.length} ${event.label} results.`);
+      setError(null);
+    } catch (cause) {
+      setTransferMessage(null);
+      setError(cause instanceof Error ? cause.message : 'Could not import results.');
+    }
+  };
+
   useEffect(() => {
     const onKey = (key: KeyboardEvent) => {
       const target = key.target;
@@ -177,6 +206,11 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
             <button type="button" onClick={() => setDeletePending(null)}>Cancel</button>
           </span> : <button type="button" className="nxn-history__delete" aria-label={`Remove solve ${solve.id}`} title="Remove solve" onClick={() => setDeletePending(solve.id)}><Trash2 size={13} /></button>}
         </li>)}</ol>}
+        <div className="nxn-transfer">
+          <button type="button" disabled={!session} onClick={exportResults}>Export results</button>
+          <label>Import results<input type="file" accept=".json,application/json" aria-label="Import results file" onChange={(change) => { void importResults(change.target.files?.[0]); change.target.value = ''; }} /></label>
+        </div>
+        {transferMessage && <p className="nxn-transfer__message" role="status">{transferMessage}</p>}
       </div>
     </section>
     <section className="nxn-stage shape-stage" aria-label={`${event.label} interactive puzzle`}>

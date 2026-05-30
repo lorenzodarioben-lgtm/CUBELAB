@@ -79,4 +79,19 @@ test.describe('shape puzzles', () => {
     await expect(page.locator('.nxn-records dd').first()).toHaveText('—');
     expect(errors()).toEqual([]);
   });
+
+  test('backs up and restores shape results', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=skewb');
+    await page.getByRole('button', { name: 'Add physical solve' }).click();
+    await page.getByRole('textbox', { name: 'Time' }).fill('13.48');
+    await page.getByRole('button', { name: 'Save result' }).click();
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export results' }).click()]);
+    expect(download.suggestedFilename()).toMatch(/^cubelab-skewb-results-.*\.json$/);
+    await page.locator('.nxn-history__delete').click();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    await page.getByLabel('Import results file').setInputFiles(await download.path());
+    await expect(page.locator('.nxn-records dd').first()).toHaveText('13.48');
+    expect(errors()).toEqual([]);
+  });
 });
