@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { puzzles } from 'cubing/puzzles';
 import { createMemoryStore } from '../../src/core/persistence/storage';
-import { addManualShapeSolve, createShapeSession, scrambleShapeSession, setShapePenalty, turnShapeSession } from '../../src/core/shapes/session';
+import { addManualShapeSolve, createShapeSession, deleteShapeSolve, scrambleShapeSession, setShapePenalty, turnShapeSession } from '../../src/core/shapes/session';
 import { loadShapeHistory, saveShapeHistory, shapeHistoryKey } from '../../src/core/shapes/storage';
 
 describe('shape event history', () => {
@@ -31,5 +31,14 @@ describe('shape event history', () => {
     const session = addManualShapeSolve(createShapeSession('skewb', kpuzzle), 12_340, 'none', 1234, 'one');
     expect(setShapePenalty(session, 'one', '+2').solves[0]?.penalty).toBe('+2');
     expect(setShapePenalty(session, 'missing', 'DNF')).toBe(session);
+  });
+
+  it('removes one shape result without altering the puzzle', async () => {
+    const kpuzzle = await puzzles.skewb!.kpuzzle();
+    const session = addManualShapeSolve(createShapeSession('skewb', kpuzzle), 12_340, 'none', 1234, 'one');
+    const removed = deleteShapeSolve(session, 'one');
+    expect(removed.solves).toHaveLength(0);
+    expect(removed.pattern).toBe(session.pattern);
+    expect(deleteShapeSolve(session, 'missing')).toBe(session);
   });
 });

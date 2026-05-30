@@ -68,3 +68,8 @@ export function setShapePenalty(session: ShapeSession, id: string, penalty: Pena
   if (!session.solves.some((solve) => solve.id === id)) return session;
   return { ...session, solves: session.solves.map((solve) => solve.id === id ? { ...solve, penalty } : solve) };
 }
+
+export function deleteShapeSolve(session: ShapeSession, id: string): ShapeSession {
+  if (!session.solves.some((solve) => solve.id === id)) return session;
+  return { ...session, solves: session.solves.filter((solve) => solve.id !== id) };
+}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { puzzles } from 'cubing/puzzles';
 import { TwistyPlayer } from 'cubing/twisty';
-import { RotateCcw, Shuffle } from 'lucide-react';
+import { RotateCcw, Shuffle, Trash2 } from 'lucide-react';
 import { useServices } from '../../app/context';
 import { mv } from '../../core/puzzle/notation';
 import type { Face } from '../../core/puzzle/notation';
@@ -11,7 +11,7 @@ import { browserStore } from '../../core/persistence/storage';
 import { shapeEvent } from '../../core/shapes/catalog';
 import type { ShapeEventId } from '../../core/shapes/catalog';
 import { generateShapeScramble } from '../../core/shapes/scramble';
-import { addManualShapeSolve, createShapeSession, isShapeSolved, resetShapeSession, scrambleShapeSession, setShapePenalty, turnShapeSession } from '../../core/shapes/session';
+import { addManualShapeSolve, createShapeSession, deleteShapeSolve, isShapeSolved, resetShapeSession, scrambleShapeSession, setShapePenalty, turnShapeSession } from '../../core/shapes/session';
 import type { ShapeSession } from '../../core/shapes/session';
 import { loadShapeHistory, saveShapeHistory } from '../../core/shapes/storage';
 import { Button, Spinner } from '../ui/primitives';
@@ -30,6 +30,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [deletePending, setDeletePending] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualTime, setManualTime] = useState('');
   const [manualPenalty, setManualPenalty] = useState<Penalty>('none');
@@ -171,6 +172,10 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
           <select aria-label={`Penalty for solve ${solve.id}`} value={solve.penalty} onChange={(change) => setSession((current) => current ? setShapePenalty(current, solve.id, change.target.value as Penalty) : current)}>
             <option value="none">OK</option><option value="+2">+2</option><option value="DNF">DNF</option>
           </select>
+          {deletePending === solve.id ? <span className="nxn-history__confirm">
+            <button type="button" onClick={() => { setSession((current) => current ? deleteShapeSolve(current, solve.id) : current); setDeletePending(null); }}>Delete</button>
+            <button type="button" onClick={() => setDeletePending(null)}>Cancel</button>
+          </span> : <button type="button" className="nxn-history__delete" aria-label={`Remove solve ${solve.id}`} title="Remove solve" onClick={() => setDeletePending(solve.id)}><Trash2 size={13} /></button>}
         </li>)}</ol>}
       </div>
     </section>

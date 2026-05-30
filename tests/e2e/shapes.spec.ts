@@ -64,4 +64,19 @@ test.describe('shape puzzles', () => {
     await expect(best).toHaveText('—');
     expect(errors()).toEqual([]);
   });
+
+  test('shape result removal takes two actions', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=skewb');
+    await page.getByRole('button', { name: 'Add physical solve' }).click();
+    await page.getByRole('textbox', { name: 'Time' }).fill('13.48');
+    await page.getByRole('button', { name: 'Save result' }).click();
+    await page.locator('.nxn-history__delete').click();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.locator('.nxn-records dd').first()).toHaveText('13.48');
+    await page.locator('.nxn-history__delete').click();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    await expect(page.locator('.nxn-records dd').first()).toHaveText('—');
+    expect(errors()).toEqual([]);
+  });
 });
