@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { puzzles } from 'cubing/puzzles';
 import { TwistyPlayer } from 'cubing/twisty';
-import { RotateCcw, Shuffle, Trash2 } from 'lucide-react';
+import { Check, Copy, RotateCcw, Shuffle, Trash2 } from 'lucide-react';
 import { useServices } from '../../app/context';
 import { mv } from '../../core/puzzle/notation';
 import type { Face } from '../../core/puzzle/notation';
@@ -15,7 +15,7 @@ import { addManualShapeSolve, createShapeSession, deleteShapeSolve, isShapeSolve
 import type { ShapeSession } from '../../core/shapes/session';
 import { loadShapeHistory, saveShapeHistory } from '../../core/shapes/storage';
 import { exportShapeHistory, importShapeHistory, mergeShapeHistory } from '../../core/shapes/transfer';
-import { Button, Spinner } from '../ui/primitives';
+import { Button, IconButton, Spinner } from '../ui/primitives';
 import { parseManualTime } from '../../core/nxn/manualTime';
 import type { Penalty } from '../../core/timing/timerMachine';
 
@@ -31,6 +31,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [deletePending, setDeletePending] = useState<string | null>(null);
   const [transferMessage, setTransferMessage] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
@@ -115,6 +116,15 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
     if (player.current) { player.current.experimentalSetupAlg = ''; player.current.alg = ''; player.current.jumpToEnd({ flash: false }); }
   };
 
+  const copyScramble = async () => {
+    if (!session?.scramble) return;
+    try {
+      await navigator.clipboard.writeText(session.scramble);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch { setError('Clipboard unavailable. Select the scramble text to copy it.'); }
+  };
+
   const saveManualTime = (form: React.FormEvent<HTMLFormElement>) => {
     form.preventDefault();
     const duration = manualPenalty === 'DNF' && !manualTime.trim() ? 0 : parseManualTime(manualTime);
@@ -179,7 +189,10 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
         <strong className="nxn-clock__time" role="timer">{formatTime(duration)}</strong>
         <span className="nxn-clock__note">{session?.phase === 'ready' ? 'First turn starts the clock' : 'New Scramble prepares a timed attempt'}</span>
       </div>
-      <div className="nxn-readout"><h2>Scramble</h2><p className="nxn-scramble">{session?.scramble ?? 'Generate a scramble to begin.'}</p>{error && <p className="nxn-error" role="alert">{error}</p>}</div>
+      <div className="nxn-readout">
+        <div className="nxn-readout__head"><h2>Scramble</h2><IconButton label="Copy scramble" size="sm" disabled={!session?.scramble} onClick={() => void copyScramble()}>{copied ? <Check size={15} /> : <Copy size={15} />}</IconButton></div>
+        <p className="nxn-scramble">{session?.scramble ?? 'Generate a scramble to begin.'}</p>{error && <p className="nxn-error" role="alert">{error}</p>}
+      </div>
       <div className="nxn-readout nxn-records">
         <h2>Session</h2>
         <dl>

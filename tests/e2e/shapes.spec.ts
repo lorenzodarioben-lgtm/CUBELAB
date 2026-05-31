@@ -6,6 +6,7 @@ test.describe('shape puzzles', () => {
   for (const [event, name, face] of [['pyram', 'Pyraminx', 'U'], ['skewb', 'Skewb', 'R'], ['minx', 'Megaminx', 'R']] as const) {
     test(`${name} renders, turns, and generates its event scramble`, async ({ page }) => {
       const errors = trackErrors(page);
+      await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
       await page.goto(`/?puzzle=${event}`);
       await expect(page.getByRole('main', { name: `${name} practice studio` })).toBeVisible();
       await expect(page.locator('twisty-player')).toBeVisible({ timeout: 30_000 });
@@ -24,6 +25,9 @@ test.describe('shape puzzles', () => {
       await page.getByRole('button', { name: 'New Scramble' }).click();
       await expect(page.getByText('First turn starts the clock')).toBeVisible({ timeout: 60_000 });
       await expect(page.locator('.nxn-scramble')).not.toContainText('Generate a scramble to begin.');
+      await page.getByRole('button', { name: 'Copy scramble' }).click();
+      const normalize = (value: string | null) => value?.replace(/\s+/g, ' ').trim();
+      expect(normalize(await page.evaluate(() => navigator.clipboard.readText()))).toBe(normalize(await page.locator('.nxn-scramble').textContent()));
       await expect.poll(async () => page.locator('twisty-player').evaluate(async (element) => {
         const view = element as TwistyPlayer;
         const [pattern, kpuzzle] = await Promise.all([view.experimentalModel.currentPattern.get(), view.experimentalModel.kpuzzle.get()]);
