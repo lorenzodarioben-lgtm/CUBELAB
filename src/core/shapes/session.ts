@@ -1,3 +1,4 @@
+import { Alg } from 'cubing/alg';
 import type { KPuzzle, KPattern } from 'cubing/kpuzzle';
 import type { Penalty } from '../timing/timerMachine';
 import type { ShapeEventId } from './catalog';
@@ -103,4 +104,28 @@ export function setShapePenalty(session: ShapeSession, id: string, penalty: Pena
 export function deleteShapeSolve(session: ShapeSession, id: string): ShapeSession {
   if (!session.solves.some((solve) => solve.id === id)) return session;
   return { ...session, solves: session.solves.filter((solve) => solve.id !== id) };
+}
+
+export interface ShapeSolution {
+  readonly text: string;
+  readonly moves: readonly string[];
+}
+
+/** Reverse the exact known scramble and play moves, then verify on the puzzle model. */
+export function deriveShapeSolution(session: ShapeSession): ShapeSolution | null {
+  if (isShapeSolved(session.pattern)) return null;
+  const sequence = [session.scramble ?? '', ...session.moves].filter(Boolean).join(' ');
+  const text = new Alg(sequence).invert().toString();
+  if (!isShapeSolved(session.pattern.applyAlg(text))) throw new Error('Could not verify the practice solution.');
+  return { text, moves: text.trim().split(/\s+/) };
+}
+
+/** Applying a hint is practice; it never manufactures a timed solve. */
+export function applyShapeSolution(session: ShapeSession, solution: ShapeSolution): ShapeSession {
+  const pattern = session.pattern.applyAlg(solution.text);
+  if (!isShapeSolved(pattern)) throw new Error('The solution does not solve this puzzle.');
+  return {
+    ...session, pattern, phase: 'solved', startedAt: null, lastDurationMs: null,
+    moves: [...session.moves, ...solution.moves], undo: [], redo: [], assisted: true,
+  };
 }

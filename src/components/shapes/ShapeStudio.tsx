@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { puzzles } from 'cubing/puzzles';
 import { TwistyPlayer } from 'cubing/twisty';
-import { Check, Copy, Redo2, RotateCcw, Shuffle, Trash2, Undo2 } from 'lucide-react';
+import { Check, Copy, Redo2, RotateCcw, Shuffle, Sparkles, Trash2, Undo2 } from 'lucide-react';
 import { useServices } from '../../app/context';
 import { mv } from '../../core/puzzle/notation';
 import type { Face } from '../../core/puzzle/notation';
@@ -11,8 +11,8 @@ import { browserStore } from '../../core/persistence/storage';
 import { shapeEvent } from '../../core/shapes/catalog';
 import type { ShapeEventId } from '../../core/shapes/catalog';
 import { generateShapeScramble } from '../../core/shapes/scramble';
-import { addManualShapeSolve, createShapeSession, deleteShapeSolve, isShapeSolved, redoShapeSession, resetShapeSession, scrambleShapeSession, setShapePenalty, turnShapeSession, undoShapeSession } from '../../core/shapes/session';
-import type { ShapeSession } from '../../core/shapes/session';
+import { addManualShapeSolve, applyShapeSolution, createShapeSession, deleteShapeSolve, deriveShapeSolution, isShapeSolved, redoShapeSession, resetShapeSession, scrambleShapeSession, setShapePenalty, turnShapeSession, undoShapeSession } from '../../core/shapes/session';
+import type { ShapeSession, ShapeSolution } from '../../core/shapes/session';
 import { loadShapeHistory, saveShapeHistory } from '../../core/shapes/storage';
 import { exportShapeHistory, importShapeHistory, mergeShapeHistory } from '../../core/shapes/transfer';
 import { Button, IconButton, Spinner } from '../ui/primitives';
@@ -33,6 +33,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [deletePending, setDeletePending] = useState<string | null>(null);
+  const [solution, setSolution] = useState<ShapeSolution | null>(null);
   const [transferMessage, setTransferMessage] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualTime, setManualTime] = useState('');
@@ -81,6 +82,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
   const turn = useCallback((move: string, inverse = false) => {
     if (!session || loading) return;
     try {
+      setSolution(null);
       const at = performance.now();
       setSession((current) => current ? turnShapeSession(current, move, at, Date.now(), crypto.randomUUID()) : current);
       player.current?.experimentalAddMove(move);
@@ -93,6 +95,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
     if (!session) return;
     const id = ++request.current;
     setLoading(true);
+    setSolution(null);
     setError(null);
     try {
       const scramble = await generateShapeScramble(eventId, session.kpuzzle);
@@ -112,6 +115,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
     request.current++;
     setLoading(false);
     setError(null);
+    setSolution(null);
     setSession((current) => current ? resetShapeSession(current) : current);
     if (player.current) { player.current.experimentalSetupAlg = ''; player.current.alg = ''; player.current.jumpToEnd({ flash: false }); }
   };
@@ -119,6 +123,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
   const undo = useCallback(() => {
     const move = session?.undo.at(-1);
     if (!move) return;
+    setSolution(null);
     setSession((current) => current ? undoShapeSession(current) : current);
     player.current?.experimentalRemoveFinalChild();
     studio.playPracticeTurn(mv(move.charAt(0).toUpperCase() as Face, 3), 175, eventId === 'pyram' ? 1.09 : 1.025);
@@ -127,6 +132,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
   const redo = useCallback(() => {
     const move = session?.redo.at(-1);
     if (!move) return;
+    setSolution(null);
     setSession((current) => current ? redoShapeSession(current, performance.now(), Date.now(), crypto.randomUUID()) : current);
     player.current?.experimentalAddMove(move);
     studio.playPracticeTurn(mv(move.charAt(0).toUpperCase() as Face, move.endsWith("'") || move.endsWith('--') ? 3 : 1), 175, eventId === 'pyram' ? 1.09 : 1.025);
@@ -139,6 +145,24 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1400);
     } catch { setError('Clipboard unavailable. Select the scramble text to copy it.'); }
+  };
+
+  const findSolution = () => {
+    if (!session || isShapeSolved(session.pattern)) return;
+    try { setSolution(deriveShapeSolution(session)); setError(null); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not find a practice solution.'); }
+  };
+
+  const useSolution = () => {
+    if (!solution || !session || !player.current) return;
+    try {
+      const solved = applyShapeSolution(session, solution);
+      player.current.alg = solved.moves.join(' ');
+      player.current.jumpToEnd({ flash: false });
+      setSession(solved);
+      setSolution(null);
+      setError(null);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not apply the practice solution.'); }
   };
 
   const saveManualTime = (form: React.FormEvent<HTMLFormElement>) => {
@@ -260,6 +284,8 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
           <IconButton label="Undo" disabled={!session?.undo.length || loading} onClick={undo}><Undo2 size={17} /></IconButton>
           <IconButton label="Redo" disabled={!session?.redo.length || loading} onClick={redo}><Redo2 size={17} /></IconButton>
         </div>
+        <Button variant="accent" size="lg" icon={<Sparkles size={16} />} disabled={!session || solved || loading} onClick={findSolution}>Find Solution</Button>
+        {solution && <div className="nxn-solution"><p>{solution.text}</p><Button variant="ghost" size="sm" onClick={useSolution}>Apply solution</Button></div>}
       </div>
       <div className="nxn-turns">
         <h2>Turn puzzle</h2>

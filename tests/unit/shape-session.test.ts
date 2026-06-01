@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { puzzles } from 'cubing/puzzles';
-import { createShapeSession, invertShapeMove, isShapeSolved, redoShapeSession, scrambleShapeSession, turnShapeSession, undoShapeSession } from '../../src/core/shapes/session';
+import { applyShapeSolution, createShapeSession, deriveShapeSolution, invertShapeMove, isShapeSolved, redoShapeSession, scrambleShapeSession, turnShapeSession, undoShapeSession } from '../../src/core/shapes/session';
 import { generateShapeScramble } from '../../src/core/shapes/scramble';
 
 describe.each([['pyram', 'pyraminx', 'U', "U'"], ['skewb', 'skewb', 'R', "R'"], ['minx', 'megaminx', 'R++', 'R--']] as const)('%s puzzle model', (eventId, puzzleId, move, inverse) => {
@@ -31,6 +31,17 @@ describe.each([['pyram', 'pyraminx', 'U', "U'"], ['skewb', 'skewb', 'R', "R'"], 
     expect(isShapeSolved(session.pattern)).toBe(true);
     expect(session.solves).toHaveLength(1);
     expect(invertShapeMove(move)).toBe(inverse);
+  });
+
+  it('verifies a practice solution without recording a timed solve', async () => {
+    const kpuzzle = await puzzles[puzzleId]!.kpuzzle();
+    const session = scrambleShapeSession(createShapeSession(eventId, kpuzzle), move);
+    const answer = deriveShapeSolution(session)!;
+    expect(isShapeSolved(session.pattern.applyAlg(answer.text))).toBe(true);
+    const solved = applyShapeSolution(session, answer);
+    expect(solved.phase).toBe('solved');
+    expect(solved.solves).toHaveLength(0);
+    expect(solved.assisted).toBe(true);
   });
 });
 

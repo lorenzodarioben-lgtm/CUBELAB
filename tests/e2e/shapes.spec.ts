@@ -34,6 +34,16 @@ test.describe('shape puzzles', () => {
         const scramble = document.querySelector('.nxn-scramble')?.textContent ?? '';
         return pattern.isIdentical(kpuzzle.defaultPattern().applyAlg(scramble));
       })).toBe(true);
+      await page.getByRole('button', { name: 'Find Solution' }).click();
+      await expect(page.getByRole('button', { name: 'Apply solution' })).toBeVisible();
+      await page.getByRole('button', { name: 'Apply solution' }).click();
+      await expect(page.getByText('Puzzle solved')).toBeVisible();
+      await expect(page.locator('.nxn-records dl > div').filter({ hasText: 'Solves' }).locator('dd')).toHaveText('0');
+      await expect.poll(async () => page.locator('twisty-player').evaluate(async (element) => {
+        const view = element as TwistyPlayer;
+        const [pattern, kpuzzle] = await Promise.all([view.experimentalModel.currentPattern.get(), view.experimentalModel.kpuzzle.get()]);
+        return pattern.isIdentical(kpuzzle.defaultPattern());
+      })).toBe(true);
       expect(errors()).toEqual([]);
     });
   }
