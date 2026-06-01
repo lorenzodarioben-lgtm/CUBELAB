@@ -98,4 +98,21 @@ test.describe('shape puzzles', () => {
     await expect(page.locator('.nxn-records dd').first()).toHaveText('13.48');
     expect(errors()).toEqual([]);
   });
+
+  test('shape turns undo and redo in the renderer', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=skewb');
+    await page.locator('[title="Turn R clockwise"]').click();
+    await expect(page.getByText('Skewb in progress')).toBeVisible();
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByText('Puzzle solved')).toBeVisible();
+    await expect.poll(async () => page.locator('twisty-player').evaluate(async (element) => {
+      const view = element as TwistyPlayer;
+      const [pattern, kpuzzle] = await Promise.all([view.experimentalModel.currentPattern.get(), view.experimentalModel.kpuzzle.get()]);
+      return pattern.isIdentical(kpuzzle.defaultPattern());
+    })).toBe(true);
+    await page.getByRole('button', { name: 'Redo' }).click();
+    await expect(page.getByText('Skewb in progress')).toBeVisible();
+    expect(errors()).toEqual([]);
+  });
 });

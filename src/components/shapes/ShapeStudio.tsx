@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { puzzles } from 'cubing/puzzles';
 import { TwistyPlayer } from 'cubing/twisty';
-import { Check, Copy, RotateCcw, Shuffle, Trash2 } from 'lucide-react';
+import { Check, Copy, Redo2, RotateCcw, Shuffle, Trash2, Undo2 } from 'lucide-react';
 import { useServices } from '../../app/context';
 import { mv } from '../../core/puzzle/notation';
 import type { Face } from '../../core/puzzle/notation';
@@ -11,7 +11,7 @@ import { browserStore } from '../../core/persistence/storage';
 import { shapeEvent } from '../../core/shapes/catalog';
 import type { ShapeEventId } from '../../core/shapes/catalog';
 import { generateShapeScramble } from '../../core/shapes/scramble';
-import { addManualShapeSolve, createShapeSession, deleteShapeSolve, isShapeSolved, resetShapeSession, scrambleShapeSession, setShapePenalty, turnShapeSession } from '../../core/shapes/session';
+import { addManualShapeSolve, createShapeSession, deleteShapeSolve, isShapeSolved, redoShapeSession, resetShapeSession, scrambleShapeSession, setShapePenalty, turnShapeSession, undoShapeSession } from '../../core/shapes/session';
 import type { ShapeSession } from '../../core/shapes/session';
 import { loadShapeHistory, saveShapeHistory } from '../../core/shapes/storage';
 import { exportShapeHistory, importShapeHistory, mergeShapeHistory } from '../../core/shapes/transfer';
@@ -116,6 +116,22 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
     if (player.current) { player.current.experimentalSetupAlg = ''; player.current.alg = ''; player.current.jumpToEnd({ flash: false }); }
   };
 
+  const undo = useCallback(() => {
+    const move = session?.undo.at(-1);
+    if (!move) return;
+    setSession((current) => current ? undoShapeSession(current) : current);
+    player.current?.experimentalRemoveFinalChild();
+    studio.playPracticeTurn(mv(move.charAt(0).toUpperCase() as Face, 3), 175, eventId === 'pyram' ? 1.09 : 1.025);
+  }, [session, studio, eventId]);
+
+  const redo = useCallback(() => {
+    const move = session?.redo.at(-1);
+    if (!move) return;
+    setSession((current) => current ? redoShapeSession(current, performance.now(), Date.now(), crypto.randomUUID()) : current);
+    player.current?.experimentalAddMove(move);
+    studio.playPracticeTurn(mv(move.charAt(0).toUpperCase() as Face, move.endsWith("'") || move.endsWith('--') ? 3 : 1), 175, eventId === 'pyram' ? 1.09 : 1.025);
+  }, [session, studio, eventId]);
+
   const copyScramble = async () => {
     if (!session?.scramble) return;
     try {
@@ -168,6 +184,11 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
     const onKey = (key: KeyboardEvent) => {
       const target = key.target;
       if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return;
+      if ((key.ctrlKey || key.metaKey) && key.code === 'KeyZ') {
+        key.preventDefault();
+        if (key.shiftKey) redo(); else undo();
+        return;
+      }
       if (key.ctrlKey || key.metaKey || key.altKey || key.repeat) return;
       if (key.code === 'KeyN') { key.preventDefault(); void newScramble(); return; }
       const pair = event.turns.find((value) => value.key && value.key === key.key.toLowerCase());
@@ -175,7 +196,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [event.turns, newScramble, turn]);
+  }, [event.turns, newScramble, turn, undo, redo]);
 
   const duration = session?.phase === 'running' && session.startedAt !== null
     ? Math.max(0, now - session.startedAt)
@@ -234,7 +255,11 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
     <section className="nxn-controls" aria-label="Puzzle controls">
       <div className="nxn-controls__actions">
         <Button variant="primary" size="lg" icon={loading ? <Spinner /> : <Shuffle size={17} />} busy={loading} disabled={!session} onClick={() => void newScramble()}>{loading ? 'Generating…' : 'New Scramble'}</Button>
-        <Button variant="ghost" size="lg" icon={<RotateCcw size={16} />} disabled={!session} onClick={reset}>Reset</Button>
+        <div className="nxn-controls__row">
+          <Button variant="ghost" size="lg" icon={<RotateCcw size={16} />} disabled={!session} onClick={reset}>Reset</Button>
+          <IconButton label="Undo" disabled={!session?.undo.length || loading} onClick={undo}><Undo2 size={17} /></IconButton>
+          <IconButton label="Redo" disabled={!session?.redo.length || loading} onClick={redo}><Redo2 size={17} /></IconButton>
+        </div>
       </div>
       <div className="nxn-turns">
         <h2>Turn puzzle</h2>
@@ -242,7 +267,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
           <button type="button" title={`Turn ${pair.label} clockwise`} disabled={!session || loading} onClick={() => turn(pair.cw)}>{pair.cw}</button>
           <button type="button" title={`Turn ${pair.label} counter-clockwise`} disabled={!session || loading} onClick={() => turn(pair.ccw, true)}>{pair.ccw}</button>
         </div>)}</div>
-        <p className="nxn-controls__tip">Keyboard: {event.turns.filter((pair) => pair.key).map((pair) => pair.label).join(' ')} · hold Shift for inverse · N for scramble</p>
+        <p className="nxn-controls__tip">Keyboard: {event.turns.filter((pair) => pair.key).map((pair) => pair.label).join(' ')} · Shift for inverse · N for scramble · Ctrl+Z to undo</p>
       </div>
       <p className="nxn-solved-indicator" aria-live="polite">{solved ? 'Puzzle solved' : `${event.label} in progress`}</p>
     </section>
