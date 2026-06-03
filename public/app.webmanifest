@@ -1,0 +1,15 @@
+{
+  "id": "/",
+  "name": "CUBELAB — The interactive cubing studio",
+  "short_name": "CUBELAB",
+  "description": "Play, scramble, and time twisty puzzles in a local studio.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0c0c0d",
+  "theme_color": "#0c0c0d",
+  "icons": [
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
+  ]
+}
