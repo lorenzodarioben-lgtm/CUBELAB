@@ -9,6 +9,9 @@ Skewb, and Megaminx also have playable 3D puzzle views, event scrambles, and sep
 Everything runs locally in the browser. There are no accounts, no servers, no analytics; solves and
 settings live in this browser's `localStorage` only.
 
+The production site can be installed as a browser app. After its first online load, the production
+bundle, puzzle definitions, fonts, audio, and scramble worker are cached for offline practice.
+
 ![Desktop studio](artifacts/after/desktop-1440-scrambled.png)
 
 | Close-up | Mid-turn M slice | Phone |
@@ -46,7 +49,7 @@ npm run test:e2e     # Playwright against the production build (builds + preview
 | Script                | Purpose                                                                         |
 | --------------------- | ------------------------------------------------------------------------------- |
 | `npm run dev`         | Vite dev server on port 5317                                                    |
-| `npm run build`       | `tsc -b` then `vite build`                                                      |
+| `npm run build`       | Typecheck, create the production bundle, and generate its offline asset cache  |
 | `npm run preview`     | Serve the production build on port 4317                                         |
 | `npm run typecheck`   | Strict TypeScript project build                                                 |
 | `npm run lint`        | ESLint (typescript-eslint + React Compiler hook rules)                          |

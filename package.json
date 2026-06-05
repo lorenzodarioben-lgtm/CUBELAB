@@ -6,7 +6,7 @@
   "description": "CUBELAB — an offline twisty-puzzle practice studio for 2x2 through 7x7 cubes.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/build-offline.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "lint": "eslint .",
