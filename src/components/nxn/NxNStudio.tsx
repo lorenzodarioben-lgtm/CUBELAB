@@ -10,7 +10,7 @@ import { invertNxMove, isNxSolved } from '../../core/nxn/model';
 import type { NxMove } from '../../core/nxn/model';
 import { formatNxAlg, formatNxMove } from '../../core/nxn/notation';
 import { generateNxScramble } from '../../core/nxn/scramble';
-import { applyNxSolution, bestNxSingle, createNxSession, redoNxSession, resetNxSession, scrambleNxSession, turnNxSession, undoNxSession } from '../../core/nxn/session';
+import { applyNxSolution, bestNxSingle, redoNxSession, resetNxSession, scrambleNxSession, turnNxSession, undoNxSession } from '../../core/nxn/session';
 import { solveTwoByTwo } from '../../core/nxn/solver';
 import { loadNxHistory, saveNxHistory } from '../../core/nxn/storage';
 import { browserStore } from '../../core/persistence/storage';
@@ -23,6 +23,7 @@ import { addManualNxSolve, deleteNxSolve, setNxPenalty } from '../../core/nxn/se
 import type { Penalty } from '../../core/timing/timerMachine';
 import { summarizeNx } from '../../core/nxn/stats';
 import { exportNxHistory, importNxHistory, mergeNxHistory } from '../../core/nxn/transfer';
+import { loadNxCurrent, saveNxCurrent } from '../../core/nxn/current';
 
 const FACE_ORDER = ['U', 'R', 'F', 'D', 'L', 'B'] as const;
 type ActiveTurn = { readonly token: number; readonly move: NxMove; readonly kind: 'manual' | 'undo' | 'redo'; readonly durationMs: number };
@@ -38,7 +39,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
   const { studio } = useServices();
   const event = cubeEvent(eventId)!;
   const storage = useMemo(() => browserStore(), []);
-  const [session, setSession] = useState(() => createNxSession(event.size, loadNxHistory(storage, eventId)));
+  const [session, setSession] = useState(() => loadNxCurrent(storage, eventId, event.size, loadNxHistory(storage, eventId)));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [width, setWidth] = useState(1);
@@ -61,6 +62,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
 
   useEffect(() => () => { request.current++; solveRequest.current++; document.body.style.cursor = ''; }, []);
   useEffect(() => { saveNxHistory(storage, eventId, session.solves); }, [storage, eventId, session.solves]);
+  useEffect(() => { saveNxCurrent(storage, eventId, session); }, [storage, eventId, session]);
   useEffect(() => {
     if (session.phase !== 'running') return;
     const id = window.setInterval(() => setNow(performance.now()), 40);

@@ -179,4 +179,21 @@ test.describe('NxN practice studio', () => {
     await expect(page.locator('.nxn-records dd').first()).toHaveText('18.42');
     expect(errors()).toEqual([]);
   });
+
+  test('reload restores the current cube without resuming an interrupted timer', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=444');
+    await page.getByRole('button', { name: 'New Scramble' }).click();
+    await expect(page.getByText('First turn starts the clock')).toBeVisible({ timeout: 60_000 });
+    const scramble = await page.locator('.nxn-scramble').textContent();
+    await page.locator('[title="Turn R clockwise"]').click();
+    await expect(page.locator('.nxn-last-turn strong')).toHaveText('R');
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('cubelab.nxn.444.current') ?? '{}').moves === 'R');
+    await page.reload();
+    await expect(page.locator('.nxn-scramble')).toHaveText(scramble!);
+    await expect(page.locator('.nxn-last-turn strong')).toHaveText('R');
+    await expect(page.getByText('PRACTICE TIMER')).toBeVisible();
+    await expect(page.getByText('4×4 in progress')).toBeVisible();
+    expect(errors()).toEqual([]);
+  });
 });
