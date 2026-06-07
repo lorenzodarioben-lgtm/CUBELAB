@@ -11,10 +11,11 @@ import { browserStore } from '../../core/persistence/storage';
 import { shapeEvent } from '../../core/shapes/catalog';
 import type { ShapeEventId } from '../../core/shapes/catalog';
 import { generateShapeScramble } from '../../core/shapes/scramble';
-import { addManualShapeSolve, applyShapeSolution, createShapeSession, deleteShapeSolve, deriveShapeSolution, isShapeSolved, redoShapeSession, resetShapeSession, scrambleShapeSession, setShapePenalty, turnShapeSession, undoShapeSession } from '../../core/shapes/session';
+import { addManualShapeSolve, applyShapeSolution, deleteShapeSolve, deriveShapeSolution, isShapeSolved, redoShapeSession, resetShapeSession, scrambleShapeSession, setShapePenalty, turnShapeSession, undoShapeSession } from '../../core/shapes/session';
 import type { ShapeSession, ShapeSolution } from '../../core/shapes/session';
 import { loadShapeHistory, saveShapeHistory } from '../../core/shapes/storage';
 import { exportShapeHistory, importShapeHistory, mergeShapeHistory } from '../../core/shapes/transfer';
+import { loadShapeCurrent, saveShapeCurrent } from '../../core/shapes/current';
 import { Button, IconButton, Spinner } from '../ui/primitives';
 import { parseManualTime } from '../../core/nxn/manualTime';
 import type { Penalty } from '../../core/timing/timerMachine';
@@ -61,7 +62,11 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
         view.setAttribute('aria-label', `${event.label} 3D puzzle`);
         stage.current.append(view);
         player.current = view;
-        setSession(createShapeSession(eventId, kpuzzle, loadShapeHistory(storage, eventId, kpuzzle)));
+        const restored = loadShapeCurrent(storage, eventId, kpuzzle, loadShapeHistory(storage, eventId, kpuzzle));
+        view.experimentalSetupAlg = restored.scramble ?? '';
+        view.alg = restored.moves.join(' ');
+        view.jumpToEnd({ flash: false });
+        setSession(restored);
       } catch (cause) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : 'Could not load this puzzle.');
       }
@@ -73,6 +78,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
   useEffect(() => {
     if (solves) saveShapeHistory(storage, eventId, solves);
   }, [solves, storage, eventId]);
+  useEffect(() => { if (session) saveShapeCurrent(storage, session); }, [session, storage]);
   useEffect(() => {
     if (session?.phase !== 'running') return;
     const id = window.setInterval(() => setNow(performance.now()), 40);

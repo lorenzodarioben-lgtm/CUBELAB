@@ -125,4 +125,26 @@ test.describe('shape puzzles', () => {
     await expect(page.getByText('Skewb in progress')).toBeVisible();
     expect(errors()).toEqual([]);
   });
+
+  test('reload restores the current shape state without resuming the timer', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=skewb');
+    await page.getByRole('button', { name: 'New Scramble' }).click();
+    await expect(page.getByText('First turn starts the clock')).toBeVisible({ timeout: 60_000 });
+    const scramble = await page.locator('.nxn-scramble').textContent();
+    await page.locator('[title="Turn R clockwise"]').click();
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('cubelab.shape.skewb.current') ?? '{}').moves?.[0] === 'R');
+    await page.reload();
+    await expect(page.getByRole('main', { name: 'Skewb practice studio' })).toBeVisible();
+    await expect(page.locator('.nxn-scramble')).toHaveText(scramble!);
+    await expect(page.locator('.nxn-records dl > div').filter({ hasText: 'Moves' }).locator('dd')).toHaveText('1');
+    await expect(page.getByText('PRACTICE TIMER')).toBeVisible();
+    await expect.poll(async () => page.locator('twisty-player').evaluate(async (element) => {
+      const view = element as TwistyPlayer;
+      const [pattern, kpuzzle] = await Promise.all([view.experimentalModel.currentPattern.get(), view.experimentalModel.kpuzzle.get()]);
+      const scrambleText = document.querySelector('.nxn-scramble')?.textContent ?? '';
+      return pattern.isIdentical(kpuzzle.defaultPattern().applyAlg(scrambleText).applyMove('R'));
+    })).toBe(true);
+    expect(errors()).toEqual([]);
+  });
 });
