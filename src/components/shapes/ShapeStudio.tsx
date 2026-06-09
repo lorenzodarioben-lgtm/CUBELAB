@@ -33,6 +33,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [allHistory, setAllHistory] = useState(false);
   const [copied, setCopied] = useState(false);
   const [deletePending, setDeletePending] = useState<string | null>(null);
   const [solution, setSolution] = useState<ShapeSolution | null>(null);
@@ -273,7 +274,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
           <label>Penalty <select value={manualPenalty} onChange={(change) => setManualPenalty(change.target.value as Penalty)}><option value="none">None</option><option value="+2">+2</option><option value="DNF">DNF</option></select></label>
           <button type="submit">Save result</button>
         </form>}
-        {historyOpen && <ol className="nxn-history">{session?.solves.slice(-8).reverse().map((solve) => <li key={solve.id}>
+        {historyOpen && <ol className="nxn-history">{(allHistory ? session?.solves.slice() : session?.solves.slice(-8))?.reverse().map((solve) => <li key={solve.id}>
           <span>{new Date(solve.at).toLocaleDateString()}</span><strong>{formatTime(effectiveMs(solve))}</strong><small>{solve.source === 'manual' ? 'physical' : `${solve.moves} moves`}</small>
           <select aria-label={`Penalty for solve ${solve.id}`} value={solve.penalty} onChange={(change) => setSession((current) => current ? setShapePenalty(current, solve.id, change.target.value as Penalty) : current)}>
             <option value="none">OK</option><option value="+2">+2</option><option value="DNF">DNF</option>
@@ -283,6 +284,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
             <button type="button" onClick={() => setDeletePending(null)}>Cancel</button>
           </span> : <button type="button" className="nxn-history__delete" aria-label={`Remove solve ${solve.id}`} title="Remove solve" onClick={() => setDeletePending(solve.id)}><Trash2 size={13} /></button>}
         </li>)}</ol>}
+        {historyOpen && (session?.solves.length ?? 0) > 8 && <button type="button" className="nxn-history-toggle" onClick={() => setAllHistory((value) => !value)}>{allHistory ? 'Show recent 8' : `Show all ${session?.solves.length} solves`}</button>}
         <div className="nxn-transfer">
           <button type="button" disabled={!session} onClick={exportResults}>Export results</button>
           <button type="button" disabled={!session} onClick={exportCsv}>Export CSV</button>

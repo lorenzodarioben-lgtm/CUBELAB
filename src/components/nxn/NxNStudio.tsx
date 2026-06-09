@@ -47,6 +47,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
   const [now, setNow] = useState(() => performance.now());
   const [copied, setCopied] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [allHistory, setAllHistory] = useState(false);
   const [deletePending, setDeletePending] = useState<string | null>(null);
   const [transferMessage, setTransferMessage] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
@@ -279,7 +280,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
             <label>Penalty <select value={manualPenalty} onChange={(event) => setManualPenalty(event.target.value as Penalty)}><option value="none">None</option><option value="+2">+2</option><option value="DNF">DNF</option></select></label>
             <button type="submit">Save result</button>
           </form>}
-          {showHistory && <ol className="nxn-history">{session.solves.slice(-8).reverse().map((solve) => <li key={solve.id}>
+          {showHistory && <ol className="nxn-history">{(allHistory ? session.solves.slice() : session.solves.slice(-8)).reverse().map((solve) => <li key={solve.id}>
             <span>{new Date(solve.at).toLocaleDateString()}</span>
             <strong>{formatTime(effectiveMs(solve))}</strong>
             {solve.assisted && <small>practice</small>}{solve.source === 'manual' && <small>physical</small>}
@@ -291,6 +292,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
               <button type="button" onClick={() => setDeletePending(null)}>Cancel</button>
             </span> : <button type="button" className="nxn-history__delete" aria-label={`Remove solve ${solve.id}`} title="Remove solve" onClick={() => setDeletePending(solve.id)}><Trash2 size={13} /></button>}
           </li>)}</ol>}
+          {showHistory && session.solves.length > 8 && <button type="button" className="nxn-history-toggle" onClick={() => setAllHistory((value) => !value)}>{allHistory ? 'Show recent 8' : `Show all ${session.solves.length} solves`}</button>}
           <div className="nxn-transfer">
             <button type="button" onClick={exportResults}>Export results</button>
             <button type="button" onClick={exportCsv}>Export CSV</button>

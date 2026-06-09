@@ -113,7 +113,7 @@
 .nxn-manual-form select:focus-visible,
 .nxn-manual-form button:focus-visible { outline: none; box-shadow: var(--focus); }
 .nxn-manual-form button { grid-column: 1 / -1; padding: 9px; color: var(--on-ivory); background: var(--ivory); border: 0; border-radius: var(--r-xs); font: 600 12px var(--font-ui); cursor: pointer; }
-.nxn-history { margin: 15px 0 0; padding: 0; list-style: none; }
+.nxn-history { max-height: 340px; overflow-y: auto; overscroll-behavior: contain; margin: 15px 0 0; padding: 0 4px 0 0; list-style: none; scrollbar-width: thin; scrollbar-color: var(--line-3) transparent; }
 .nxn-history li { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; padding: 7px 0; border-top: 1px solid var(--line); font: 11px var(--font-ui); color: var(--text-2); }
 .nxn-history strong { margin-left: auto; color: var(--text); font: 12px var(--font-mono); }
 .nxn-history small { color: var(--hold); }

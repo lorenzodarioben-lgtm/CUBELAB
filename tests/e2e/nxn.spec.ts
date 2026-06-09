@@ -212,4 +212,21 @@ test.describe('NxN practice studio', () => {
     expect(csv).toContain('"444"');
     expect(errors()).toEqual([]);
   });
+
+  test('opens the full history beyond the recent eight results', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=222');
+    for (let i = 0; i < 9; i++) {
+      await page.getByRole('button', { name: 'Add physical solve' }).click();
+      await page.getByRole('textbox', { name: 'Time' }).fill(`${10 + i}.00`);
+      await page.getByRole('button', { name: 'Save result' }).click();
+    }
+    await expect(page.locator('.nxn-history li')).toHaveCount(8);
+    await page.getByRole('button', { name: 'Show all 9 solves' }).click();
+    await expect(page.locator('.nxn-history li')).toHaveCount(9);
+    await expect(page.locator('.nxn-history li').last()).toContainText('10.00');
+    await page.getByRole('button', { name: 'Show recent 8' }).click();
+    await expect(page.locator('.nxn-history li')).toHaveCount(8);
+    expect(errors()).toEqual([]);
+  });
 });
