@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { trackErrors } from './helpers';
 
 test.describe('NxN practice studio', () => {
@@ -194,6 +195,21 @@ test.describe('NxN practice studio', () => {
     await expect(page.locator('.nxn-last-turn strong')).toHaveText('R');
     await expect(page.getByText('PRACTICE TIMER')).toBeVisible();
     await expect(page.getByText('4×4 in progress')).toBeVisible();
+    expect(errors()).toEqual([]);
+  });
+
+  test('exports exact per-event results as CSV', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=444');
+    await page.getByRole('button', { name: 'Add physical solve' }).click();
+    await page.getByRole('textbox', { name: 'Time' }).fill('12.345');
+    await page.getByRole('combobox', { name: 'Penalty' }).selectOption('+2');
+    await page.getByRole('button', { name: 'Save result' }).click();
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export CSV' }).click()]);
+    expect(download.suggestedFilename()).toMatch(/^cubelab-444-results-.*\.csv$/);
+    const csv = await readFile(await download.path(), 'utf8');
+    expect(csv).toContain('"12.345","\'+2","14.345"');
+    expect(csv).toContain('"444"');
     expect(errors()).toEqual([]);
   });
 });

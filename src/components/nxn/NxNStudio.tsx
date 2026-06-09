@@ -24,6 +24,7 @@ import type { Penalty } from '../../core/timing/timerMachine';
 import { summarizeNx } from '../../core/nxn/stats';
 import { exportNxHistory, importNxHistory, mergeNxHistory } from '../../core/nxn/transfer';
 import { loadNxCurrent, saveNxCurrent } from '../../core/nxn/current';
+import { exportPracticeCsv } from '../../core/stats/csv';
 
 const FACE_ORDER = ['U', 'R', 'F', 'D', 'L', 'B'] as const;
 type ActiveTurn = { readonly token: number; readonly move: NxMove; readonly kind: 'manual' | 'undo' | 'redo'; readonly durationMs: number };
@@ -218,6 +219,17 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
     setTransferMessage(`Exported ${session.solves.length} ${event.shortLabel} results.`);
   };
 
+  const exportCsv = () => {
+    const content = exportPracticeCsv(eventId, session.solves);
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `cubelab-${eventId}-results-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTransferMessage(`Exported ${session.solves.length} rows as CSV.`);
+  };
+
   const importResults = async (file: File | undefined) => {
     if (!file) return;
     try {
@@ -281,6 +293,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
           </li>)}</ol>}
           <div className="nxn-transfer">
             <button type="button" onClick={exportResults}>Export results</button>
+            <button type="button" onClick={exportCsv}>Export CSV</button>
             <label>Import results<input type="file" accept=".json,application/json" aria-label="Import results file" onChange={(event) => { void importResults(event.target.files?.[0]); event.target.value = ''; }} /></label>
           </div>
           {transferMessage && <p className="nxn-transfer__message" role="status">{transferMessage}</p>}
