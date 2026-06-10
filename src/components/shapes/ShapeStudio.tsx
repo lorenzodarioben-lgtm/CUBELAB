@@ -18,6 +18,7 @@ import { exportShapeHistory, importShapeHistory, mergeShapeHistory } from '../..
 import { loadShapeCurrent, saveShapeCurrent } from '../../core/shapes/current';
 import { exportPracticeCsv } from '../../core/stats/csv';
 import { Button, IconButton, Spinner } from '../ui/primitives';
+import { SolveTrend } from '../ui/SolveTrend';
 import { parseManualTime } from '../../core/nxn/manualTime';
 import type { Penalty } from '../../core/timing/timerMachine';
 
@@ -267,6 +268,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
           <div><dt>Solves</dt><dd>{session?.solves.length ?? 0}</dd></div>
           <div><dt>Moves</dt><dd>{session?.moves.length ?? 0}</dd></div>
         </dl>
+        <SolveTrend solves={session?.solves ?? []} />
         <button type="button" className="nxn-history-toggle" onClick={() => setHistoryOpen((value) => !value)} aria-expanded={historyOpen}>{historyOpen ? 'Hide' : 'Show'} recent solves</button>
         <button type="button" className="nxn-history-toggle nxn-add-time" onClick={() => setManualOpen((value) => !value)} aria-expanded={manualOpen}>{manualOpen ? 'Cancel entry' : 'Add physical solve'}</button>
         {manualOpen && <form className="nxn-manual-form" onSubmit={saveManualTime}>

@@ -92,6 +92,9 @@
 .nxn-records dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin: 9px 0; }
 .nxn-records dt { color: var(--text-2); font: 12px var(--font-ui); }
 .nxn-records dd { margin: 0; color: var(--text); font: 13px var(--font-mono); font-variant-numeric: tabular-nums; }
+.solve-trend { margin: 17px 0 6px; padding: 12px 0 3px; border-top: 1px solid var(--line); color: var(--hold); }
+.solve-trend span { display: block; margin-bottom: 8px; color: var(--text-3); font: 10px var(--font-ui); }
+.solve-trend svg { display: block; width: 100%; height: 52px; overflow: visible; }
 .nxn-history-toggle {
   margin: 13px 0 0;
   padding: 4px 0;

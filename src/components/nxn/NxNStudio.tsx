@@ -17,6 +17,7 @@ import { browserStore } from '../../core/persistence/storage';
 import { Button, IconButton, Spinner } from '../ui/primitives';
 import { NxNCanvas } from './NxNCanvas';
 import { NxNNet } from './NxNNet';
+import { SolveTrend } from '../ui/SolveTrend';
 import { useServices } from '../../app/context';
 import { parseManualTime } from '../../core/nxn/manualTime';
 import { addManualNxSolve, deleteNxSolve, setNxPenalty } from '../../core/nxn/session';
@@ -269,6 +270,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
             <div><dt>Clean solves</dt><dd>{cleanCount}</dd></div>
             <div><dt>Moves</dt><dd>{session.moves.length}</dd></div>
           </dl>
+          <SolveTrend solves={session.solves} />
           <button type="button" className="nxn-history-toggle" onClick={() => setShowHistory((value) => !value)} aria-expanded={showHistory}>
             {showHistory ? 'Hide' : 'Show'} recent solves
           </button>

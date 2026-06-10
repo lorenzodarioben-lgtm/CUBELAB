@@ -124,6 +124,7 @@ test.describe('NxN practice studio', () => {
     };
     for (const seconds of ['10.00', '11.00', '12.00', '13.00', '14.00']) await add(seconds);
     await expect(page.locator('.nxn-records dl > div').filter({ hasText: 'Current ao5' }).locator('dd')).toHaveText('12.00');
+    await expect(page.getByRole('img', { name: 'Recent solve times, from 10.00 to 14.00' })).toBeVisible();
     await page.getByRole('combobox', { name: 'Puzzle' }).selectOption('666');
     for (const seconds of ['20.00', '21.00', '22.00']) await add(seconds);
     await expect(page.locator('.nxn-records dl > div').filter({ hasText: 'Current mo3' }).locator('dd')).toHaveText('21.00');
