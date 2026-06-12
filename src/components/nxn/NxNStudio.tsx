@@ -18,6 +18,7 @@ import { Button, IconButton, Spinner } from '../ui/primitives';
 import { NxNCanvas } from './NxNCanvas';
 import { NxNNet } from './NxNNet';
 import { SolveTrend } from '../ui/SolveTrend';
+import { PuzzleSoundControl } from '../ui/PuzzleSoundControl';
 import { useServices } from '../../app/context';
 import { parseManualTime } from '../../core/nxn/manualTime';
 import { addManualNxSolve, deleteNxSolve, setNxPenalty } from '../../core/nxn/session';
@@ -344,6 +345,7 @@ export function NxNStudio({ eventId }: { readonly eventId: CubeEventId }) {
           <p className="nxn-last-turn" aria-live="polite">Last turn <strong>{session.moves.length ? formatNxMove(session.moves.at(-1)!) : '—'}</strong></p>
           <p className="nxn-controls__tip">Keyboard: U R F D L B · hold Shift for inverse · N for scramble · Ctrl+Z to undo</p>
         </div>
+        <PuzzleSoundControl />
         <p className="nxn-solved-indicator" aria-live="polite">{isNxSolved(session.cube) ? 'Puzzle solved' : `${event.shortLabel} in progress`}</p>
       </section>
     </main>

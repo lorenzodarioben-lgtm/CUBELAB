@@ -230,4 +230,20 @@ test.describe('NxN practice studio', () => {
     await expect(page.locator('.nxn-history li')).toHaveCount(8);
     expect(errors()).toEqual([]);
   });
+
+  test('shared sound volume is adjustable across puzzle modes', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('/?puzzle=222');
+    const slider = page.getByRole('slider', { name: 'Turn sound volume' });
+    await expect(slider).toBeDisabled();
+    await page.getByRole('button', { name: 'Enable sound' }).click();
+    await expect(slider).toBeEnabled();
+    await slider.press('Home');
+    await expect(page.locator('.puzzle-sound output')).toHaveText('0%');
+    await slider.press('End');
+    await expect(page.locator('.puzzle-sound output')).toHaveText('100%');
+    await page.getByRole('combobox', { name: 'Puzzle' }).selectOption('skewb');
+    await expect(page.getByRole('slider', { name: 'Turn sound volume' })).toHaveValue('1');
+    expect(errors()).toEqual([]);
+  });
 });

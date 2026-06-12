@@ -218,6 +218,14 @@
 .nxn-last-turn { display: flex; justify-content: space-between; margin: 15px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--text-2); font: 11px var(--font-ui); }
 .nxn-last-turn strong { color: var(--ivory); font: 12px var(--font-mono); }
 .nxn-controls__tip { margin: 17px 0 0; color: var(--text-3); font: 11px/1.55 var(--font-ui); }
+.puzzle-sound { margin-top: 21px; padding-top: 16px; border-top: 1px solid var(--line-2); }
+.puzzle-sound__head, .puzzle-sound__row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.puzzle-sound__head { margin-bottom: 10px; color: var(--text-2); font: 11px var(--font-ui); }
+.puzzle-sound__head output { color: var(--ivory); font: 11px var(--font-mono); }
+.puzzle-sound__row input { width: 100%; accent-color: var(--ivory); cursor: pointer; }
+.puzzle-sound__row input:disabled { opacity: 0.45; cursor: not-allowed; }
+.puzzle-sound__row input:focus-visible { outline: none; box-shadow: var(--focus); }
+.puzzle-sound small { display: block; margin-top: 9px; color: var(--text-3); font: 10px/1.4 var(--font-ui); }
 .nxn-solved-indicator { margin: 20px 0 0; padding-top: 13px; border-top: 1px solid var(--line-2); color: var(--text-2); font: 11px var(--font-mono); }
 
 .shape-stage { overflow: hidden; }

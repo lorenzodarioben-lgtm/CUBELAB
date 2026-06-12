@@ -19,6 +19,7 @@ import { loadShapeCurrent, saveShapeCurrent } from '../../core/shapes/current';
 import { exportPracticeCsv } from '../../core/stats/csv';
 import { Button, IconButton, Spinner } from '../ui/primitives';
 import { SolveTrend } from '../ui/SolveTrend';
+import { PuzzleSoundControl } from '../ui/PuzzleSoundControl';
 import { parseManualTime } from '../../core/nxn/manualTime';
 import type { Penalty } from '../../core/timing/timerMachine';
 
@@ -319,6 +320,7 @@ export function ShapeStudio({ eventId }: { readonly eventId: ShapeEventId }) {
         </div>)}</div>
         <p className="nxn-controls__tip">Keyboard: {event.turns.filter((pair) => pair.key).map((pair) => pair.label).join(' ')} · Shift for inverse · N for scramble · Ctrl+Z to undo</p>
       </div>
+      <PuzzleSoundControl />
       <p className="nxn-solved-indicator" aria-live="polite">{solved ? 'Puzzle solved' : `${event.label} in progress`}</p>
     </section>
   </main>;
