@@ -87,10 +87,15 @@ as practice, so it cannot become a clean best single. Results are stored separat
 The **Find Solution** button on 2×2 verifies the returned algorithm against the physical model
 before offering to apply it; applying it never creates a timed result.
 
-The non-3×3 cube modes also accept physical-cube times. Their result rows let you correct a
-penalty or remove a solve, and JSON export/import provides a per-event backup. Pyraminx and
-Skewb, and Megaminx have shape-specific turn buttons beside their 3D views. Their turns and solved states use
-the corresponding puzzle definitions rather than cube geometry.
+Every added puzzle accepts physical-cube times as well as on-screen solves. Its history includes
+penalty corrections, deletion, a recent-times trend, best single, session mean, and the event's
+ao5/ao12 or mo3 where applicable. CSV export makes results easy to analyse; JSON export/import
+backs up the complete event history. The selected puzzle, scramble, and current position survive a
+reload without starting a fresh timed attempt. Each studio has its own volume and sound preview;
+turns use the same recorded speedcube sound as the 3×3.
+
+Pyraminx, Skewb, and Megaminx have shape-specific turn buttons beside their 3D views. Their
+turns and solved states use the corresponding puzzle definitions rather than cube geometry.
 
 These are practice scrambles generated locally by cubing.js, not official competition scrambles.
 
@@ -186,13 +191,15 @@ src/
     scramble/    random-state scrambles via cubing.js (lazy, web worker)
     solver/      centre homing + cubing.js two-phase solve + verification
     timing/      timer state machine (casual / spacebar / inspection, STM/HTM/QTM)
-    stats/       WCA-style averages and time formatting
+    stats/       WCA-style averages, time formatting, CSV export, and recent-times trends
+    nxn/         exact N×N piece model, notation, scrambles, gestures, sessions, persistence, 2×2 solver
+    shapes/      cubing.js puzzle definitions, event turns, sessions, persistence, verified solutions
     persistence/ versioned, validated localStorage (settings, history v2, cube snapshot)
     audio/       turn sounds: synthesis, event→sound planner, Web Audio player
   app/           Studio controller (vanilla Zustand store), UI store, actions, debug hooks
   components/    stage (R3F canvas, lighting, camera rig, pointer arbitration), cube (shared cubie
                  model, stickered + stickerless resources, piece SDF mesher, piece shader,
-                 gestures, hover outline), controls, panels (incl. cube-style picker), ui primitives
+                 gestures, hover outline), NxN and shape studios, controls, panels, ui primitives
   assets/        cube-style previews rendered from the real models
   hooks/         keyboard, environment (visibility, reduced motion, fullscreen)
   styles/        tokens · base · layout · components
