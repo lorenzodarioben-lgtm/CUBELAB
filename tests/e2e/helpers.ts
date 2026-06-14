@@ -95,7 +95,7 @@ export async function dragCube(page: Page, from: Point3, to: Point3, steps = 12)
  * text absorbs it so the following real tap is delivered.
  */
 export async function absorbEmulatedTap(page: Page): Promise<void> {
-  await page.locator('.brand__word').tap();
+  await page.locator('.brand').tap();
 }
 
 /** Real touch-pointer drag via CDP (pointerType "touch"). */

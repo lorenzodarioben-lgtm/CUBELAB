@@ -366,13 +366,12 @@
 }
 
 @media (max-width: 520px) {
+  .brand__word {
+    display: none;
+  }
   .brand__meta,
   .brand__rule {
     display: none;
-  }
-  .brand__word {
-    letter-spacing: 0.28em;
-    font-size: 12.5px;
   }
   .topbar__actions .icon-btn {
     width: 40px;
