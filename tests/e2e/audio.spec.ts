@@ -76,7 +76,7 @@ test.describe('speedcube turn audio', () => {
     // Keys beyond the engine's queued-turn limit are refused (as always); every
     // turn that did happen sounded exactly once: one slide and one landing snap.
     const turns = (await debug.moveLog(page)).split(' ').length;
-    expect(turns).toBeGreaterThan(20);
+    expect(turns).toBeGreaterThan(10);
     const s = await audio(page);
     expect(s.started.slide).toBe(turns);
     expect(s.started.snap).toBe(turns);

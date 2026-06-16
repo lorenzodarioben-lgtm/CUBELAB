@@ -37,6 +37,9 @@ test.describe('NxN practice studio', () => {
     await page.goto('/?puzzle=222');
     const canvas = page.locator('.nxn-canvas canvas');
     await expect(canvas).toBeVisible();
+    await expect.poll(async () => (await canvas.boundingBox())?.height ?? 0, {
+      message: 'the WebGL canvas has resized to its stage',
+    }).toBeGreaterThan(500);
     const box = (await canvas.boundingBox())!;
     const x = box.x + box.width * 0.35;
     const y = box.y + box.height * 0.5;
