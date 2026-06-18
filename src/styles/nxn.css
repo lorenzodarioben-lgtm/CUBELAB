@@ -255,4 +255,6 @@
   .puzzle-select { min-width: 65px; padding-left: 8px; }
   .nxn-stage { height: 53svh; min-height: 310px; }
   .nxn-stage__hint { bottom: 8px; width: calc(100% - 28px); }
+  .nxn-stage:not(.shape-stage) { margin-bottom: 42px; }
+  .nxn-stage:not(.shape-stage) .nxn-stage__hint { bottom: -36px; }
 }
