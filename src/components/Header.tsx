@@ -3,7 +3,8 @@ import { useServices, useStudio, useUi } from '../app/context';
 import { toggleZen } from '../app/actions';
 import { LogoMark } from './ui/Logo';
 import { IconButton, Segmented } from './ui/primitives';
-import { PUZZLE_EVENTS, puzzleEvent } from '../core/puzzleCatalog';
+import { EXPERIMENTAL_PUZZLES } from '../core/features';
+import { publicPuzzleEvents, puzzleEvent } from '../core/puzzleCatalog';
 import type { PuzzleEventId } from '../core/puzzleCatalog';
 
 export function Header({ puzzle, onPuzzleChange }: { readonly puzzle: PuzzleEventId; readonly onPuzzleChange: (puzzle: PuzzleEventId) => void }) {
@@ -42,9 +43,10 @@ export function Header({ puzzle, onPuzzleChange }: { readonly puzzle: PuzzleEven
       </a>
       <p className="topbar__tagline">The interactive cubing studio.</p>
       <nav className="topbar__actions" aria-label="Studio controls">
+        {EXPERIMENTAL_PUZZLES &&
         <select className="puzzle-select" aria-label="Puzzle" value={puzzle} onChange={(event) => onPuzzleChange(event.target.value as PuzzleEventId)}>
-          {PUZZLE_EVENTS.map((event) => <option key={event.id} value={event.id}>{event.shortLabel}</option>)}
-        </select>
+          {publicPuzzleEvents().map((event) => <option key={event.id} value={event.id}>{event.shortLabel}</option>)}
+        </select>}
         {puzzle === '333' &&
         <Segmented
           className="topbar__mode"

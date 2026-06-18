@@ -19,14 +19,23 @@ import { PlaybackPanel } from '../components/controls/PlaybackPanel';
 import { ConfirmDialog, LiveRegion, Toast } from '../components/ui/Overlays';
 import { Button } from '../components/ui/primitives';
 import { cx } from '../components/ui/cx';
-import { puzzleEvent } from '../core/puzzleCatalog';
+import { EXPERIMENTAL_PUZZLES } from '../core/features';
+import { publicPuzzleId, puzzleEvent } from '../core/puzzleCatalog';
 import type { PuzzleEventId } from '../core/puzzleCatalog';
 
 const NxNStudio = lazy(() => import('../components/nxn/NxNStudio').then((module) => ({ default: module.NxNStudio })));
 const ShapeStudio = lazy(() => import('../components/shapes/ShapeStudio').then((module) => ({ default: module.ShapeStudio })));
 
 function puzzleFromUrl(): PuzzleEventId {
-  return puzzleEvent(new URLSearchParams(window.location.search).get('puzzle') ?? '')?.id ?? '333';
+  return publicPuzzleId(new URLSearchParams(window.location.search).get('puzzle') ?? '');
+}
+
+function dropGatedPuzzleParam() {
+  if (EXPERIMENTAL_PUZZLES) return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('puzzle')) return;
+  url.searchParams.delete('puzzle');
+  window.history.replaceState(null, '', url);
 }
 
 export function App() {
@@ -37,25 +46,30 @@ export function App() {
   useEnvironmentSync(services);
 
   useEffect(() => {
-    const onPopState = () => setPuzzle(puzzleFromUrl());
+    dropGatedPuzzleParam();
+    const onPopState = () => {
+      dropGatedPuzzleParam();
+      setPuzzle(puzzleFromUrl());
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   const choosePuzzle = (id: PuzzleEventId) => {
-    if (id === puzzle) return;
+    const next = publicPuzzleId(id);
+    if (next === puzzle) return;
     const url = new URL(window.location.href);
-    if (id === '333') url.searchParams.delete('puzzle');
-    else url.searchParams.set('puzzle', id);
+    if (next === '333') url.searchParams.delete('puzzle');
+    else url.searchParams.set('puzzle', next);
     window.history.pushState(null, '', url);
-    setPuzzle(id);
+    setPuzzle(next);
   };
 
   return (
     <div className={cx('app', puzzle === '333' && zen && 'is-zen')}>
       <div className="backdrop" aria-hidden />
       <Header puzzle={puzzle} onPuzzleChange={choosePuzzle} />
-      {puzzle === '333' ? <>
+      {!EXPERIMENTAL_PUZZLES || puzzle === '333' ? <>
       <main className="studio" id="studio">
         <h1 className="sr-only">CUBELAB — interactive 3×3×3 cube studio</h1>
         <section className="studio__stage" aria-label="3D cube. Drag stickers to twist, drag the background to orbit.">
