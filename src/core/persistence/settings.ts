@@ -38,7 +38,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  cubeStyle: 'stickerless',
+  cubeStyle: 'stickered',
   turnSpeed: 'normal',
   playbackSpeed: 'normal',
   scrambleStyle: 'animate',

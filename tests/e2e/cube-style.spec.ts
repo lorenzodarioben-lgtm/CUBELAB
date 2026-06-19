@@ -34,16 +34,16 @@ async function sessionState(page: Page) {
 }
 
 test.describe('cube styles', () => {
-  test('stickerless by default; Settings switches the live cube and the choice persists', async ({ page }) => {
+  test('stickered by default; Settings switches the live cube and the choice persists', async ({ page }) => {
     const errors = trackErrors(page);
     await openStudio(page);
-    expect(await renderedStyle(page)).toBe('stickerless');
-    await chooseStyle(page, 'stickered');
+    expect(await renderedStyle(page)).toBe('stickered');
+    await chooseStyle(page, 'stickerless');
     expect(await expectRenderMatchesModel(page)).toBe(SOLVED);
     await page.reload();
-    await page.waitForFunction(() => window.__CUBELAB__?.renderedStyle?.() === 'stickered', null, { timeout: 60_000 });
+    await page.waitForFunction(() => window.__CUBELAB__?.renderedStyle?.() === 'stickerless', null, { timeout: 60_000 });
     await page.getByRole('button', { name: 'Settings' }).first().click();
-    await expect(page.getByRole('radio', { name: /Classic Stickered/ })).toBeChecked();
+    await expect(page.getByRole('radio', { name: /Premium Stickerless/ })).toBeChecked();
     await page.keyboard.press('Escape');
     expect(errors()).toEqual([]);
   });

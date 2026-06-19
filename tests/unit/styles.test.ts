@@ -27,9 +27,9 @@ import { faceletFrame } from '../../src/components/cube/pieceFrames';
 import { createPieceMaterial } from '../../src/components/cube/pieceMaterial';
 
 describe('cube style setting', () => {
-  it('defaults to Premium Stickerless for new users', () => {
-    expect(DEFAULT_SETTINGS.cubeStyle).toBe('stickerless');
-    expect(loadSettings(createMemoryStore()).cubeStyle).toBe('stickerless');
+  it('defaults to Classic Stickered for new users', () => {
+    expect(DEFAULT_SETTINGS.cubeStyle).toBe('stickered');
+    expect(loadSettings(createMemoryStore()).cubeStyle).toBe('stickered');
   });
 
   it('migrates settings saved before styles existed without touching anything else', () => {
@@ -37,7 +37,7 @@ describe('cube style setting', () => {
     delete legacy.cubeStyle;
     const store = createMemoryStore({ [STORAGE_KEYS.settings]: JSON.stringify({ v: 1, data: legacy }) });
     const loaded = loadSettings(store);
-    expect(loaded.cubeStyle).toBe('stickerless');
+    expect(loaded.cubeStyle).toBe('stickered');
     expect(loaded.finish).toBe('matte');
     expect(loaded.turnSpeed).toBe('snappy');
     expect(loaded.sound).toBe(true);
@@ -45,13 +45,13 @@ describe('cube style setting', () => {
 
   it('keeps an explicit choice and survives a save/load round trip', () => {
     const store = createMemoryStore();
-    saveSettings(store, { ...DEFAULT_SETTINGS, cubeStyle: 'stickered' });
-    expect(loadSettings(store).cubeStyle).toBe('stickered');
+    saveSettings(store, { ...DEFAULT_SETTINGS, cubeStyle: 'stickerless' });
+    expect(loadSettings(store).cubeStyle).toBe('stickerless');
   });
 
   it('falls back safely on corrupted or unknown values', () => {
     for (const bad of ['STICKERED', 'glass', 42, null, { style: 'stickered' }]) {
-      expect(sanitizeSettings({ cubeStyle: bad }).cubeStyle).toBe('stickerless');
+      expect(sanitizeSettings({ cubeStyle: bad }).cubeStyle).toBe('stickered');
     }
   });
 });
