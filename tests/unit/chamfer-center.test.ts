@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { buildStickerlessChamferGeometry, chamferOutline, sampleChamferSurface, STICKERLESS_CHAMFER_NORMALS, STICKERLESS_CHAMFER_SURFACE as profile } from '../../src/components/cube/stickerlessChamferGeometry';
 import { buildStickerlessCenterGeometry, CONTINUOUS_CENTRE_NORMALS } from '../../src/components/cube/stickerlessCenterGeometry';
@@ -49,7 +49,7 @@ describe('approved moulded chamfer centre', () => {
     }
   });
 
-  for (const detail of [30, 40]) it(`has finite normals and a closed, outward, nondegenerate mesh at detail ${detail}`, () => {
+  for (const detail of [24, 30, 40]) it(`has finite normals and a closed, outward, nondegenerate mesh at detail ${detail}`, () => {
     const g = buildStickerlessChamferGeometry(detail), p = g.getAttribute('position'), n = g.getAttribute('normal'), ids = g.index!;
     const welded: number[] = [], positions = new Map<string, number>(), edges = new Map<string, { count: number; balance: number }>();
     for (let i = 0; i < p.count; i++) {
@@ -78,22 +78,59 @@ describe('approved moulded chamfer centre', () => {
 });
 
 describe('production chamfer routing', () => {
-  for (const tier of ['high', 'medium'] as const) it(`uses approved centre geometry and normals on Gloss ${tier}`, () => {
+  for (const tier of ['high', 'medium', 'low'] as const) it(`uses approved centre geometry and normals on Gloss ${tier}`, () => {
     const r = createStickerlessResources(tier, 'gloss'), expected = buildStickerlessChamferGeometry(PIECE_DETAIL[tier]);
-    expect(hash(r.pieces.center.getAttribute('position').array)).toBe(hash(expected.getAttribute('position').array));
+    for (const key of ['position', 'normal']) expect(hash(r.pieces.center.getAttribute(key).array)).toBe(hash(expected.getAttribute(key).array));
+    expect(hash(r.pieces.center.index!.array)).toBe(hash(expected.index!.array));
     const shader = compile(r.materials[centreId]!);
-    expect(shader.fragmentShader).toContain(STICKERLESS_CHAMFER_NORMALS);
-    expect(shader.fragmentShader).toContain('plasticWindowVisibility');
-    expect((shader.uniforms.uCentreSurface!.value as THREE.Vector4).toArray()).toEqual([.420, .511, .438, .37]);
+    if (tier === 'low') {
+      // Low uses the approved mesh normals, without either analytic normal hook.
+      expect(r.materials[centreId]!.type).toBe('MeshStandardMaterial');
+      expect(shader.fragmentShader).not.toContain('pieceAnalyticRimNormal');
+      expect(shader.fragmentShader).not.toContain('plasticWindowVisibility');
+      expect(shader.uniforms.uCentreSurface).toBeUndefined();
+    } else {
+      expect(shader.fragmentShader).toContain(STICKERLESS_CHAMFER_NORMALS);
+      expect(shader.fragmentShader).toContain('plasticWindowVisibility');
+      expect((shader.uniforms.uCentreSurface!.value as THREE.Vector4).toArray()).toEqual([.420, .511, .438, .37]);
+    }
     expected.dispose(); r.dispose();
   });
 
-  for (const [tier, finish] of [['high', 'matte'], ['medium', 'matte'], ['low', 'matte'], ['low', 'gloss']] as const) it(`retains the previous centre and shader on ${tier} ${finish}`, () => {
+  for (const [tier, finish] of [['high', 'matte'], ['medium', 'matte'], ['low', 'matte']] as const) it(`retains the previous centre and shader on ${tier} ${finish}`, () => {
     const r = createStickerlessResources(tier, finish), old = buildStickerlessCenterGeometry(PIECE_DETAIL[tier]);
     for (const key of ['position', 'normal']) expect(hash(r.pieces.center.getAttribute(key).array)).toBe(hash(old.getAttribute(key).array));
     const shader = compile(r.materials[centreId]!);
     expect(shader.fragmentShader).not.toContain(STICKERLESS_CHAMFER_NORMALS);
     if (tier !== 'low') expect(shader.fragmentShader).toContain(CONTINUOUS_CENTRE_NORMALS);
     old.dispose(); r.dispose();
+  });
+
+  it('releases each tier centre only after its last Gloss owner, independently of Matte', () => {
+    // Adjacent resource sets can overlap while the previous shaders finish warming.
+    const tiers = ['high', 'medium', 'low', 'high'] as const;
+    const sets = tiers.map(tier => createStickerlessResources(tier, 'gloss'));
+    const matte = createStickerlessResources('low', 'matte');
+    expect(sets[0]!.pieces.center).toBe(sets[3]!.pieces.center);
+    expect(sets[2]!.pieces.center).not.toBe(matte.pieces.center);
+    expect(sets[2]!.pieces.corner).toBe(matte.pieces.corner);
+    const centers = [...new Set(sets.map(r => r.pieces.center))];
+    const released = centers.map(g => { const fn = vi.fn(); g.addEventListener('dispose', fn); return fn; });
+    const bodyReleased = vi.fn(); matte.pieces.corner.addEventListener('dispose', bodyReleased);
+    try {
+      sets[0]!.dispose(); expect(released[0]).not.toHaveBeenCalled();
+      for (const r of sets.slice(1)) { r.dispose(); r.dispose(); }
+      for (const fn of released) expect(fn).toHaveBeenCalledTimes(1);
+      expect(bodyReleased).not.toHaveBeenCalled();
+      matte.dispose(); expect(bodyReleased).toHaveBeenCalledTimes(1);
+      // Cached CPU geometry can be uploaded again on Low -> High -> Low.
+      const low = createStickerlessResources('low', 'gloss');
+      expect(low.pieces.center).toBe(sets[2]!.pieces.center);
+      low.dispose(); expect(released[2]).toHaveBeenCalledTimes(2);
+    } finally {
+      for (const r of sets) r.dispose(); matte.dispose();
+      centers.forEach((g, i) => g.removeEventListener('dispose', released[i]!));
+      matte.pieces.corner.removeEventListener('dispose', bodyReleased);
+    }
   });
 });

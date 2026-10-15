@@ -53,7 +53,8 @@ export function createStickerlessResources(tier: RenderTier, finish: Finish): St
   const gloss = finish === 'gloss';
   const hybrid = gloss && tier !== 'low';
   const sharedPieces = acquirePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
-  const pieces = hybrid ? { ...sharedPieces, center: acquireStickerlessChamferGeometry(detail) } : sharedPieces;
+  // Gloss keeps its approved shape at every resolution; Hybrid only controls shading.
+  const pieces = gloss ? { ...sharedPieces, center: acquireStickerlessChamferGeometry(detail) } : sharedPieces;
   const palette = Object.fromEntries(FACES.map((face) => [face, new THREE.Color(FACE_COLORS[face].hex)])) as Record<Face, THREE.Color>;
   // How far the turn in flight has opened the cube (shared by every piece).
   const exposure = { value: 0 };
@@ -123,7 +124,7 @@ export function createStickerlessResources(tier: RenderTier, finish: Finish): St
       if (disposed) return;
       disposed = true;
       releasePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
-      if (hybrid) releaseStickerlessChamferGeometry(detail);
+      if (gloss) releaseStickerlessChamferGeometry(detail);
       materials.forEach((m) => m.dispose());
       core.dispose();
       coreMaterial.dispose();
