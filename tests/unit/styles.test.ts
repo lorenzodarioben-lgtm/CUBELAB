@@ -252,7 +252,10 @@ describe('Premium Stickerless realism', () => {
 
   it('stickerless pieces get the parting line, track, waviness and honeycomb; the stickered bodies only their honeycomb', () => {
     const high = createStickerlessResources('high', 'gloss');
-    for (const m of high.materials) expect(definesOf(m)).toEqual(['PIECE_CAP_SEAM', 'PIECE_HONEYCOMB', 'PIECE_TRACK', 'PIECE_WAVY']);
+    high.materials.forEach((m, id) => expect(definesOf(m)).toEqual([
+      'PIECE_CAP_SEAM', ...(CUBIE_DEFS[id]!.kind === 'center' ? ['PIECE_CONTINUOUS_CENTRE'] : []),
+      'PIECE_HONEYCOMB', 'PIECE_RIM_NORMALS', 'PIECE_TRACK', 'PIECE_WAVY',
+    ]));
     // Low tier keeps the cheap parting line only (bump details need the physical tiers).
     const low = createStickerlessResources('low', 'gloss');
     for (const m of low.materials) expect(definesOf(m)).toEqual(['PIECE_CAP_SEAM']);
@@ -263,6 +266,38 @@ describe('Premium Stickerless realism', () => {
       expect((m as THREE.MeshStandardMaterial).envMapIntensity).toBe(1);
     }
     for (const r of [high, low, stickered]) r.dispose();
+  });
+
+  it('isolates rim-normal shaders and uniforms to opted-in physical materials', () => {
+    const slots = [new THREE.Color('#ffffff'), null, null, null, null, null];
+    const look = { tier: 'high', finish: 'gloss' } as const;
+    const rimNormals = { home: CANONICAL_HOME.center, shape: STICKERLESS_SHAPE };
+    const legacy = createPieceMaterial(slots, look, 1);
+    const corrected = createPieceMaterial(slots, look, 1, { rimNormals });
+    const low = createPieceMaterial(slots, { ...look, tier: 'low' }, 1, { rimNormals });
+    const compile = (m: THREE.Material) => {
+      const shader = {
+        vertexShader: THREE.ShaderLib.physical.vertexShader,
+        fragmentShader: THREE.ShaderLib.physical.fragmentShader,
+        uniforms: {} as Record<string, { value: unknown }>,
+      };
+      m.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
+      return shader;
+    };
+    const oldShader = compile(legacy);
+    const newShader = compile(corrected);
+    expect(legacy.customProgramCacheKey()).toBe('cubelab-piece-physical');
+    expect(corrected.customProgramCacheKey()).not.toBe(legacy.customProgramCacheKey());
+    expect(newShader.vertexShader).toBe(oldShader.vertexShader);
+    expect(oldShader.fragmentShader).not.toContain('pieceAnalyticRimNormal');
+    expect(oldShader.uniforms).not.toHaveProperty('uRimProfile');
+    expect(compile(low).fragmentShader).not.toContain('pieceAnalyticRimNormal');
+    expect((newShader.uniforms.uRimProfile!.value as THREE.Vector4).toArray()).toEqual([
+      PIECE_HALF, STICKERLESS_SHAPE.rimRadius, STICKERLESS_SHAPE.innerRadius.center, STICKERLESS_SHAPE.pillow,
+    ]);
+    expect(newShader.fragmentShader).toContain('normalMatrix * pieceAnalyticRimNormal');
+    expect(newShader.fragmentShader).toContain('nonPerturbedNormal = normal;');
+    for (const m of [legacy, corrected, low]) m.dispose();
   });
 
   it('every piece has its own, stable finish (tiny deterministic variation)', () => {

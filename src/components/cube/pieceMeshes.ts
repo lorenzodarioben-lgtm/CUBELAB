@@ -13,18 +13,22 @@ import type { PieceShape } from './pieceGeometry';
 export type PieceSet = Readonly<Record<CubieKind, THREE.BufferGeometry>>;
 
 const cache = new Map<string, { set: PieceSet; users: number }>();
-const keyOf = (shape: PieceShape, detail: number) => `${shape.id}@${detail}`;
+export interface CenterMeshOverride {
+  readonly id: string;
+  readonly build: (detail: number) => THREE.BufferGeometry;
+}
+const keyOf = (shape: PieceShape, detail: number, center?: CenterMeshOverride) => `${shape.id}@${detail}${center ? `:${center.id}` : ''}`;
 
 /** Borrows the canonical meshes of a design at a resolution (built on first use). */
-export function acquirePieceMeshes(shape: PieceShape, detail: number): PieceSet {
-  const key = keyOf(shape, detail);
+export function acquirePieceMeshes(shape: PieceShape, detail: number, center?: CenterMeshOverride): PieceSet {
+  const key = keyOf(shape, detail, center);
   let entry = cache.get(key);
   if (!entry) {
     entry = {
       set: {
         corner: buildPieceGeometry(CANONICAL_HOME.corner, detail, shape),
         edge: buildPieceGeometry(CANONICAL_HOME.edge, detail, shape),
-        center: buildPieceGeometry(CANONICAL_HOME.center, detail, shape),
+        center: center ? center.build(detail) : buildPieceGeometry(CANONICAL_HOME.center, detail, shape),
       },
       users: 0,
     };
@@ -35,8 +39,8 @@ export function acquirePieceMeshes(shape: PieceShape, detail: number): PieceSet 
 }
 
 /** Returns borrowed meshes; the last user frees their GPU buffers (CPU data stays cached). */
-export function releasePieceMeshes(shape: PieceShape, detail: number): void {
-  const entry = cache.get(keyOf(shape, detail));
+export function releasePieceMeshes(shape: PieceShape, detail: number, center?: CenterMeshOverride): void {
+  const entry = cache.get(keyOf(shape, detail, center));
   if (!entry) return;
   entry.users = Math.max(0, entry.users - 1);
   if (entry.users === 0) Object.values(entry.set).forEach((g) => g.dispose());

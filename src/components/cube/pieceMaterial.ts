@@ -33,8 +33,10 @@
  *    studio reflections bend a little differently on every piece.
  */
 import * as THREE from 'three';
+import { CONTINUOUS_CENTRE_NORMALS, STICKERLESS_CENTRE_SURFACE } from './stickerlessCenterGeometry';
 import type { Finish } from '../../core/persistence/settings';
-import { CAP_DEPTH, PIECE_HALF } from './pieceGeometry';
+import { CAP_DEPTH, PIECE_HALF, pieceKind } from './pieceGeometry';
+import type { PieceShape } from './pieceGeometry';
 import type { RenderTier } from './renderTier';
 
 
@@ -228,6 +230,77 @@ normal = pieceBump(-vViewPosition, normal, vec2(dFdx(pieceBumpHeight), dFdy(piec
 #endif
 `;
 
+/**
+ * The projected mesh can span a curved rim and its flat face with one triangle.
+ * Interpolating their unit normals makes the narrow coating highlight scallop.
+ * Evaluate that rim's existing SDF gradient instead; keep the original normals
+ * at multi-colour joins and blend smoothly into the flat and internal surfaces.
+ * Only the explicitly opted-in stickerless physical materials use these hooks.
+ */
+const RIM_DECLARATIONS = /* glsl */ `
+uniform mat3 normalMatrix;
+uniform vec3 uRimHome;
+uniform vec4 uRimProfile;
+
+// Gradient of the same rounded face extrusion and pillow used by the mesher.
+vec3 pieceAnalyticRimNormal(vec3 p, int face) {
+  int axis = face / 2;
+  int b = (axis + 1) % 3;
+  int c = (axis + 2) % 3;
+  float signFace = (face - axis * 2) == 0 ? 1.0 : -1.0;
+  float halfWidth = uRimProfile.x;
+  float rim = uRimProfile.y;
+  vec2 uv = vec2(p[b], p[c]);
+  vec2 quadrant = mix(vec2(-1.0), vec2(1.0), step(vec2(0.0), uv));
+  vec2 corner = abs(vec2(uRimHome[b], uRimHome[c]) + quadrant * 0.5);
+  float inner = (corner.x < 0.501 && corner.y < 0.501) ? 1.0 : 0.0;
+  float radius = mix(rim, uRimProfile.z, inner);
+  vec2 q = abs(uv) - halfWidth + radius;
+  vec2 positive = max(q, 0.0);
+  float len = length(positive);
+  float outline = min(max(q.x, q.y), 0.0) + len - radius;
+  vec2 outlineGradient = len > 1e-6
+    ? positive / len * quadrant
+    : (q.x > q.y ? vec2(quadrant.x, 0.0) : vec2(0.0, quadrant.y));
+  float height = signFace * p[axis] - halfWidth;
+  vec2 w = vec2(outline, height) + rim;
+  vec2 wp = max(w, 0.0);
+  float wl = length(wp);
+  vec2 weight = wl > 1e-6 ? wp / wl : (w.x > w.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0));
+  vec3 gradient = vec3(0.0);
+  gradient[b] = weight.x * outlineGradient.x;
+  gradient[c] = weight.x * outlineGradient.y;
+  gradient[axis] = weight.y * signFace;
+  vec2 profile = 1.0 - pow(min(abs(uv) / halfWidth, 1.0), vec2(2.0));
+  vec2 profileGradient = -2.0 * uv / (halfWidth * halfWidth) * (1.0 - step(vec2(halfWidth), abs(uv)));
+  float t = clamp(-height / ${CAP_DEPTH.toFixed(4)}, 0.0, 1.0);
+  float fade = 1.0 - t * t * (3.0 - 2.0 * t);
+  float fadeGradient = height < 0.0 && height > -${CAP_DEPTH.toFixed(4)} ? 6.0 * t * (1.0 - t) / ${CAP_DEPTH.toFixed(4)} : 0.0;
+  gradient[b] -= uRimProfile.w * profileGradient.x * profile.y * fade;
+  gradient[c] -= uRimProfile.w * profileGradient.y * profile.x * fade;
+  gradient[axis] -= uRimProfile.w * profile.x * profile.y * fadeGradient * signFace;
+  return normalize(gradient);
+}
+`;
+
+const RIM_NORMAL = /* glsl */ `
+#include <normal_fragment_begin>
+float rimWeight = smoothstep(0.025, 0.10, pieceHidden) * (1.0 - smoothstep(0.90, 0.99, pieceHidden)) * pieceCap * (1.0 - pieceSecondCap);
+if (rimWeight > 0.0) {
+  int rimFace = 0;
+  float rimBest = -10.0;
+  for (int i = 0; i < 6; i++) {
+    if (uFaceOn[i] > 0.5 && pieceHeights[i] > rimBest) {
+      rimBest = pieceHeights[i];
+      rimFace = i;
+    }
+  }
+  vec3 rimNormal = normalize(normalMatrix * pieceAnalyticRimNormal(vPiecePos, rimFace)) * faceDirection;
+  normal = normalize(mix(normal, rimNormal, rimWeight));
+  nonPerturbedNormal = normal;
+}
+`;
+
 const ROUGHNESS = /* glsl */ `
 #include <roughnessmap_fragment>
 roughnessFactor = mix(uBlackRoughness, roughnessFactor, pieceCap) * (0.9 + 0.2 * pieceNoise(vPiecePos * 5.0 + uSeed));
@@ -304,6 +377,13 @@ export interface PieceMaterialOptions {
   readonly waviness?: number;
   /** Deterministic per-piece finish variation: relative roughness and coat-roughness offsets. */
   readonly variation?: { readonly roughness: number; readonly coat: number };
+  /** Analytical shading normals for the design's single-cap rounded rims. */
+  readonly rimNormals?: {
+    readonly home: readonly [number, number, number];
+    readonly shape: PieceShape;
+    /** The opt-in Stickerless centre loft, using its true geometric gradient. */
+    readonly continuousCentre?: boolean;
+  };
 }
 
 /**
@@ -323,6 +403,8 @@ export function createPieceMaterial(
   const track = options.track !== undefined && physical;
   const wavy = (options.waviness ?? 0) > 0 && physical;
   const capSeam = options.capSeam === true;
+  const rimNormals = physical && options.rimNormals !== undefined;
+  const continuousCentre = rimNormals && options.rimNormals!.continuousCentre === true && pieceKind(options.rimNormals!.home) === 'center';
   const uniforms = {
     uFaceColor: { value: slotColors.map((c) => (c ? c.clone() : BLACK.clone())) },
     uFaceOn: { value: slotColors.map((c) => (c ? 1 : 0)) },
@@ -338,7 +420,24 @@ export function createPieceMaterial(
     uExposure: options.exposure ?? { value: 0 },
     ...(track ? { uPieceHome: { value: new THREE.Vector3(...options.track!) } } : {}),
     ...(wavy ? { uWavy: { value: options.waviness! } } : {}),
+    ...(rimNormals
+      ? {
+          uRimHome: { value: new THREE.Vector3(...options.rimNormals!.home) },
+          uRimProfile: {
+            value: new THREE.Vector4(
+              PIECE_HALF,
+              options.rimNormals!.shape.rimRadius,
+              options.rimNormals!.shape.innerRadius[pieceKind(options.rimNormals!.home)],
+              options.rimNormals!.shape.pillow,
+            ),
+          },
+        }
+      : {}),
   };
+  const centre = STICKERLESS_CENTRE_SURFACE;
+  if (continuousCentre) Object.assign(uniforms, {
+    uCentreSurface: { value: new THREE.Vector4(centre.plateauRadius, centre.top, centre.side, centre.cornerRadius) },
+  });
   const common = { color: '#ffffff', roughness: options.capRoughness ?? (gloss ? 0.2 : 0.42), metalness: 0 };
   const material = physical
     ? new THREE.MeshPhysicalMaterial({
@@ -354,6 +453,8 @@ export function createPieceMaterial(
   if (track) defines.PIECE_TRACK = '';
   if (wavy) defines.PIECE_WAVY = '';
   if (capSeam) defines.PIECE_CAP_SEAM = '';
+  if (rimNormals) defines.PIECE_RIM_NORMALS = '';
+  if (continuousCentre) defines.PIECE_CONTINUOUS_CENTRE = '';
   if (Object.keys(defines).length > 0) material.defines = { ...material.defines, ...defines };
   if (options.variation) {
     material.roughness *= 1 + options.variation.roughness;
@@ -372,6 +473,11 @@ export function createPieceMaterial(
       .replace('#include <normal_fragment_maps>', BUMP)
       .replace('#include <lights_physical_fragment>', COAT)
       .replace('#include <aomap_fragment>', CAVITY);
+    if (rimNormals) {
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>\n${continuousCentre ? CONTINUOUS_CENTRE_NORMALS : RIM_DECLARATIONS}`)
+        .replace('#include <normal_fragment_begin>', RIM_NORMAL);
+    }
   };
   const variant = Object.keys(defines).sort().join('+');
   material.customProgramCacheKey = () => `cubelab-piece-${physical ? 'physical' : 'standard'}${variant ? `-${variant}` : ''}`;

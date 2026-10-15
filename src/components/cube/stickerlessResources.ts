@@ -4,9 +4,9 @@
  * `pieceMaterial.ts`. Piece meshes come from the shared, reference-counted
  * cache in `pieceMeshes.ts`.
  *
- * The plastic is a UV-coated ABS: a broad satin sheen under a sharp, clear
- * coat with stronger studio reflections, so the domed faces carry soft
- * highlight bands; very gentle moulding waviness and a deterministic per-piece
+ * The plastic has a broad satin base under a restrained clear coat, so the
+ * moulded rims catch crisp reflections without a prominent second sheen.
+ * Very gentle moulding waviness and a deterministic per-piece
  * finish variation keep neighbouring pieces from reflecting identically. The
  * mechanism is charcoal plastic with a moulded honeycomb and a ring track,
  * the parting line where each coloured shell meets the black body is drawn,
@@ -25,6 +25,7 @@ import { prng } from '../../core/audio/synth';
 import { acquirePieceMeshes, releasePieceMeshes } from './pieceMeshes';
 import type { PieceSet } from './pieceMeshes';
 import type { RenderTier } from './renderTier';
+import { STICKERLESS_CENTRE_MESH } from './stickerlessCenterGeometry';
 
 /** Distance from a cubie centre to the middle of its outer face (the top of the pillow). */
 export const STICKERLESS_SURFACE = PIECE_HALF + PILLOW;
@@ -47,7 +48,7 @@ export interface StickerlessResources {
 
 export function createStickerlessResources(tier: RenderTier, finish: Finish): StickerlessResources {
   const detail = PIECE_DETAIL[tier];
-  const pieces = acquirePieceMeshes(STICKERLESS_SHAPE, detail);
+  const pieces = acquirePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
   const gloss = finish === 'gloss';
   const palette = Object.fromEntries(FACES.map((face) => [face, new THREE.Color(FACE_COLORS[face].hex)])) as Record<Face, THREE.Color>;
   // How far the turn in flight has opened the cube (shared by every piece).
@@ -61,11 +62,13 @@ export function createStickerlessResources(tier: RenderTier, finish: Finish): St
       (id * 7.31) % 13,
       {
         capRoughness: gloss ? 0.26 : 0.42,
-        capCoat: gloss ? 0.78 : 0.12,
+        capCoat: gloss ? 0.35 : 0.12,
         capCoatRoughness: gloss ? 0.07 : 0.4,
         // Applies with the stickerless reflection map (three.js uses the scene's
         // own intensity for materials that fall back to the scene environment).
         envIntensity: gloss ? 1 : 0.9,
+        seamRange: [0.35, 0.9],
+        rimNormals: { home: CANONICAL_HOME[frame.kind], shape: STICKERLESS_SHAPE, continuousCentre: frame.kind === 'center' },
         interiorColor: '#17171a',
         honeycomb: true,
         track: CANONICAL_HOME[frame.kind],
@@ -95,7 +98,7 @@ export function createStickerlessResources(tier: RenderTier, finish: Finish): St
     dispose() {
       if (disposed) return;
       disposed = true;
-      releasePieceMeshes(STICKERLESS_SHAPE, detail);
+      releasePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
       materials.forEach((m) => m.dispose());
       core.dispose();
       coreMaterial.dispose();
