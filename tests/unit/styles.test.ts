@@ -216,15 +216,17 @@ describe('GPU resource ownership', () => {
   it('stickerless: piece meshes are shared and freed only when the last user lets go', () => {
     const first = createStickerlessResources('medium', 'gloss');
     const second = createStickerlessResources('medium', 'matte');
-    // Same tier → the very same canonical meshes (no second ~80 ms build).
+    // Matte shares the canonical bodies; Gloss owns its approved replacement centre separately.
     expect(second.pieces.corner).toBe(first.pieces.corner);
+    expect(second.pieces.edge).toBe(first.pieces.edge);
+    expect(second.pieces.center).not.toBe(first.pieces.center);
     const disposedPieces = watchDisposals(Object.values(first.pieces));
     const disposedMaterials = watchDisposals([...first.materials, first.core, first.coreMaterial]);
     first.dispose();
     expect(disposedMaterials()).toBe(first.materials.length + 2);
-    expect(disposedPieces()).toBe(0); // still in use by `second`
+    expect(disposedPieces()).toBe(1); // only the Gloss centre; shared bodies remain in use by Matte
     first.dispose(); // idempotent: must not release twice
-    expect(disposedPieces()).toBe(0);
+    expect(disposedPieces()).toBe(1);
     second.dispose();
     expect(disposedPieces()).toBe(3);
     // A later set reuses the cached CPU meshes; they simply upload again.

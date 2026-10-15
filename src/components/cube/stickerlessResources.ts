@@ -25,7 +25,8 @@ import { prng } from '../../core/audio/synth';
 import { acquirePieceMeshes, releasePieceMeshes } from './pieceMeshes';
 import type { PieceSet } from './pieceMeshes';
 import type { RenderTier } from './renderTier';
-import { STICKERLESS_CENTRE_MESH } from './stickerlessCenterGeometry';
+import { CONTINUOUS_CENTRE_NORMALS, STICKERLESS_CENTRE_MESH } from './stickerlessCenterGeometry';
+import { acquireStickerlessChamferGeometry, releaseStickerlessChamferGeometry, STICKERLESS_CHAMFER_NORMALS, STICKERLESS_CHAMFER_SURFACE } from './stickerlessChamferGeometry';
 import { applyStrongHybrid } from './stickerlessHybrid';
 
 /** Distance from a cubie centre to the middle of its outer face (the top of the pillow). */
@@ -49,8 +50,10 @@ export interface StickerlessResources {
 
 export function createStickerlessResources(tier: RenderTier, finish: Finish): StickerlessResources {
   const detail = PIECE_DETAIL[tier];
-  const pieces = acquirePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
   const gloss = finish === 'gloss';
+  const hybrid = gloss && tier !== 'low';
+  const sharedPieces = acquirePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
+  const pieces = hybrid ? { ...sharedPieces, center: acquireStickerlessChamferGeometry(detail) } : sharedPieces;
   const palette = Object.fromEntries(FACES.map((face) => [face, new THREE.Color(FACE_COLORS[face].hex)])) as Record<Face, THREE.Color>;
   // How far the turn in flight has opened the cube (shared by every piece).
   const exposure = { value: 0 };
@@ -85,9 +88,18 @@ export function createStickerlessResources(tier: RenderTier, finish: Finish): St
   const core = new THREE.SphereGeometry(0.5, tier === 'low' ? 16 : 32, tier === 'low' ? 12 : 24);
   const coreMaterial = new THREE.MeshStandardMaterial({ color: '#050506', roughness: 0.7, metalness: 0 });
   // Matte and Low retain their approved material and illumination paths.
-  const hybrid = gloss && tier !== 'low';
   const diffuseEnvironment = { value: null as THREE.Texture | null };
   if (hybrid) {
+    for (const [id, frame] of PIECE_FRAMES.entries()) if (frame.kind === 'center') {
+      const material = materials[id]!, compile = material.onBeforeCompile, key = material.customProgramCacheKey();
+      material.onBeforeCompile = (shader, renderer) => {
+        compile.call(material, shader, renderer);
+        shader.fragmentShader = shader.fragmentShader.replace(CONTINUOUS_CENTRE_NORMALS, STICKERLESS_CHAMFER_NORMALS);
+        const p = STICKERLESS_CHAMFER_SURFACE;
+        (shader.uniforms.uCentreSurface!.value as THREE.Vector4).set(p.plateauRadius, p.top, p.side, p.cornerRadius);
+      };
+      material.customProgramCacheKey = () => key + '-chamfer-centre-v1';
+    }
     for (const material of materials) applyStrongHybrid(material as THREE.MeshStandardMaterial, diffuseEnvironment);
     applyStrongHybrid(coreMaterial, diffuseEnvironment, false);
   }
@@ -111,6 +123,7 @@ export function createStickerlessResources(tier: RenderTier, finish: Finish): St
       if (disposed) return;
       disposed = true;
       releasePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
+      if (hybrid) releaseStickerlessChamferGeometry(detail);
       materials.forEach((m) => m.dispose());
       core.dispose();
       coreMaterial.dispose();
