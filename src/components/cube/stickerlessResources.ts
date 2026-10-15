@@ -51,7 +51,7 @@ export interface StickerlessResources {
 export function createStickerlessResources(tier: RenderTier, finish: Finish): StickerlessResources {
   const detail = PIECE_DETAIL[tier];
   const gloss = finish === 'gloss';
-  const hybrid = gloss && tier !== 'low';
+  const hybrid = gloss;
   const sharedPieces = acquirePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
   // Gloss keeps its approved shape at every resolution; Hybrid only controls shading.
   const pieces = gloss ? { ...sharedPieces, center: acquireStickerlessChamferGeometry(detail) } : sharedPieces;
@@ -66,6 +66,7 @@ export function createStickerlessResources(tier: RenderTier, finish: Finish): St
       { tier, finish },
       (id * 7.31) % 13,
       {
+        physicalFinish: gloss,
         capRoughness: gloss ? 0.26 : 0.42,
         capCoat: gloss ? 0.35 : 0.12,
         capCoatRoughness: gloss ? 0.07 : 0.4,
@@ -88,10 +89,10 @@ export function createStickerlessResources(tier: RenderTier, finish: Finish): St
   // The mechanism's core: fills the central cell, glimpsed only between layers mid-turn.
   const core = new THREE.SphereGeometry(0.5, tier === 'low' ? 16 : 32, tier === 'low' ? 12 : 24);
   const coreMaterial = new THREE.MeshStandardMaterial({ color: '#050506', roughness: 0.7, metalness: 0 });
-  // Matte and Low retain their approved material and illumination paths.
+  // Strong Hybrid is the Gloss identity; tier controls detail, not illumination.
   const diffuseEnvironment = { value: null as THREE.Texture | null };
   if (hybrid) {
-    for (const [id, frame] of PIECE_FRAMES.entries()) if (frame.kind === 'center') {
+    for (const [id, frame] of PIECE_FRAMES.entries()) if (tier !== 'low' && frame.kind === 'center') {
       const material = materials[id]!, compile = material.onBeforeCompile, key = material.customProgramCacheKey();
       material.onBeforeCompile = (shader, renderer) => {
         compile.call(material, shader, renderer);

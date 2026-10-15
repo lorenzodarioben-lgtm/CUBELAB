@@ -12,9 +12,10 @@ function compile(material: THREE.Material) {
 }
 
 describe('production Strong Hybrid', () => {
-  for (const tier of ['high', 'medium'] as const) it(`uses the reviewed shell response and illumination at ${tier}`, () => {
+  for (const tier of ['high', 'medium', 'low'] as const) it(`uses the reviewed shell response and illumination at ${tier}`, () => {
     const resources = createStickerlessResources(tier, 'gloss');
     for (const material of resources.materials as THREE.MeshPhysicalMaterial[]) {
+      expect(material.type).toBe('MeshPhysicalMaterial');
       expect(material.roughness).toBeGreaterThanOrEqual(0.13 * 0.93);
       expect(material.roughness).toBeLessThanOrEqual(0.13 * 1.07);
       expect(material.clearcoat).toBe(0.14);
@@ -24,7 +25,10 @@ describe('production Strong Hybrid', () => {
       expect(material.ior).toBe(1.5);
       expect(material.metalness).toBe(0);
       const shader = compile(material);
-      expect(shader.fragmentShader).toContain('pieceAnalyticRimNormal');
+      if (tier === 'low') {
+        expect(shader.fragmentShader).not.toContain('pieceAnalyticRimNormal');
+        expect(Object.keys(material.defines ?? {}).filter(key => key.startsWith('PIECE_'))).toEqual(['PIECE_CAP_SEAM']);
+      } else expect(shader.fragmentShader).toContain('pieceAnalyticRimNormal');
       expect(shader.fragmentShader).toContain('textureCubeUV( uPlasticDiffuseEnvironment, envMapRotation * worldNormal');
       expect(shader.fragmentShader).toContain('mix(plasticRoomRadiance, envMapColor.rgb, plasticWindowVisibility)');
       expect(shader.fragmentShader).toContain('reflectedLight.directSpecular = plasticSavedDirectSpecular;');
@@ -35,8 +39,8 @@ describe('production Strong Hybrid', () => {
     resources.dispose();
   });
 
-  it('updates both environment bindings without replacing materials or recompiling shaders', () => {
-    const resources = createStickerlessResources('high', 'gloss');
+  for (const tier of ['high', 'medium', 'low'] as const) it(`updates ${tier} environment bindings without replacing materials or recompiling shaders`, () => {
+    const resources = createStickerlessResources(tier, 'gloss');
     const material = resources.materials[0] as THREE.MeshPhysicalMaterial, shader = compile(material), key = material.customProgramCacheKey();
     const specular = new THREE.Texture(), diffuse = new THREE.Texture();
     resources.setEnvironment(specular, diffuse);
@@ -51,7 +55,7 @@ describe('production Strong Hybrid', () => {
     resources.dispose(); specular.dispose(); diffuse.dispose();
   });
 
-  it('leaves Matte, Low and Classic outside the hybrid shader and material paths', () => {
+  it('leaves Matte and Classic outside the hybrid shader and material paths', () => {
     for (const tier of ['high', 'medium', 'low'] as const) {
       const matte = createStickerlessResources(tier, 'matte');
       for (const material of matte.materials as THREE.MeshPhysicalMaterial[]) {
@@ -69,13 +73,6 @@ describe('production Strong Hybrid', () => {
       }
       matte.dispose(); classic.dispose();
     }
-    const low = createStickerlessResources('low', 'gloss');
-    for (const material of low.materials as THREE.MeshStandardMaterial[]) {
-      expect(material.type).toBe('MeshStandardMaterial');
-      expect(material.roughness).toBeGreaterThanOrEqual(0.26 * 0.93);
-      expect(compile(material).uniforms).not.toHaveProperty('uPlasticDiffuseEnvironment');
-    }
-    low.dispose();
   });
 
   it('matches the reviewed finite-window illumination', () => {

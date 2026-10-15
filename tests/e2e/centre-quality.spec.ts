@@ -80,8 +80,8 @@ async function expectProfile(page: Page, tier: keyof typeof PIECE_DETAIL) {
   const hash = (a: ArrayBufferView) => createHash('sha256').update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength)).digest('hex');
   const expected = {
     position: hash(geometry.getAttribute('position').array), normal: hash(geometry.getAttribute('normal').array), index: hash(geometry.index!.array),
-    vertices: geometry.getAttribute('position').count, material: tier === 'low' ? 'MeshStandardMaterial' : 'MeshPhysicalMaterial',
-    analytic: tier !== 'low', hybrid: tier !== 'low', linked: true, compiled: true, error: 0,
+    vertices: geometry.getAttribute('position').count, material: 'MeshPhysicalMaterial',
+    analytic: tier !== 'low', hybrid: true, linked: true, compiled: true, error: 0,
   };
   geometry.dispose();
   await expect.poll(async () => (await centres(page)).map(({ name: _name, group: _group, ...profile }) => profile)).toEqual(Array.from({ length: 6 }, () => expected));
@@ -94,6 +94,28 @@ async function setQuality(page: Page, name: 'Auto' | 'High' | 'Low') {
   await page.keyboard.press('Escape');
 }
 
+async function appearance(page: Page) {
+  await scene(page);
+  return page.evaluate(() => {
+    const { state: s } = window.__CENTRE_QUALITY_TEST__;
+    const lights: unknown[] = [];
+    s.scene.traverseVisible(o => {
+      const light = o as import('three').Light;
+      if (light.isLight) lights.push({ type: light.type, color: light.color.toArray(), intensity: light.intensity, position: light.position.toArray() });
+    });
+    const materials = s.scene.getObjectByName('cube')!.children.filter(g => g.name.startsWith('cubie-')).map(group => {
+      const material = (group.children.find(o => (o as Mesh).isMesh) as Mesh).material as import('three').MeshPhysicalMaterial;
+      return { type: material.type, roughness: material.roughness, clearcoat: material.clearcoat, coatRoughness: material.clearcoatRoughness, specular: material.specularIntensity, ior: material.ior, envIntensity: material.envMapIntensity };
+    });
+    const mesh = s.scene.getObjectByName('cubie-U')!.children.find(o => (o as Mesh).isMesh) as Mesh;
+    const material = mesh.material as import('three').MeshPhysicalMaterial;
+    const properties = s.gl.properties.get(material) as { uniforms: Record<string, { value: import('three').Texture }> };
+    const diffuse = properties.uniforms.uPlasticDiffuseEnvironment.value;
+    const image = material.envMap?.image as { width: number; height: number } | undefined;
+    return { lights, materials, specular: material.envMap?.uuid, diffuse: diffuse?.uuid, width: image?.width, height: image?.height };
+  });
+}
+
 async function decline(page: Page) {
   await scene(page);
   await page.evaluate(() => {
@@ -101,6 +123,36 @@ async function decline(page: Page) {
     if (!callback) throw Error('Auto PerformanceMonitor is not mounted');
     callback();
   });
+}
+
+async function observeDecline(page: Page) {
+  await scene(page);
+  const watcher = await page.evaluateHandle(() => {
+    const { state: s } = window.__CENTRE_QUALITY_TEST__, render = s.gl.render;
+    const frames: Array<{ material: string; specular: boolean; diffuse: boolean }> = [];
+    s.gl.render = function (scene, camera) {
+      const visible = scene === s.scene && this.getRenderTarget() === null;
+      render.call(this, scene, camera);
+      if (visible) {
+        const mesh = scene.getObjectByName('cubie-U')!.children.find(o => (o as Mesh).isMesh) as Mesh;
+        const material = mesh.material as import('three').MeshPhysicalMaterial;
+        const properties = this.properties.get(material) as { uniforms?: Record<string, { value: unknown }> };
+        frames.push({ material: material.type, specular: !!material.envMap, diffuse: !!properties.uniforms?.uPlasticDiffuseEnvironment?.value });
+      }
+    };
+    return { stop() { s.gl.render = render; return frames; } };
+  });
+  try {
+    await decline(page);
+    await page.waitForFunction(() => {
+      const mesh = window.__CENTRE_QUALITY_TEST__.state.scene.getObjectByName('cubie-U')!.children.find(o => (o as Mesh).isMesh) as Mesh;
+      return mesh.geometry.getAttribute('position').count === 3074;
+    });
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const frames = await watcher.evaluate(w => w.stop());
+    expect(frames.length).toBeGreaterThan(0);
+    expect(frames.every(f => f.material === 'MeshPhysicalMaterial' && f.specular && f.diffuse)).toBe(true);
+  } finally { await watcher.evaluate(w => w.stop()); await watcher.dispose(); }
 }
 
 async function interact(page: Page) {
@@ -125,12 +177,21 @@ test('Auto decline and explicit Low retain six chamfer centres during orbit, tur
   const errors = trackErrors(page);
   await openStudio(page, { settings: { cubeStyle: 'stickerless', finish: 'gloss', quality: 'auto', sound: false } });
   const initial = await expectProfile(page, 'high');
-  await interact(page);
-  await decline(page);
+  await observeDecline(page);
   const low = await expectProfile(page, 'low');
   expect(low.map(g => g.group)).toEqual(initial.map(g => g.group));
+  const lowLook = await appearance(page);
+  expect(lowLook.width).toBe(384); expect(lowLook.height).toBe(512);
+  expect(lowLook.diffuse).toBeTruthy();
+  expect(lowLook.lights).toHaveLength(1);
   await interact(page); await expectProfile(page, 'low');
+  expect(await appearance(page)).toEqual(lowLook);
   await setQuality(page, 'High'); await expectProfile(page, 'high');
+  const highLook = await appearance(page);
+  expect(highLook.lights).toEqual(lowLook.lights);
+  expect(highLook.materials).toEqual(lowLook.materials);
+  await interact(page); await expectProfile(page, 'high');
+  expect(await appearance(page)).toEqual(highLook);
   await setQuality(page, 'Low'); await expectProfile(page, 'low');
   await setQuality(page, 'High'); await expectProfile(page, 'high');
   await waitIdle(page); await page.waitForTimeout(1200);

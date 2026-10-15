@@ -340,6 +340,8 @@ export interface PieceLook {
 
 /** Per-design adjustments; omitted fields keep the stickerless defaults. */
 export interface PieceMaterialOptions {
+  /** Retain clearcoat/IOR on Low without enabling its expensive surface details. */
+  readonly physicalFinish?: boolean;
   /** Exterior plastic (within the caps): roughness and clear coat. */
   readonly capRoughness?: number;
   readonly capCoat?: number;
@@ -398,12 +400,13 @@ export function createPieceMaterial(
   options: PieceMaterialOptions = {},
 ): THREE.Material {
   const gloss = look.finish === 'gloss';
-  const physical = look.tier !== 'low';
-  const honeycomb = options.honeycomb === true && physical;
-  const track = options.track !== undefined && physical;
-  const wavy = (options.waviness ?? 0) > 0 && physical;
+  const detailed = look.tier !== 'low';
+  const physical = detailed || options.physicalFinish === true;
+  const honeycomb = options.honeycomb === true && detailed;
+  const track = options.track !== undefined && detailed;
+  const wavy = (options.waviness ?? 0) > 0 && detailed;
   const capSeam = options.capSeam === true;
-  const rimNormals = physical && options.rimNormals !== undefined;
+  const rimNormals = detailed && options.rimNormals !== undefined;
   const continuousCentre = rimNormals && options.rimNormals!.continuousCentre === true && pieceKind(options.rimNormals!.home) === 'center';
   const uniforms = {
     uFaceColor: { value: slotColors.map((c) => (c ? c.clone() : BLACK.clone())) },

@@ -6,7 +6,7 @@ export interface DiffuseEnvironment {
 }
 
 /**
- * Called only by the Stickerless Gloss resource factory on physical tiers.
+ * Called only by the Stickerless Gloss resource factory, at every detail tier.
  * Keep the approved piece shader, normals and deterministic finish variation.
  * The mechanism shares the illumination without acquiring the shell's polish.
  */

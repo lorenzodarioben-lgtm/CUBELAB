@@ -219,7 +219,7 @@ function Lighting({ high, shadows, reflections, hybrid }: { high: boolean; shado
         shadow-camera-near={1}
         shadow-camera-far={24}
       />}
-      <StudioEnvironment size={high ? 256 : 128} intensity={1} reflections={reflections} hybrid={hybrid} hybridSize={shadows ? 512 : 256} />
+      <StudioEnvironment size={high ? 256 : 128} intensity={1} reflections={reflections} hybrid={hybrid} hybridSize={shadows ? 512 : high ? 256 : 128} />
     </>
   );
 }
@@ -352,7 +352,7 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
     >
       {settings.quality === 'auto' && <PerformanceMonitor onDecline={() => setAutoDegraded(true)} flipflops={2} />}
       <CameraRig rig={rig} reduced={reduced} transportOpen={transportOpen} zen={zen} frame={frameRef} floor={floorRef} />
-      <Lighting high={quality !== 'low'} shadows={quality === 'high'} reflections={reflections} hybrid={settings.cubeStyle === 'stickerless' && settings.finish === 'gloss' && quality !== 'low'} />
+      <Lighting high={quality !== 'low'} shadows={quality === 'high'} reflections={reflections} hybrid={settings.cubeStyle === 'stickerless' && settings.finish === 'gloss'} />
       <group ref={frameRef} name="cube-frame">
         <CubeModel
           reflections={reflections}

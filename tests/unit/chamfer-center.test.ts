@@ -85,9 +85,9 @@ describe('production chamfer routing', () => {
     const shader = compile(r.materials[centreId]!);
     if (tier === 'low') {
       // Low uses the approved mesh normals, without either analytic normal hook.
-      expect(r.materials[centreId]!.type).toBe('MeshStandardMaterial');
+      expect(r.materials[centreId]!.type).toBe('MeshPhysicalMaterial');
       expect(shader.fragmentShader).not.toContain('pieceAnalyticRimNormal');
-      expect(shader.fragmentShader).not.toContain('plasticWindowVisibility');
+      expect(shader.fragmentShader).toContain('plasticWindowVisibility');
       expect(shader.uniforms.uCentreSurface).toBeUndefined();
     } else {
       expect(shader.fragmentShader).toContain(STICKERLESS_CHAMFER_NORMALS);
