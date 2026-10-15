@@ -307,8 +307,8 @@ describe('Premium Stickerless realism', () => {
     const coat = (r: typeof a) => r.materials.map((m) => (m as THREE.MeshPhysicalMaterial).clearcoatRoughness);
     expect(rough(a)).toEqual(rough(b)); // never changes between builds or renders
     expect(new Set(rough(a)).size).toBeGreaterThan(20); // but differs piece to piece
-    for (const r of rough(a)) expect(Math.abs(r / 0.26 - 1)).toBeLessThanOrEqual(0.07 + 1e-9);
-    for (const c of coat(a)) expect(Math.abs(c / 0.07 - 1)).toBeLessThanOrEqual(0.2 + 1e-9);
+    for (const r of rough(a)) expect(Math.abs(r / 0.13 - 1)).toBeLessThanOrEqual(0.07 + 1e-9);
+    for (const c of coat(a)) expect(Math.abs(c / 0.14 - 1)).toBeLessThanOrEqual(0.2 + 1e-9);
     a.dispose();
     b.dispose();
   });

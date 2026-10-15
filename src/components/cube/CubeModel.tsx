@@ -188,7 +188,7 @@ export function CubeModel({ engine, quality, finish, style, faceLabels, registry
         base[def.id]!.quaternion.setFromRotationMatrix(scratch.m);
       }
     }
-    visuals.setStickerlessEnvironment(reflections.stickerless);
+    visuals.setStickerlessEnvironment(reflections.stickerless, reflections.stickerlessDiffuse);
     const visual = engine.getVisualTurn(now);
     // A layer part-way round opens the cube (whole-cube rotations open nothing).
     visuals.setTurnExposure(visual && visual.layer !== null ? Math.abs(Math.sin(2 * visual.angle)) : 0);

@@ -23,6 +23,7 @@ import type { OrbitRig } from './orbitRig';
 import { Celebration } from './Celebration';
 import { STICKERLESS_REFLECTORS, installStudioEnvironment, renderEnvironment } from './studioEnvironment';
 import { StyleReflections } from '../cube/styleReflections';
+import { renderStickerlessEnvironment, stickerlessWindowIntensity, stickerlessWindowPosition } from './stickerlessEnvironment';
 
 const FOV = 27;
 /** Bounding-sphere radius of the cube (half its space diagonal, in world units). */
@@ -148,39 +149,46 @@ function CameraRig({ rig, reduced, transportOpen, zen, frame, floor }: CameraRig
 }
 
 /**
- * Prefiltered studio reflections (see studioEnvironment.ts), rebuilt only when
- * the tier changes: the shared scene environment, and the stickerless cube's
- * own map with its reflector cards.
+ * Keep the shared scene environment independent of Stickerless's reflection
+ * maps. Rebuild the latter only when the tier or Gloss lighting mode changes.
  */
-function StudioEnvironment({ size, intensity, reflections }: { size: number; intensity: number; reflections: StyleReflections }) {
+function StudioEnvironment({ size, intensity, reflections, hybrid, hybridSize }: { size: number; intensity: number; reflections: StyleReflections; hybrid: boolean; hybridSize: number }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const invalidate = useThree((s) => s.invalidate);
   useEffect(() => {
     const restore = installStudioEnvironment(gl, scene, intensity, size);
+    invalidate();
+    return restore;
+  }, [gl, scene, size, intensity, invalidate]);
+  useEffect(() => {
+    if (hybrid) {
+      const maps = renderStickerlessEnvironment(gl, hybridSize);
+      reflections.setStickerless(maps.specular.texture, maps.diffuse.texture);
+      invalidate();
+      return () => { reflections.setStickerless(null); maps.dispose(); };
+    }
     const stickerless = renderEnvironment(gl, size, STICKERLESS_REFLECTORS);
     reflections.setStickerless(stickerless.texture);
     invalidate();
     return () => {
       reflections.setStickerless(null);
       stickerless.dispose();
-      restore();
     };
-  }, [gl, scene, size, intensity, reflections, invalidate]);
+  }, [gl, size, reflections, hybrid, hybridSize, invalidate]);
   return null;
 }
 
 /**
- * Product-photography lighting: image-based light from the studio environment
- * (softboxes and strips in a dark cyclorama), plus a warm key light from the
- * overhead box that casts soft shadows on the high tier, so turning layers and
- * seams shade each other, and a whisper of sky fill for the shadow sides.
+ * Classic and Matte retain their studio lights. Stickerless Gloss uses the
+ * reviewed finite window, with a matching diffuse key and High-tier shadow.
  */
-function Lighting({ high, shadows, reflections }: { high: boolean; shadows: boolean; reflections: StyleReflections }) {
+function Lighting({ high, shadows, reflections, hybrid }: { high: boolean; shadows: boolean; reflections: StyleReflections; hybrid: boolean }) {
   return (
     <>
-      <hemisphereLight args={['#ffffff', '#1a1a1d', 0.38]} />
+      <hemisphereLight visible={!hybrid} args={['#ffffff', '#1a1a1d', 0.38]} />
       <directionalLight
+        visible={!hybrid}
         position={[-4.5, 8, 5.5]}
         intensity={1.35}
         color="#fff6ec"
@@ -195,8 +203,23 @@ function Lighting({ high, shadows, reflections }: { high: boolean; shadows: bool
         shadow-camera-near={2}
         shadow-camera-far={22}
       />
-      <directionalLight position={[6.5, 2.5, 4.5]} intensity={1.05} color="#f4f6ff" />
-      <StudioEnvironment size={high ? 256 : 128} intensity={1} reflections={reflections} />
+      <directionalLight visible={!hybrid} position={[6.5, 2.5, 4.5]} intensity={1.05} color="#f4f6ff" />
+      {hybrid && <directionalLight
+        position={stickerlessWindowPosition()}
+        intensity={stickerlessWindowIntensity()}
+        color="#fffaf0"
+        castShadow={shadows}
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.00012}
+        shadow-normalBias={0.003}
+        shadow-camera-left={-3.4}
+        shadow-camera-right={3.4}
+        shadow-camera-top={3.4}
+        shadow-camera-bottom={-3.4}
+        shadow-camera-near={1}
+        shadow-camera-far={24}
+      />}
+      <StudioEnvironment size={high ? 256 : 128} intensity={1} reflections={reflections} hybrid={hybrid} hybridSize={shadows ? 512 : 256} />
     </>
   );
 }
@@ -329,7 +352,7 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
     >
       {settings.quality === 'auto' && <PerformanceMonitor onDecline={() => setAutoDegraded(true)} flipflops={2} />}
       <CameraRig rig={rig} reduced={reduced} transportOpen={transportOpen} zen={zen} frame={frameRef} floor={floorRef} />
-      <Lighting high={quality !== 'low'} shadows={quality === 'high'} reflections={reflections} />
+      <Lighting high={quality !== 'low'} shadows={quality === 'high'} reflections={reflections} hybrid={settings.cubeStyle === 'stickerless' && settings.finish === 'gloss' && quality !== 'low'} />
       <group ref={frameRef} name="cube-frame">
         <CubeModel
           reflections={reflections}

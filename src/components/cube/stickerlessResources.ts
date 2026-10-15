@@ -26,6 +26,7 @@ import { acquirePieceMeshes, releasePieceMeshes } from './pieceMeshes';
 import type { PieceSet } from './pieceMeshes';
 import type { RenderTier } from './renderTier';
 import { STICKERLESS_CENTRE_MESH } from './stickerlessCenterGeometry';
+import { applyStrongHybrid } from './stickerlessHybrid';
 
 /** Distance from a cubie centre to the middle of its outer face (the top of the pillow). */
 export const STICKERLESS_SURFACE = PIECE_HALF + PILLOW;
@@ -41,8 +42,8 @@ export interface StickerlessResources {
   readonly coreMaterial: THREE.Material;
   /** Tells the materials how far the turn in flight has opened the cube (0…1). */
   setExposure(value: number): void;
-  /** Uses this reflection map (null: the scene environment). */
-  setEnvironment(texture: THREE.Texture | null): void;
+  /** Reflection map, plus room-only irradiance for Gloss (null: scene fallback). */
+  setEnvironment(texture: THREE.Texture | null, diffuse?: THREE.Texture | null): void;
   dispose(): void;
 }
 
@@ -83,6 +84,13 @@ export function createStickerlessResources(tier: RenderTier, finish: Finish): St
   // The mechanism's core: fills the central cell, glimpsed only between layers mid-turn.
   const core = new THREE.SphereGeometry(0.5, tier === 'low' ? 16 : 32, tier === 'low' ? 12 : 24);
   const coreMaterial = new THREE.MeshStandardMaterial({ color: '#050506', roughness: 0.7, metalness: 0 });
+  // Matte and Low retain their approved material and illumination paths.
+  const hybrid = gloss && tier !== 'low';
+  const diffuseEnvironment = { value: null as THREE.Texture | null };
+  if (hybrid) {
+    for (const material of materials) applyStrongHybrid(material as THREE.MeshStandardMaterial, diffuseEnvironment);
+    applyStrongHybrid(coreMaterial, diffuseEnvironment, false);
+  }
   let disposed = false;
   return {
     pieces,
@@ -92,8 +100,12 @@ export function createStickerlessResources(tier: RenderTier, finish: Finish): St
     setExposure(value) {
       exposure.value = value;
     },
-    setEnvironment(texture) {
+    setEnvironment(texture, diffuse = null) {
       for (const m of materials) (m as THREE.MeshStandardMaterial).envMap = texture;
+      if (hybrid) {
+        diffuseEnvironment.value = diffuse ?? texture;
+        coreMaterial.envMap = texture;
+      }
     },
     dispose() {
       if (disposed) return;

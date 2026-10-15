@@ -8,12 +8,18 @@ import type * as THREE from 'three';
  */
 export class StyleReflections {
   #stickerless: THREE.Texture | null = null;
+  #stickerlessDiffuse: THREE.Texture | null = null;
 
   get stickerless(): THREE.Texture | null {
     return this.#stickerless;
   }
 
-  setStickerless(texture: THREE.Texture | null): void {
+  get stickerlessDiffuse(): THREE.Texture | null {
+    return this.#stickerlessDiffuse;
+  }
+
+  setStickerless(texture: THREE.Texture | null, diffuse: THREE.Texture | null = null): void {
     this.#stickerless = texture;
+    this.#stickerlessDiffuse = diffuse;
   }
 }

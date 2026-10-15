@@ -76,6 +76,7 @@ export class CubeVisuals {
   #stickered: StickeredResources | null = null;
   #stickerless: StickerlessResources | null = null;
   #stickerlessEnv: THREE.Texture | null = null;
+  #stickerlessDiffuse: THREE.Texture | null = null;
   #textures: THREE.Texture[] = [];
   #disposed = false;
   #compiling: Promise<unknown> | null = null;
@@ -110,7 +111,7 @@ export class CubeVisuals {
   get stickerless(): StickerlessResources {
     if (!this.#stickerless) {
       this.#stickerless = createStickerlessResources(this.tier, this.finish);
-      this.#stickerless.setEnvironment(this.#stickerlessEnv);
+      this.#stickerless.setEnvironment(this.#stickerlessEnv, this.#stickerlessDiffuse);
     }
     return this.#stickerless;
   }
@@ -120,10 +121,11 @@ export class CubeVisuals {
    * is aligned, 1 at 45°. Both styles light the faces a turn exposes by it.
    */
   /** The stickerless cube's own reflection map (null: use the scene environment). */
-  setStickerlessEnvironment(texture: THREE.Texture | null): void {
-    if (texture === this.#stickerlessEnv) return;
+  setStickerlessEnvironment(texture: THREE.Texture | null, diffuse: THREE.Texture | null = null): void {
+    if (texture === this.#stickerlessEnv && diffuse === this.#stickerlessDiffuse) return;
     this.#stickerlessEnv = texture;
-    this.#stickerless?.setEnvironment(texture);
+    this.#stickerlessDiffuse = diffuse;
+    this.#stickerless?.setEnvironment(texture, diffuse);
   }
 
   setTurnExposure(value: number): void {
