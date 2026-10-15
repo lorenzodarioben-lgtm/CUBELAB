@@ -43,9 +43,9 @@ async function scene(page: Page) {
   });
 }
 
-async function centres(page: Page) {
+async function centres(page: Page, expectedNormals?: number[]) {
   await scene(page);
-  return page.evaluate(async () => {
+  return page.evaluate(async expectedNormals => {
     const { state } = window.__CENTRE_QUALITY_TEST__, { gl, scene, camera } = state;
     gl.render(scene, camera);
     const context = gl.getContext();
@@ -58,10 +58,12 @@ async function centres(page: Page) {
       if (!program?.program) throw Error('Centre shader was not compiled');
       const shaders = context.getAttachedShaders(program.program)!;
       const fragment = context.getShaderSource(shaders.find(s => context.getShaderParameter(s, context.SHADER_TYPE) === context.FRAGMENT_SHADER)!)!;
+      const normals = mesh.geometry.getAttribute('normal').array;
       return {
         name: group.name, group: group.uuid,
         position: await hash(mesh.geometry.getAttribute('position').array),
-        normal: await hash(mesh.geometry.getAttribute('normal').array),
+        normal: await hash(normals),
+        normalError: expectedNormals && normals.length === expectedNormals.length ? Array.from(normals).reduce((max, value, i) => Math.max(max, Math.abs(value - expectedNormals[i]!)), 0) : null,
         index: await hash(mesh.geometry.index!.array),
         vertices: mesh.geometry.getAttribute('position').count,
         material: mesh.material.type,
@@ -72,19 +74,26 @@ async function centres(page: Page) {
         error: context.getError(),
       };
     }));
-  });
+  }, expectedNormals);
 }
 
 async function expectProfile(page: Page, tier: keyof typeof PIECE_DETAIL) {
   const geometry = buildStickerlessChamferGeometry(PIECE_DETAIL[tier]);
   const hash = (a: ArrayBufferView) => createHash('sha256').update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength)).digest('hex');
   const expected = {
-    position: hash(geometry.getAttribute('position').array), normal: hash(geometry.getAttribute('normal').array), index: hash(geometry.index!.array),
+    position: hash(geometry.getAttribute('position').array), index: hash(geometry.index!.array), matchingNormals: true,
     vertices: geometry.getAttribute('position').count, material: 'MeshPhysicalMaterial',
     analytic: tier !== 'low', hybrid: true, linked: true, compiled: true, error: 0,
   };
+  const expectedNormals = Array.from(geometry.getAttribute('normal').array);
   geometry.dispose();
-  await expect.poll(async () => (await centres(page)).map(({ name: _name, group: _group, ...profile }) => profile)).toEqual(Array.from({ length: 6 }, () => expected));
+  await expect.poll(async () => {
+    const rows = await centres(page, expectedNormals);
+    // Node and Chromium can differ at a near-zero component (~2e-17).
+    // Keep exact buffer hashes among all six centres and compare every
+    // component to the CPU reference within 1e-12.
+    return rows.map(({ name: _name, group: _group, normal, normalError, ...profile }) => ({ ...profile, matchingNormals: normal === rows[0]!.normal && normalError !== null && normalError < 1e-12 }));
+  }).toEqual(Array.from({ length: 6 }, () => expected));
   return centres(page);
 }
 

@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { INNER_RADIUS, PIECE_HALF, PILLOW, RIM_RADIUS } from './pieceGeometry';
 
-const APPROVED = { radius: .420, drop: .073, softening: .008 } as const;
+const APPROVED = { radius: .425, drop: .073, softening: .008 } as const;
 const TOP = PIECE_HALF + PILLOW;
 const SIDE = PIECE_HALF - RIM_RADIUS;
 export const STICKERLESS_CHAMFER_SURFACE = {

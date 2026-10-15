@@ -15,12 +15,12 @@ function compile(material: THREE.Material) {
 }
 
 describe('approved moulded chamfer centre', () => {
-  it('matches the approved workshop position, normal and index hashes exactly', () => {
+  it('matches the approved 0.425 candidate position, normal and index hashes exactly', () => {
     const geometry = buildStickerlessChamferGeometry(40);
-    expect(hash(geometry.getAttribute('position').array)).toBe('6325c9f19d5fbbd637ac786d80d6f8aaf17e108541e0ca81ef30c1e0fad9ba08');
-    expect(hash(geometry.getAttribute('normal').array)).toBe('17cea169927821bfef800a2ae7f8d54ae5247c1ff04225a18e0d151e1a88fb36');
+    expect(hash(geometry.getAttribute('position').array)).toBe('b63a0387fafea0aecaa653a26d38cc583e03199394ddaca8e65833ea4053d2f7');
+    expect(hash(geometry.getAttribute('normal').array)).toBe('0be5d46ffe349b9e0053741cc743093d25de9ce1ca8650223aee717271b8dd44');
     expect(hash(geometry.index!.array)).toBe('4f1c3d11f61c8e9060b8a68fd57677c6cecca89d26fb0a44f6decb27f5f6bdd1');
-    expect(profile).toMatchObject({ plateauRadius: .420, drop: .073, softening: .008, top: .511, side: .438 });
+    expect(profile).toMatchObject({ plateauRadius: .425, drop: .073, softening: .008, top: .511, side: .438 });
     geometry.dispose();
   });
 
@@ -92,7 +92,7 @@ describe('production chamfer routing', () => {
     } else {
       expect(shader.fragmentShader).toContain(STICKERLESS_CHAMFER_NORMALS);
       expect(shader.fragmentShader).toContain('plasticWindowVisibility');
-      expect((shader.uniforms.uCentreSurface!.value as THREE.Vector4).toArray()).toEqual([.420, .511, .438, .37]);
+      expect((shader.uniforms.uCentreSurface!.value as THREE.Vector4).toArray()).toEqual([.425, .511, .438, .37]);
     }
     expected.dispose(); r.dispose();
   });
