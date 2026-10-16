@@ -16,15 +16,15 @@ function compile(material: THREE.Material) {
 
 describe('approved moulded chamfer centre', () => {
   for (const [detail, positions, normals, indices] of [
-    [24, 'b6464bfd9ac8767efe93c50b98d27e9510bb315e96c0450b04fa5bff5e4c7537', '227ebcdfa97e45117feef1b8023b27cb7528442da42f0f582c77cd09934c3359', '373bf08ecef797e681f9ae8a5cc11b31a7e0c71bf0adb97e057e94db4ccc615a'],
-    [30, '3151c886e373c1155d469eebd3c3b1b94bf9b046323a70ece45fa3158a7add78', '193ec6da9688eeb031693066997ebf17ae904f63f4d31994ef81751215ce14bc', '602b2db961b25595b62854930f254f79c0138546b27a5ddd682a6dc86b88dc3b'],
-    [40, '2d5524b7b736b054c0ec4779acf2df8a3d9943ecae80e8c0f636ac8e36c004f3', 'b83423aa6cf52c5bb8fa052349dcca276625ad21d82b16911d9a99d37442f7a6', '4f1c3d11f61c8e9060b8a68fd57677c6cecca89d26fb0a44f6decb27f5f6bdd1'],
-  ] as const) it(`matches the approved stronger candidate mesh and normal hashes at detail ${detail}`, () => {
+    [24, '8a406e159b33d6a07c7460eb8842c4190a528814d4bb7d253f31b893871ed32b', '3e7a50518c67edc3884f925e586e92ad8c53c3b110d5b28197744e04cddaf961', '373bf08ecef797e681f9ae8a5cc11b31a7e0c71bf0adb97e057e94db4ccc615a'],
+    [30, 'db96aa183d20f2f02c5fb6d100a02ffadb875aeb47611fa1465b41059125cc8d', '73ea8537d5ca724a03b6ec0b67432b5b940029eff28837d82607ab583201e77d', '602b2db961b25595b62854930f254f79c0138546b27a5ddd682a6dc86b88dc3b'],
+    [40, 'cfcfeb331c053b4d08a5e75e9595ce52ead62f743eeb6c189862ed9ec2c5bbbc', '42e22d5aab61e3cdd5e202c215530617be4716e15361c92978ce93a14b585c8f', '4f1c3d11f61c8e9060b8a68fd57677c6cecca89d26fb0a44f6decb27f5f6bdd1'],
+  ] as const) it(`matches the approved 0.4255 candidate mesh and normal hashes at detail ${detail}`, () => {
     const geometry = buildStickerlessChamferGeometry(detail);
     expect(hash(geometry.getAttribute('position').array)).toBe(positions);
     expect(hash(geometry.getAttribute('normal').array)).toBe(normals);
     expect(hash(geometry.index!.array)).toBe(indices);
-    expect(profile).toMatchObject({ plateauRadius: .425, drop: .073, softening: .008, top: .511, side: .438 });
+    expect(profile).toMatchObject({ plateauRadius: .4255, cornerRadius: .3589, drop: .073, softening: .008, top: .511, side: .438 });
     geometry.dispose();
   });
 
@@ -114,7 +114,7 @@ describe('production chamfer routing', () => {
     } else {
       expect(shader.fragmentShader).toContain(STICKERLESS_CHAMFER_NORMALS);
       expect(shader.fragmentShader).toContain('plasticWindowVisibility');
-      expect((shader.uniforms.uCentreSurface!.value as THREE.Vector4).toArray()).toEqual([.425, .511, .438, .37]);
+      expect((shader.uniforms.uCentreSurface!.value as THREE.Vector4).toArray()).toEqual([.4255, .511, .438, .3589]);
     }
     expected.dispose(); r.dispose();
   });

@@ -2,7 +2,9 @@
 import * as THREE from 'three';
 import { INNER_RADIUS, PIECE_HALF, PILLOW, RIM_RADIUS } from './pieceGeometry';
 
-const APPROVED = { radius: .425, drop: .073, softening: .008 } as const;
+// Local to the Gloss centre; shared piece radii are never changed.
+export const HOUSING_CORNER_RADIUS = INNER_RADIUS.center * .97;
+const APPROVED = { radius: .4255, drop: .073, softening: .008 } as const;
 export const CONVEXITY_BOUND = 0.0015;
 export const CONVEXITY_AMPLITUDE = 0.00149997;
 /** Endpoint-tangent bow, restricted to the original straight lip. No junction is re-softened. */
@@ -18,13 +20,13 @@ const TOP = PIECE_HALF + PILLOW;
 const SIDE = PIECE_HALF - RIM_RADIUS;
 export const STICKERLESS_CHAMFER_SURFACE = {
   plateauRadius: APPROVED.radius, top: TOP, side: SIDE,
-  drop: APPROVED.drop, softening: APPROVED.softening, cornerRadius: INNER_RADIUS.center,
+  drop: APPROVED.drop, softening: APPROVED.softening, cornerRadius: HOUSING_CORNER_RADIUS,
 } as const;
 
 /** Exact original rounded-square outline, including its angular derivative. */
 export function chamferOutline(angle: number) {
   const x = Math.cos(angle), z = Math.sin(angle), ax = Math.abs(x), az = Math.abs(z);
-  const h = PIECE_HALF, r = INNER_RADIUS.center, k = h - r;
+  const h = PIECE_HALF, r = HOUSING_CORNER_RADIUS, k = h - r;
   let radius: number, nx: number, nz: number;
   if (Math.min(ax, az) * h <= k * Math.max(ax, az)) {
     radius = h / Math.max(ax, az); nx = ax > az ? Math.sign(x) : 0; nz = ax > az ? 0 : Math.sign(z);
@@ -114,7 +116,7 @@ uniform vec4 uCentreSurface;
 vec3 pieceAnalyticRimNormal(vec3 p, int face) {
   float r=length(p.xz); if(r<=${APPROVED.radius.toFixed(9)}) return vec3(0.,1.,0.);
   vec2 e=p.xz/r, a=abs(e), tangent=vec2(-e.y,e.x);
-  float h=${PIECE_HALF}, c=${INNER_RADIUS.center}, k=h-c, outer; vec2 n;
+  float h=${PIECE_HALF}, c=${HOUSING_CORNER_RADIUS}, k=h-c, outer; vec2 n;
   if(min(a.x,a.y)*h<=k*max(a.x,a.y)){outer=h/max(a.x,a.y);n=a.x>a.y?vec2(sign(e.x),0.):vec2(0.,sign(e.y));}
   else {float sum=a.x+a.y;outer=k*sum+sqrt(c*c-2.*k*k+k*k*sum*sum);n=sign(e)*(outer*a-k)/c;}
   if(p.y<${(TOP - APPROVED.drop - 1e-6).toFixed(9)}) return vec3(n.x,0.,n.y);
