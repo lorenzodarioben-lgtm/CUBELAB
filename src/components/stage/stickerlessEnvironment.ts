@@ -2,7 +2,29 @@
 import * as THREE from 'three';
 import { HOME_POSE, sphericalPosition } from './orbitRig';
 
-const WINDOW = { position: [-3, 5, -4], size: [10, 6], radiance: 5.2, room: 1.2 } as const;
+// Approved Open Product Studio (Candidate B): exact tested source parameters.
+const WINDOW = { position: [-1, 2.5, 7], size: [8, 4.5], radiance: 3.6, room: 1.4 } as const;
+
+interface Panel {
+  readonly position: readonly [number, number, number];
+  readonly size: readonly [number, number];
+  readonly radiance: number;
+}
+
+const FILL: readonly Panel[] = [
+  { position: [-8, 0, 6], size: [2, 11], radiance: 4.2 },
+  { position: [7, 0, -6], size: [2, 11], radiance: 3.8 },
+  { position: [3, -5, 8], size: [9, 4], radiance: 0.7 },
+];
+
+/** Offscreen lighting emitters only; the cube's geometry and materials are unchanged. */
+function emitter(panel: Panel, position = new THREE.Vector3(...panel.position)) {
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(...panel.size),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color('#fffaf0').multiplyScalar(panel.radiance), side: THREE.DoubleSide }));
+  mesh.position.copy(position);
+  mesh.lookAt(0, 0, 0);
+  return mesh;
+}
 
 /** The reviewed photographic source is fixed in the home-view studio frame. */
 export function stickerlessWindowPosition(): THREE.Vector3 {
@@ -30,13 +52,11 @@ export function renderStickerlessEnvironment(renderer: THREE.WebGLRenderer, size
     ['#909494', '#777772', '#aaa9a3', '#665044', '#898780', '#757572'].map((color) =>
       new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(WINDOW.room), side: THREE.BackSide })));
   scene.add(room);
+  for (const panel of FILL) scene.add(emitter(panel));
   const pmrem = new THREE.PMREMGenerator(renderer);
+  // Fill remains in both existing maps; the primary window keeps its existing shadow mask.
   const diffuse = pmrem.fromScene(scene, 0, 0.1, 80, { size });
-  const window = new THREE.Mesh(new THREE.PlaneGeometry(...WINDOW.size),
-    new THREE.MeshBasicMaterial({ color: new THREE.Color('#fffaf0').multiplyScalar(WINDOW.radiance), side: THREE.DoubleSide }));
-  window.position.copy(stickerlessWindowPosition());
-  window.lookAt(0, 0, 0);
-  scene.add(window);
+  scene.add(emitter(WINDOW, stickerlessWindowPosition()));
   const specular = pmrem.fromScene(scene, 0, 0.1, 80, { size });
   scene.traverse((object) => {
     if (object instanceof THREE.Mesh) {

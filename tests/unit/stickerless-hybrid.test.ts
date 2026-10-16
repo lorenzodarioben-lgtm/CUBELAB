@@ -75,8 +75,11 @@ describe('production Strong Hybrid', () => {
     }
   });
 
-  it('matches the reviewed finite-window illumination', () => {
-    expect(stickerlessWindowPosition().length()).toBeCloseTo(Math.sqrt(50), 12);
-    expect(stickerlessWindowIntensity()).toBeCloseTo(4.347050572660111, 12);
+  it('matches the approved Open Product Studio key direction and finite-window illumination', () => {
+    const position = stickerlessWindowPosition();
+    const approvedPosition = [1.9088975102225918, 5.88579360309672, 4.238342123662473];
+    position.toArray().forEach((value, i) => expect(value).toBeCloseTo(approvedPosition[i]!, 12));
+    expect(position.length()).toBeCloseTo(7.5, 12);
+    expect(stickerlessWindowIntensity()).toBeCloseTo(1.8541561083576226, 12);
   });
 });
