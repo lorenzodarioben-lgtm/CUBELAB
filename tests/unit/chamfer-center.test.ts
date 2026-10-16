@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
-import { buildStickerlessChamferGeometry, chamferOutline, sampleChamferSurface, STICKERLESS_CHAMFER_NORMALS, STICKERLESS_CHAMFER_SURFACE as profile } from '../../src/components/cube/stickerlessChamferGeometry';
+import { buildStickerlessChamferGeometry, chamferOutline, sampleChamferSurface, CONVEXITY_AMPLITUDE, CONVEXITY_BOUND, STICKERLESS_CHAMFER_NORMALS, STICKERLESS_CHAMFER_SURFACE as profile } from '../../src/components/cube/stickerlessChamferGeometry';
 import { buildStickerlessCenterGeometry, CONTINUOUS_CENTRE_NORMALS } from '../../src/components/cube/stickerlessCenterGeometry';
 import { createStickerlessResources, PIECE_DETAIL } from '../../src/components/cube/stickerlessResources';
 import { CUBIE_DEFS } from '../../src/core/puzzle/cubies';
@@ -15,16 +15,23 @@ function compile(material: THREE.Material) {
 }
 
 describe('approved moulded chamfer centre', () => {
-  it('matches the approved 0.425 candidate position, normal and index hashes exactly', () => {
-    const geometry = buildStickerlessChamferGeometry(40);
-    expect(hash(geometry.getAttribute('position').array)).toBe('b63a0387fafea0aecaa653a26d38cc583e03199394ddaca8e65833ea4053d2f7');
-    expect(hash(geometry.getAttribute('normal').array)).toBe('0be5d46ffe349b9e0053741cc743093d25de9ce1ca8650223aee717271b8dd44');
-    expect(hash(geometry.index!.array)).toBe('4f1c3d11f61c8e9060b8a68fd57677c6cecca89d26fb0a44f6decb27f5f6bdd1');
+  for (const [detail, positions, normals, indices] of [
+    [24, 'b6464bfd9ac8767efe93c50b98d27e9510bb315e96c0450b04fa5bff5e4c7537', '227ebcdfa97e45117feef1b8023b27cb7528442da42f0f582c77cd09934c3359', '373bf08ecef797e681f9ae8a5cc11b31a7e0c71bf0adb97e057e94db4ccc615a'],
+    [30, '3151c886e373c1155d469eebd3c3b1b94bf9b046323a70ece45fa3158a7add78', '193ec6da9688eeb031693066997ebf17ae904f63f4d31994ef81751215ce14bc', '602b2db961b25595b62854930f254f79c0138546b27a5ddd682a6dc86b88dc3b'],
+    [40, '2d5524b7b736b054c0ec4779acf2df8a3d9943ecae80e8c0f636ac8e36c004f3', 'b83423aa6cf52c5bb8fa052349dcca276625ad21d82b16911d9a99d37442f7a6', '4f1c3d11f61c8e9060b8a68fd57677c6cecca89d26fb0a44f6decb27f5f6bdd1'],
+  ] as const) it(`matches the approved stronger candidate mesh and normal hashes at detail ${detail}`, () => {
+    const geometry = buildStickerlessChamferGeometry(detail);
+    expect(hash(geometry.getAttribute('position').array)).toBe(positions);
+    expect(hash(geometry.getAttribute('normal').array)).toBe(normals);
+    expect(hash(geometry.index!.array)).toBe(indices);
     expect(profile).toMatchObject({ plateauRadius: .425, drop: .073, softening: .008, top: .511, side: .438 });
     geometry.dispose();
   });
 
-  it('has a flat circle, tiny softened top and straight variable-width lip without an outer shelf', () => {
+  it('localizes the approved tiny bow to the descending lip and preserves the plateau, softening and endpoints', () => {
+    expect(CONVEXITY_BOUND).toBe(.0015);
+    expect(CONVEXITY_AMPLITUDE).toBe(.00149997);
+    expect(STICKERLESS_CHAMFER_NORMALS).toContain(`float bowSlope=${CONVEXITY_AMPLITUDE.toFixed(12)}*bowDerivative/lipLength;`);
     expect(chamferOutline(Math.PI / 4).radius - profile.plateauRadius).toBeGreaterThan(chamferOutline(0).radius - profile.plateauRadius);
     for (let i = 0; i < 80; i++) {
       const angle = i * Math.PI / 40, span = chamferOutline(angle).radius - profile.plateauRadius;
@@ -35,10 +42,14 @@ describe('approved moulded chamfer centre', () => {
       for (let j = 1; j <= 100; j++) {
         const t = j / 100, s = sampleChamferSurface(angle, 'lip', t);
         expect(s.position[1]).toBeLessThan(previous); previous = s.position[1];
-        if (span * t >= profile.softening) {
-          const expected = profile.top - profile.drop * (span * t - profile.softening / 2) / (span - profile.softening / 2);
-          expect(s.position[1]).toBe(expected);
-        }
+        // Independent pre-convexity reference, including the entire original top softening.
+        const distance = span * t, w = profile.softening;
+        const line = distance >= w ? distance - w / 2 : distance / 2 - w / (2 * Math.PI) * Math.sin(Math.PI * distance / w);
+        const baseline = profile.top - profile.drop * line / (span - w / 2);
+        const displacement = s.position[1] - baseline;
+        expect(displacement).toBeGreaterThanOrEqual(0);
+        expect(displacement).toBeLessThanOrEqual(CONVEXITY_BOUND);
+        if (distance <= w || j === 100) expect(displacement).toBe(0);
         if (j < 100) {
           const e = 1e-6, a = new THREE.Vector3(...sampleChamferSurface(angle - e, 'lip', t).position), b = new THREE.Vector3(...sampleChamferSurface(angle + e, 'lip', t).position);
           const c = new THREE.Vector3(...sampleChamferSurface(angle, 'lip', t - e).position), d = new THREE.Vector3(...sampleChamferSurface(angle, 'lip', t + e).position);
@@ -46,6 +57,17 @@ describe('approved moulded chamfer centre', () => {
           expect(numeric.dot(new THREE.Vector3(...s.normal))).toBeGreaterThan(.999999);
         }
       }
+      const softeningEnd = sampleChamferSurface(angle, 'lip', profile.softening / span);
+      const originalSlope = profile.drop / (span - profile.softening / 2);
+      expect(softeningEnd.position[1]).toBeCloseTo(profile.top - profile.drop * (profile.softening / 2) / (span - profile.softening / 2), 14);
+      for (const point of [softeningEnd, sampleChamferSurface(angle, 'lip', 1)]) {
+        // The radial slope is encoded by the horizontal normal projected onto the face radius.
+        const radial = (point.normal[0] * Math.cos(angle) + point.normal[2] * Math.sin(angle)) / point.normal[1];
+        expect(radial).toBeCloseTo(originalSlope, 12);
+      }
+      const midpoint = (profile.softening + (span - profile.softening) / 2) / span;
+      const straightHeight = profile.top - profile.drop * (span * midpoint - profile.softening / 2) / (span - profile.softening / 2);
+      expect(sampleChamferSurface(angle, 'lip', midpoint).position[1] - straightHeight).toBeCloseTo(CONVEXITY_AMPLITUDE, 14);
     }
   });
 

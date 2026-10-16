@@ -1,8 +1,19 @@
-/** Approved Stickerless Gloss centre: a flat circle and softened straight circle-to-square lip. */
+/** Approved Stickerless Gloss centre: flat circle with a microscopically convex chamfer lip. */
 import * as THREE from 'three';
 import { INNER_RADIUS, PIECE_HALF, PILLOW, RIM_RADIUS } from './pieceGeometry';
 
 const APPROVED = { radius: .425, drop: .073, softening: .008 } as const;
+export const CONVEXITY_BOUND = 0.0015;
+export const CONVEXITY_AMPLITUDE = 0.00149997;
+/** Endpoint-tangent bow, restricted to the original straight lip. No junction is re-softened. */
+export function lipBow(s: number, span: number) {
+  const length = span - APPROVED.softening, u = (s - APPROVED.softening) / length;
+  if (u <= 1e-12 || u >= 1 - 1e-12) return { height: 0, radial: 0, angularFactor: 0 };
+  const derivative = 32 * u * (1 - u) * (1 - 2 * u);
+  return { height: CONVEXITY_AMPLITUDE * 16 * u * u * (1 - u) * (1 - u),
+    radial: CONVEXITY_AMPLITUDE * derivative / length,
+    angularFactor: CONVEXITY_AMPLITUDE * derivative * u / length };
+}
 const TOP = PIECE_HALF + PILLOW;
 const SIDE = PIECE_HALF - RIM_RADIUS;
 export const STICKERLESS_CHAMFER_SURFACE = {
@@ -37,9 +48,10 @@ export function sampleChamferSurface(angle: number, region: 'plateau' | 'lip', t
   const span = o.radius - p.radius, radius = region === 'plateau' ? p.radius * t : p.radius + span * t;
   if (region === 'plateau') return { position: [radius * ex, TOP, radius * ez] as const, normal: [0, 1, 0] as const, radius };
   const f = softenedLine(span * t, p.softening), denominator = span - p.softening / 2;
-  const y = TOP - p.drop * f.value / denominator;
-  const radialNormal = p.drop * f.derivative / denominator;
-  const tangentialNormal = -p.drop * f.value * o.derivative / (denominator * denominator * radius);
+  const bow = lipBow(span * t, span);
+  const y = TOP - p.drop * f.value / denominator + bow.height;
+  const radialNormal = p.drop * f.derivative / denominator - bow.radial;
+  const tangentialNormal = -p.drop * f.value * o.derivative / (denominator * denominator * radius) + bow.angularFactor * o.derivative / radius;
   const nx = radialNormal * ex - tangentialNormal * ez, nz = radialNormal * ez + tangentialNormal * ex;
   const length = Math.hypot(nx, 1, nz);
   return { position: [radius * ex, y, radius * ez] as const, normal: [nx / length, 1 / length, nz / length] as const, radius };
@@ -113,6 +125,14 @@ vec3 pieceAnalyticRimNormal(vec3 p, int face) {
   float denominator=span-w*.5;
   float radial=${APPROVED.drop.toFixed(9)}*df/denominator;
   float around=-${APPROVED.drop.toFixed(9)}*f*angular/(denominator*denominator*r);
+  // Exact radial/angular derivatives of the same experimental height offset.
+  float lipLength=span-w, u=(s-w)/lipLength;
+  if(u>0. && u<1.) {
+    float bowDerivative=32.*u*(1.-u)*(1.-2.*u);
+    float bowSlope=0.001499970000*bowDerivative/lipLength;
+    radial-=bowSlope;
+    around+=bowSlope*u*angular/r;
+  }
   vec2 horizontal=radial*e+around*tangent;
   return normalize(vec3(horizontal.x,1.,horizontal.y));
 }`;
