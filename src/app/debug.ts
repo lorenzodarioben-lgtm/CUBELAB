@@ -29,7 +29,19 @@ export interface DebugApi {
   visualFacelets?: () => string;
   /** Screen position of a point given in cube coordinates (follows the view). */
   project?: (point: [number, number, number]) => { x: number; y: number };
-  renderInfo?: () => { geometries: number; textures: number; programs: number };
+  renderInfo?: () => { geometries: number; textures: number; programs: number; calls: number; triangles: number };
+  /** The layer turn on screen right now (radians about +axis), or null at rest. */
+  visualTurn?: () => { axis: number; layer: number | null; angle: number } | null;
+  /** Which Stickerless renderer this page load uses (`?stickerless=v2` selects the experiment). */
+  stickerlessRenderer?: () => string;
+  /**
+   * Renders the current scene `frames` times back to back, waiting for the GPU
+   * after each frame, and returns the mean wall time per frame in ms. Read-only:
+   * it draws what is already on screen and changes no state.
+   */
+  benchmark?: (frames: number) => number;
+  /** Renders the current frame and reads the canvas (RGBA, 0–255) at page points. Read-only. */
+  samplePixels?: (points: Array<{ x: number; y: number }>) => number[][];
   /** The cube style the 3D scene is actually showing (`null` before the stage mounts). */
   renderedStyle?: () => string | null;
   /** Turn-audio state: context, voices started by kind, voices sounding now. */

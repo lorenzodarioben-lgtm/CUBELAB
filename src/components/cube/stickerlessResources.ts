@@ -28,6 +28,8 @@ import type { RenderTier } from './renderTier';
 import { CONTINUOUS_CENTRE_NORMALS, STICKERLESS_CENTRE_MESH } from './stickerlessCenterGeometry';
 import { acquireStickerlessChamferGeometry, releaseStickerlessChamferGeometry, STICKERLESS_CHAMFER_NORMALS, STICKERLESS_CHAMFER_SURFACE } from './stickerlessChamferGeometry';
 import { applyStrongHybrid } from './stickerlessHybrid';
+import type { VisualTurn } from '../../core/engine/cubeEngine';
+import type { CubieOrientations } from '../../core/puzzle/cubies';
 
 /** Distance from a cubie centre to the middle of its outer face (the top of the pillow). */
 export const STICKERLESS_SURFACE = PIECE_HALF + PILLOW;
@@ -46,6 +48,14 @@ export interface StickerlessResources {
   /** Reflection map, plus room-only irradiance for Gloss (null: scene fallback). */
   setEnvironment(texture: THREE.Texture | null, diffuse?: THREE.Texture | null): void;
   dispose(): void;
+  /** Experimental v2 only (`stickerless2/`): the layer turn in flight. */
+  setTurn?(visual: VisualTurn | null): void;
+  /** Experimental v2 only: the puzzle state (each cubie's orientation), for the bounce light's colours. */
+  setCells?(cubies: CubieOrientations): void;
+  /** Experimental v2 only: installed as each piece mesh's `onBeforeRender`. */
+  readonly onPieceRender?: THREE.Object3D['onBeforeRender'];
+  /** Experimental v2 only: the core turns with slice moves and whole-cube rotations. */
+  readonly coreFollowsSlices?: boolean;
 }
 
 export function createStickerlessResources(tier: RenderTier, finish: Finish): StickerlessResources {

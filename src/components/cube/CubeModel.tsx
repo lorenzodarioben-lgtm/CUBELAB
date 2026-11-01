@@ -94,6 +94,7 @@ function StickerlessPiece({ def, visuals, faceLabels }: PieceProps) {
         quaternion={PIECE_FRAMES[def.id]!.quaternion}
         castShadow={shadows}
         receiveShadow={shadows}
+        {...(res.onPieceRender ? { onBeforeRender: res.onPieceRender } : {})}
       />
       {faceLabels &&
         ANCHORS[def.id]!.map((a, i) => (
@@ -159,6 +160,7 @@ interface CubeModelProps {
 export function CubeModel({ engine, quality, finish, style, faceLabels, registry, reflections }: CubeModelProps) {
   const invalidate = useThree((s) => s.invalidate);
   const groups = useRef<Array<THREE.Group | null>>([]);
+  const coreRef = useRef<THREE.Mesh>(null);
   const visuals = useMemo(() => new CubeVisuals(quality, finish), [quality, finish]);
   useEffect(() => () => visuals.dispose(), [visuals]);
   // A style change only swaps meshes; ask for a frame so it shows at once.
@@ -192,10 +194,19 @@ export function CubeModel({ engine, quality, finish, style, faceLabels, registry
     const visual = engine.getVisualTurn(now);
     // A layer part-way round opens the cube (whole-cube rotations open nothing).
     visuals.setTurnExposure(visual && visual.layer !== null ? Math.abs(Math.sin(2 * visual.angle)) : 0);
+    visuals.setTurnState(visual);
+    visuals.setCubeCells(state.cubies);
     scratch.inLayer.fill(false);
     if (visual) {
       for (const id of visual.cubies) scratch.inLayer[id] = true;
       scratch.q.setFromAxisAngle(AXES[visual.axis], visual.angle);
+    }
+    // A core with arms (Stickerless v2) turns with slices and whole-cube rotations; its
+    // six arms look the same after any quarter turn, so it needs no committed orientation.
+    const coreMesh = coreRef.current;
+    if (coreMesh?.userData.followsSlices) {
+      if (visual && (visual.layer === 0 || visual.layer === null)) coreMesh.quaternion.copy(scratch.q);
+      else coreMesh.quaternion.identity();
     }
     for (const def of CUBIE_DEFS) {
       const group = groups.current[def.id];
@@ -231,7 +242,12 @@ export function CubeModel({ engine, quality, finish, style, faceLabels, registry
   return (
     <group name="cube" userData={{ style }}>
       {/* The mechanism's dark core: only ever glimpsed between layers mid-turn. */}
-      <mesh geometry={core.core} material={core.coreMaterial} />
+      <mesh
+        ref={coreRef}
+        geometry={core.core}
+        material={core.coreMaterial}
+        userData={{ followsSlices: style === 'stickerless' && visuals.stickerless.coreFollowsSlices === true }}
+      />
       {CUBIE_DEFS.map((def) => (
         <group
           key={def.id}

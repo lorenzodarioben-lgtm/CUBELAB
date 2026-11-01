@@ -25,15 +25,28 @@ export function trackErrors(page: Page): () => string[] {
  * reloads inside a test keep their data) and optional seeded settings.
  */
 export async function openStudio(page: Page, options: { settings?: Record<string, unknown>; path?: string } = {}): Promise<void> {
+  const style = styleOverride(options.settings);
   await page.addInitScript((settings) => {
     if (sessionStorage.getItem('cubelab:e2e-initialised')) return;
     localStorage.clear();
     localStorage.setItem('cubelab.gestureHintSeen', '1');
     if (settings) localStorage.setItem('cubelab.settings', JSON.stringify({ v: 1, data: settings }));
     sessionStorage.setItem('cubelab:e2e-initialised', '1');
-  }, options.settings ?? null);
-  await page.goto(options.path ?? '/');
+  }, style.settings);
+  await page.goto(style.path(options.path ?? '/'));
   await waitForStage(page);
+}
+
+/**
+ * `CUBELAB_E2E_STYLE=stickerless-v1|stickerless-v2` reruns the suite on Stickerless Gloss: tests that do not
+ * choose a cube style get it seeded, and every page opened here carries the renderer flag. Unset: unchanged.
+ */
+function styleOverride(settings: Record<string, unknown> | undefined) {
+  const style = process.env.CUBELAB_E2E_STYLE;
+  if (style !== 'stickerless-v1' && style !== 'stickerless-v2') return { settings: settings ?? null, path: (p: string) => p };
+  const seeded = settings && 'cubeStyle' in settings ? settings : { ...settings, cubeStyle: 'stickerless', finish: 'gloss' };
+  const flag = style === 'stickerless-v2' ? 'stickerless=v2' : 'stickerless=v1';
+  return { settings: seeded, path: (p: string) => (p.includes('stickerless=') ? p : `${p}${p.includes('?') ? '&' : '?'}${flag}`) };
 }
 
 export async function waitForStage(page: Page): Promise<void> {

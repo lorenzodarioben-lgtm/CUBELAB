@@ -24,6 +24,9 @@ import { Celebration } from './Celebration';
 import { STICKERLESS_REFLECTORS, installStudioEnvironment, renderEnvironment } from './studioEnvironment';
 import { StyleReflections } from '../cube/styleReflections';
 import { renderStickerlessEnvironment, stickerlessWindowIntensity, stickerlessWindowPosition } from './stickerlessEnvironment';
+import type { CubeEngine } from '../../core/engine/cubeEngine';
+import { STICKERLESS_RENDERER } from '../cube/stickerless2/flag';
+import { V2_STUDIO } from '../cube/stickerless2/studio';
 
 const FOV = 27;
 /** Bounding-sphere radius of the cube (half its space diagonal, in world units). */
@@ -150,7 +153,8 @@ function CameraRig({ rig, reduced, transportOpen, zen, frame, floor }: CameraRig
 
 /**
  * Keep the shared scene environment independent of Stickerless's reflection
- * maps. Rebuild the latter only when the tier or Gloss lighting mode changes.
+ * maps. Rebuild the latter only when the tier or Gloss lighting mode changes
+ * (and, for v2, once a lost WebGL context is restored).
  */
 function StudioEnvironment({ size, intensity, reflections, hybrid, hybridSize }: { size: number; intensity: number; reflections: StyleReflections; hybrid: boolean; hybridSize: number }) {
   const gl = useThree((s) => s.gl);
@@ -161,7 +165,35 @@ function StudioEnvironment({ size, intensity, reflections, hybrid, hybridSize }:
     invalidate();
     return restore;
   }, [gl, scene, size, intensity, invalidate]);
+  // v2 rebuilds its maps once a lost WebGL context is restored: their contents did not survive it.
+  const [restored, setRestored] = useState(0);
   useEffect(() => {
+    if (STICKERLESS_RENDERER !== 'v2') return;
+    const canvas = gl.domElement;
+    const onRestored = () => setRestored((n) => n + 1);
+    canvas.addEventListener('webglcontextrestored', onRestored);
+    return () => canvas.removeEventListener('webglcontextrestored', onRestored);
+  }, [gl]);
+  const v2 = hybrid && STICKERLESS_RENDERER === 'v2';
+  const rebuild = v2 ? restored : 0;
+  useEffect(() => {
+    if (v2) {
+      const maps = renderStickerlessEnvironment(gl, hybridSize, V2_STUDIO.panels, V2_STUDIO.room, { key: V2_STUDIO.key, fill: V2_STUDIO.fill });
+      // Maps the context took with it are not freed again.
+      let lost = false;
+      const canvas = gl.domElement;
+      const onLost = () => {
+        lost = true;
+      };
+      canvas.addEventListener('webglcontextlost', onLost);
+      reflections.setStickerless(maps.specular.texture, maps.diffuse.texture);
+      invalidate();
+      return () => {
+        canvas.removeEventListener('webglcontextlost', onLost);
+        reflections.setStickerless(null);
+        if (!lost) maps.dispose();
+      };
+    }
     if (hybrid) {
       const maps = renderStickerlessEnvironment(gl, hybridSize);
       reflections.setStickerless(maps.specular.texture, maps.diffuse.texture);
@@ -175,7 +207,8 @@ function StudioEnvironment({ size, intensity, reflections, hybrid, hybridSize }:
       reflections.setStickerless(null);
       stickerless.dispose();
     };
-  }, [gl, size, reflections, hybrid, hybridSize, invalidate]);
+    // `rebuild` is not read: a restored context only asks for fresh v2 maps.
+  }, [gl, size, reflections, hybrid, hybridSize, invalidate, v2, rebuild]);
   return null;
 }
 
@@ -184,6 +217,8 @@ function StudioEnvironment({ size, intensity, reflections, hybrid, hybridSize }:
  * reviewed finite window, with a matching diffuse key and High-tier shadow.
  */
 function Lighting({ high, shadows, reflections, hybrid }: { high: boolean; shadows: boolean; reflections: StyleReflections; hybrid: boolean }) {
+  // v2's studio brings its own key softbox, which the key light matches (production's window otherwise).
+  const key = STICKERLESS_RENDERER === 'v2' ? V2_STUDIO.key : undefined;
   return (
     <>
       <hemisphereLight visible={!hybrid} args={['#ffffff', '#1a1a1d', 0.38]} />
@@ -205,9 +240,9 @@ function Lighting({ high, shadows, reflections, hybrid }: { high: boolean; shado
       />
       <directionalLight visible={!hybrid} position={[6.5, 2.5, 4.5]} intensity={1.05} color="#f4f6ff" />
       {hybrid && <directionalLight
-        position={stickerlessWindowPosition()}
-        intensity={stickerlessWindowIntensity()}
-        color="#fffaf0"
+        position={stickerlessWindowPosition(key)}
+        intensity={stickerlessWindowIntensity(key)}
+        color={key?.tint ?? '#fffaf0'}
         castShadow={shadows}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.00012}
@@ -247,7 +282,7 @@ function BlobShadow() {
 }
 
 /** Read-only verification hooks: rendered facelets, cube→screen projection and the shown style. */
-function DebugBridge({ registry, frame }: { registry: StickerRegistry; frame: RefObject<THREE.Group | null> }) {
+function DebugBridge({ registry, frame, engine }: { registry: StickerRegistry; frame: RefObject<THREE.Group | null>; engine: CubeEngine }) {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
@@ -255,6 +290,37 @@ function DebugBridge({ registry, frame }: { registry: StickerRegistry; frame: Re
     const api = (window as unknown as { __CUBELAB__?: Record<string, unknown> }).__CUBELAB__;
     if (!api) return;
     const v = new THREE.Vector3();
+    api.visualTurn = () => {
+      const turn = engine.getVisualTurn();
+      return turn ? { axis: turn.axis, layer: turn.layer, angle: turn.angle } : null;
+    };
+    api.stickerlessRenderer = () => STICKERLESS_RENDERER;
+    api.benchmark = (frames: number) => {
+      const context = gl.getContext();
+      const pixel = new Uint8Array(4);
+      gl.render(scene, camera);
+      context.readPixels(0, 0, 1, 1, context.RGBA, context.UNSIGNED_BYTE, pixel);
+      const start = performance.now();
+      for (let i = 0; i < frames; i++) {
+        gl.render(scene, camera);
+        // Reading a pixel waits for the GPU to finish the frame.
+        context.readPixels(0, 0, 1, 1, context.RGBA, context.UNSIGNED_BYTE, pixel);
+      }
+      return (performance.now() - start) / frames;
+    };
+    api.samplePixels = (points: Array<{ x: number; y: number }>) => {
+      const context = gl.getContext();
+      const r = gl.domElement.getBoundingClientRect();
+      const scale = gl.domElement.width / r.width;
+      const pixel = new Uint8Array(4);
+      gl.render(scene, camera);
+      return points.map(({ x, y }) => {
+        const px = Math.round((x - r.left) * scale);
+        const py = gl.domElement.height - 1 - Math.round((y - r.top) * scale);
+        context.readPixels(px, py, 1, 1, context.RGBA, context.UNSIGNED_BYTE, pixel);
+        return [pixel[0]!, pixel[1]!, pixel[2]!, pixel[3]!];
+      });
+    };
     api.visualFacelets = () => readVisualFacelets(registry.meshes, frame.current);
     api.project = (p: [number, number, number]) => {
       camera.updateMatrixWorld();
@@ -268,6 +334,8 @@ function DebugBridge({ registry, frame }: { registry: StickerRegistry; frame: Re
       geometries: gl.info.memory.geometries,
       textures: gl.info.memory.textures,
       programs: gl.info.programs?.length ?? 0,
+      calls: gl.info.render.calls,
+      triangles: gl.info.render.triangles,
     });
     // The style actually on screen (the model the scene graph carries), not the setting.
     api.renderedStyle = () => (scene.getObjectByName('cube')?.userData.style as string | undefined) ?? null;
@@ -276,8 +344,12 @@ function DebugBridge({ registry, frame }: { registry: StickerRegistry; frame: Re
       delete api.project;
       delete api.renderInfo;
       delete api.renderedStyle;
+      delete api.visualTurn;
+      delete api.stickerlessRenderer;
+      delete api.benchmark;
+      delete api.samplePixels;
     };
-  }, [camera, gl, scene, registry, frame]);
+  }, [camera, gl, scene, registry, frame, engine]);
   return null;
 }
 
@@ -391,7 +463,7 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
         hover={hover}
         onFirstGesture={onFirstGesture}
       />
-      <DebugBridge registry={registry} frame={frameRef} />
+      <DebugBridge registry={registry} frame={frameRef} engine={studio.engine} />
       <ReadySignal onReady={onReady} />
     </Canvas>
   );
