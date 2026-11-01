@@ -3,8 +3,9 @@
  * shaders compile and draw the puzzle state (pixel colours on screen match the
  * model after face, slice and rotation moves, and during a held turn), it
  * survives quality changes without leaking GPU resources, Classic Stickered
- * renders identically whether or not the flag is present, and the build
- * ignores the development branch's diagnostic and review parameters.
+ * renders identically whether or not the flag is present, Settings previews
+ * Premium Stickerless as the renderer in use, and the build ignores the
+ * development branch's diagnostic and review parameters.
  */
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -167,6 +168,28 @@ test('Classic Stickered draws the same pixels with or without the v2 flag', asyn
   const flagged = await capture(V2);
   const differing = plain.filter((p, i) => p.some((v, k) => Math.abs(v - flagged[i]![k]!) > 1)).length;
   expect(differing).toBe(0);
+});
+
+test('Settings previews Premium Stickerless as the renderer this page draws it', async ({ browser, baseURL }) => {
+  const previews = async (path: string) => {
+    const context = await browser.newContext({ baseURL, viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    await openStudio(page, { settings: STICKERLESS, path });
+    await page.getByRole('button', { name: 'Settings' }).first().click();
+    const images = page.getByRole('dialog').locator('.style-card__preview img');
+    await expect(images).toHaveCount(2);
+    await expect
+      .poll(() => images.evaluateAll((all) => all.every((img) => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0)))
+      .toBe(true);
+    const files = await images.evaluateAll((all) => all.map((img) => new URL((img as HTMLImageElement).currentSrc).pathname.split('/').pop()!));
+    await context.close();
+    return files;
+  };
+  const [classic, stickerless] = await previews('/');
+  const [classicFlagged, stickerlessFlagged] = await previews(V2);
+  expect(stickerless).toMatch(/^stickerless-[\w-]{8}\.webp$/);
+  expect(stickerlessFlagged).toMatch(/^stickerless-v2-[\w-]{8}\.webp$/);
+  expect(classicFlagged).toBe(classic);
 });
 
 test('the lighting review exists only on the dev server: production ignores ?v2review', async ({ page }) => {

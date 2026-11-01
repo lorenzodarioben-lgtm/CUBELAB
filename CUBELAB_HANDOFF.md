@@ -25,7 +25,8 @@ about what was and was not verified.
     (`git checkout main && git merge premium-slices-upgrade`).
 - `.gitattributes` normalises line endings to LF.
 - Screenshots: `artifacts/before/` (v1), `artifacts/after/` (current default style) and
-  `artifacts/styles/` (both styles side by side, selector, live switch).
+  `artifacts/styles/` (Classic, Stickerless v1 and the opt-in Stickerless v2 side by side, selector,
+  live switch).
 
 ## Eighth pass — photoreal stickerless plastic + speedcube turn audio
 

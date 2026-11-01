@@ -1,7 +1,9 @@
-// Side-by-side captures of both cube styles in identical conditions.
+// Side-by-side captures of the cube styles in identical conditions: Classic
+// Stickered, Premium Stickerless as drawn by default (v1) and as drawn with
+// ?stickerless=v2 (Candidate Y, opt-in).
 // Usage: npm run build && npm run preview (port 4317) in another shell, then:
 //        node scripts/capture-style-matrix.mjs [outDir]
-// Writes <outDir>/{stickered,stickerless}/*.png plus selector and switching shots.
+// Writes <outDir>/{stickered,stickerless,stickerless-v2}/*.png plus selector and switching shots.
 import { mkdirSync } from 'node:fs';
 import { chromium, devices } from '@playwright/test';
 
@@ -13,7 +15,18 @@ const args = process.platform === 'win32' ? ['--use-angle=d3d11', '--enable-gpu'
 const browser = await chromium.launch({ args });
 const errors = [];
 
-async function open(settings, { mobile = false, path = '' } = {}) {
+const STYLES = [
+  { dir: 'stickered', cubeStyle: 'stickered', flag: '', renderer: null },
+  { dir: 'stickerless', cubeStyle: 'stickerless', flag: '', renderer: 'v1' },
+  { dir: 'stickerless-v2', cubeStyle: 'stickerless', flag: 'stickerless=v2', renderer: 'v2' },
+];
+/** A query string from the given parameters (empty ones skipped). */
+const query = (...params) => (params.some(Boolean) ? '?' + params.filter(Boolean).join('&') : '');
+/** Resolves once the page draws `style` with every shader of its look compiled. */
+const drawn = (page, style) =>
+  page.waitForFunction((s) => window.__CUBELAB__?.renderedStyle?.() === s && !window.__CUBELAB__.lookPending?.(), style, { timeout: 120000 });
+
+async function open(settings, { mobile = false, path = '', renderer = null } = {}) {
   const context = await browser.newContext(mobile ? { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } } : { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   await context.addInitScript((s) => {
     localStorage.setItem('cubelab.gestureHintSeen', '1');
@@ -23,7 +36,11 @@ async function open(settings, { mobile = false, path = '' } = {}) {
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && errors.push(m.text()));
   await page.goto(BASE + path);
-  await page.waitForFunction((s) => window.__CUBELAB__?.renderedStyle?.() === s, settings.cubeStyle, { timeout: 60000 });
+  await drawn(page, settings.cubeStyle);
+  if (renderer) {
+    const used = await page.evaluate(() => window.__CUBELAB__.stickerlessRenderer?.());
+    if (used !== renderer) throw new Error(`expected the ${renderer} renderer, the page drew ${used}`);
+  }
   await page.waitForTimeout(800);
   return { context, page };
 }
@@ -47,14 +64,16 @@ async function release(page, from) {
   await idle(page);
 }
 
-for (const style of ['stickered', 'stickerless']) {
-  const dir = `${OUT}/${style}`;
+for (const { dir: name, cubeStyle, flag, renderer } of STYLES) {
+  const dir = `${OUT}/${name}`;
   mkdirSync(dir, { recursive: true });
-  const base = { cubeStyle: style, scrambleStyle: 'instant', quality: 'high' };
+  const base = { cubeStyle, scrambleStyle: 'instant', quality: 'high' };
+  const scrambled = query(flag, 'scramble=' + encodeURIComponent(SCRAMBLE));
   {
-    const { context, page } = await open(base);
+    const { context, page } = await open(base, { path: query(flag), renderer });
     await page.screenshot({ path: `${dir}/solved.png`, clip: CUBE });
-    await page.goto(BASE + '?scramble=' + encodeURIComponent(SCRAMBLE));
+    await page.goto(BASE + scrambled);
+    await drawn(page, cubeStyle);
     await page.waitForFunction(() => window.__CUBELAB__?.timer().phase === 'ready', null, { timeout: 60000 });
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${dir}/scrambled.png`, clip: CUBE });
@@ -83,29 +102,29 @@ for (const style of ['stickered', 'stickerless']) {
     await context.close();
   }
   {
-    const { context, page } = await open({ ...base, quality: 'low' }, { path: '?scramble=' + encodeURIComponent(SCRAMBLE) });
+    const { context, page } = await open({ ...base, quality: 'low' }, { path: scrambled, renderer });
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${dir}/quality-low.png`, clip: CUBE });
     await context.close();
   }
   {
-    const { context, page } = await open({ ...base, quality: 'auto' }, { mobile: true, path: '?scramble=' + encodeURIComponent(SCRAMBLE) });
+    const { context, page } = await open({ ...base, quality: 'auto' }, { mobile: true, path: scrambled, renderer });
     await page.waitForTimeout(600);
     await page.screenshot({ path: `${dir}/mobile.png` });
     await context.close();
   }
 }
 
-// Selector, both selection states, desktop and phone.
+// Selector, each selection state (and the v2 preview), desktop and phone.
 for (const [label, mobile] of [
   ['desktop', false],
   ['mobile', true],
 ]) {
-  for (const style of ['stickered', 'stickerless']) {
-    const { context, page } = await open({ cubeStyle: style, scrambleStyle: 'instant' }, { mobile });
+  for (const { dir: name, cubeStyle, flag, renderer } of STYLES) {
+    const { context, page } = await open({ cubeStyle, scrambleStyle: 'instant' }, { mobile, path: query(flag), renderer });
     await page.getByRole('button', { name: 'Settings' }).first().click();
     await page.waitForTimeout(500);
-    await page.screenshot({ path: `${OUT}/selector-${label}-${style}.png` });
+    await page.screenshot({ path: `${OUT}/selector-${label}-${name}.png` });
     await context.close();
   }
 }
