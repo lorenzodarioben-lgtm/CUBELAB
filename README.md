@@ -1,10 +1,9 @@
 # CUBELAB
 
-**The interactive cubing studio.** The original photoreal 3×3×3 remains the full-featured studio:
-stickerless or stickered, face and M/E/S slice turns, WCA-style random-state practice scrambles,
-timing, and move-by-move solve playback. The puzzle selector now adds playable stickerless 2×2,
-4×4, 5×5, 6×6, and 7×7 cubes with their own scrambles, timers, and solve histories. Pyraminx,
-Skewb, and Megaminx also have playable 3D puzzle views, event scrambles, and separate timing histories.
+**The interactive cubing studio.** A photoreal 3×3×3: stickerless or stickered, face and M/E/S
+slice turns, WCA-style random-state practice scrambles, timing, and move-by-move solve playback.
+Studios for 2×2, 4×4–7×7, Pyraminx, Skewb and Megaminx are in the code but switched off, so the site
+offers the 3×3 only (see [Other puzzles](#other-puzzles-switched-off)).
 
 Everything runs locally in the browser. There are no accounts, no servers, no analytics; solves and
 settings live in this browser's `localStorage` only.
@@ -67,42 +66,6 @@ npm run test:e2e     # Playwright against the production build (builds + preview
 First Playwright run on a new machine: `npx playwright install chromium firefox webkit`.
 
 ## Using the studio
-
-### Choosing a puzzle
-
-Use the puzzle selector in the top bar. The 3×3 keeps its existing solver, playback, styles,
-settings, and statistics. The other sizes use a shared exact-piece model with rounded plastic caps,
-a dark internal mechanism, animated turns, and a playable 2D net when WebGL is unavailable.
-
-| Size | Practice features |
-| --- | --- |
-| 2×2 | Event scramble, timer, undo/redo, local history, verified solution |
-| 4×4–7×7 | Event scramble, outer and wide turns, timer, undo/redo, local history |
-| Pyraminx | Event scramble, face and tip turns, timer, local history |
-| Skewb | Event scramble, corner-axis turns, timer, local history |
-| Megaminx | Event scramble, R/D double turns and U turns, timer, local history |
-
-In these new modes, tap a coloured face to turn it, drag a sticker along a row or column to turn
-that layer, or use the face buttons and keyboard (`U R F D L B`; hold Shift for inverse). Drag the
-background to orbit. For larger cubes, choose **Outer**, **Wide 2**, or **Wide 3** where available.
-The first turn after a scramble starts the timer; solving stops it. Undo and redo mark an attempt
-as practice, so it cannot become a clean best single. Results are stored separately for each size.
-The **Find Solution** button on 2×2 verifies the returned algorithm against the physical model
-before offering to apply it; applying it never creates a timed result.
-
-Every added puzzle accepts physical-cube times as well as on-screen solves. Its history includes
-penalty corrections, deletion, a recent-times trend, best single, session mean, and the event's
-ao5/ao12 or mo3 where applicable. CSV export makes results easy to analyse; JSON export/import
-backs up the complete event history. The selected puzzle, scramble, and current position survive a
-reload without starting a fresh timed attempt. Each studio has its own volume and sound preview;
-turns use the same recorded speedcube sound as the 3×3.
-
-Pyraminx, Skewb, and Megaminx have shape-specific turn buttons beside their 3D views. Their
-turns and solved states use the corresponding puzzle definitions rather than cube geometry.
-
-These are practice scrambles generated locally by cubing.js, not official competition scrambles.
-
-### 3×3 turning and controls
 
 ### Turning the cube
 
@@ -183,6 +146,47 @@ three speeds, Reset (confirms if it would discard a running attempt), camera res
 share links (`?scramble=R%20M%27%20U`), Zen mode, two cube styles (Classic Stickered / Premium
 Stickerless), sticker letters for colour-vision differences, gloss/matte finish, render quality (auto/high/low), reduced motion, orbit sensitivity, optional
 speedcube turning sounds with volume and preview (off by default), and a 2D net fallback when WebGL is unavailable.
+
+### Other puzzles (switched off)
+
+The site offers the 3×3 only: the top bar has no puzzle selector, and a `?puzzle=` link opens the
+3×3 and drops the parameter. The 2×2, 4×4–7×7, Pyraminx, Skewb and Megaminx studios stay in the code
+(`src/core/nxn/`, `src/core/shapes/`, `src/components/nxn/`, `src/components/shapes/`). Their unit
+tests still run; their browser tests are skipped while the studios are off. Setting
+`EXPERIMENTAL_PUZZLES` to `true` in `src/core/features.ts` brings back the selector and the studios
+described below.
+
+With the studios on, the 3×3 keeps its solver, playback, styles, settings, and statistics. The
+other sizes use a shared exact-piece model with rounded plastic caps, a dark internal mechanism,
+animated turns, and a playable 2D net when WebGL is unavailable.
+
+| Puzzle | Practice features |
+| --- | --- |
+| 2×2 | Event scramble, timer, undo/redo, local history, verified solution |
+| 4×4–7×7 | Event scramble, outer and wide turns, timer, undo/redo, local history |
+| Pyraminx | Event scramble, face and tip turns, timer, local history |
+| Skewb | Event scramble, corner-axis turns, timer, local history |
+| Megaminx | Event scramble, R/D double turns and U turns, timer, local history |
+
+In these studios, tap a coloured face to turn it, drag a sticker along a row or column to turn
+that layer, or use the face buttons and keyboard (`U R F D L B`; hold Shift for inverse). Drag the
+background to orbit. For larger cubes, choose **Outer**, **Wide 2**, or **Wide 3** where available.
+The first turn after a scramble starts the timer; solving stops it. Undo and redo mark an attempt
+as practice, so it cannot become a clean best single. Results are stored separately for each size.
+The **Find Solution** button on 2×2 verifies the returned algorithm against the physical model
+before offering to apply it; applying it never creates a timed result.
+
+Each of these puzzles accepts physical-cube times as well as on-screen solves. Its history includes
+penalty corrections, deletion, a recent-times trend, best single, session mean, and the event's
+ao5/ao12 or mo3 where applicable. CSV export makes results easy to analyse; JSON export/import
+backs up the complete event history. The selected puzzle, scramble, and current position survive a
+reload without starting a fresh timed attempt. Each studio has its own volume and sound preview;
+turns use the same recorded speedcube sound as the 3×3.
+
+Pyraminx, Skewb, and Megaminx have shape-specific turn buttons beside their 3D views. Their
+turns and solved states use the corresponding puzzle definitions rather than cube geometry.
+
+These are practice scrambles generated locally by cubing.js, not official competition scrambles.
 
 ## Architecture
 
@@ -338,6 +342,7 @@ read from the three.js scene graph, `project(point)`, `moveLog()`, `renderInfo()
 ## Known limitations
 
 See `CUBELAB_HANDOFF.md`. In short: wide moves are not part of the 3×3 notation;
-4×4–7×7 do not yet have auto-solvers; the timer is a training tool, not WCA-certified;
+the other puzzles are switched off, and 4×4–7×7 have no auto-solver even when on; the timer is a
+training tool, not WCA-certified;
 history is per-browser; touch was verified with
 Chromium touch emulation (not physical devices); Firefox/WebKit are covered by a smoke test only.
