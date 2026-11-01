@@ -23,6 +23,11 @@ import type { StickeredResources } from './stickeredResources';
 import { STICKERLESS_SURFACE, createStickerlessResources } from './stickerlessResources';
 import type { StickerlessResources } from './stickerlessResources';
 import type { RenderTier } from './renderTier';
+import type { VisualTurn } from '../../core/engine/cubeEngine';
+import type { CubieOrientations } from '../../core/puzzle/cubies';
+import { STICKERLESS_RENDERER } from './stickerless2/flag';
+import type { StickerlessRenderer } from './stickerless2/flag';
+import { createStickerlessV2Resources } from './stickerless2/resources';
 
 export type { RenderTier } from './renderTier';
 
@@ -69,21 +74,25 @@ function labelTexture(face: Face): THREE.Texture {
 export class CubeVisuals {
   readonly tier: RenderTier;
   readonly finish: Finish;
+  /** Which Stickerless renderer this set builds (v2 is the opt-in experiment). */
+  readonly stickerlessRenderer: StickerlessRenderer;
   /** Real-time shadows are cast on the high tier only. */
   readonly shadows: boolean;
   readonly label = new THREE.PlaneGeometry(0.46, 0.46);
   readonly labelMaterials: Readonly<Record<Face, THREE.Material>>;
   #stickered: StickeredResources | null = null;
   #stickerless: StickerlessResources | null = null;
+  #cells: CubieOrientations | null = null;
   #stickerlessEnv: THREE.Texture | null = null;
   #stickerlessDiffuse: THREE.Texture | null = null;
   #textures: THREE.Texture[] = [];
   #disposed = false;
   #compiling: Promise<unknown> | null = null;
 
-  constructor(tier: RenderTier, finish: Finish) {
+  constructor(tier: RenderTier, finish: Finish, stickerlessRenderer: StickerlessRenderer = STICKERLESS_RENDERER) {
     this.tier = tier;
     this.finish = finish;
+    this.stickerlessRenderer = stickerlessRenderer;
     this.shadows = tier === 'high';
     const labelMaterials = {} as Record<Face, THREE.Material>;
     for (const face of FACES) {
@@ -107,11 +116,13 @@ export class CubeVisuals {
     return this.#stickered;
   }
 
-  /** The Premium Stickerless set, created on first use. */
+  /** The Premium Stickerless set (v1, or the experimental v2 when selected), created on first use. */
   get stickerless(): StickerlessResources {
     if (!this.#stickerless) {
-      this.#stickerless = createStickerlessResources(this.tier, this.finish);
+      this.#stickerless =
+        this.stickerlessRenderer === 'v2' ? createStickerlessV2Resources(this.tier, this.finish) : createStickerlessResources(this.tier, this.finish);
       this.#stickerless.setEnvironment(this.#stickerlessEnv, this.#stickerlessDiffuse);
+      if (this.#cells) this.#stickerless.setCells?.(this.#cells);
     }
     return this.#stickerless;
   }
@@ -131,6 +142,17 @@ export class CubeVisuals {
   setTurnExposure(value: number): void {
     this.#stickered?.setExposure(value);
     this.#stickerless?.setExposure(value);
+  }
+
+  /** The layer turn in flight (only the experimental Stickerless v2 uses it). */
+  setTurnState(visual: VisualTurn | null): void {
+    this.#stickerless?.setTurn?.(visual);
+  }
+
+  /** The puzzle state (only the experimental Stickerless v2 uses it), kept for a set created later. */
+  setCubeCells(cubies: CubieOrientations): void {
+    this.#cells = cubies;
+    this.#stickerless?.setCells?.(cubies);
   }
 
   /**
