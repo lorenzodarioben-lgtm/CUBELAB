@@ -3,7 +3,7 @@
  * shadow, celebration and pointer interaction. Renders on demand — frames are
  * requested only while something moves — to keep laptops and phones cool.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows, PerformanceMonitor } from '@react-three/drei';
@@ -27,6 +27,8 @@ import { renderStickerlessEnvironment, stickerlessWindowIntensity, stickerlessWi
 import type { CubeEngine } from '../../core/engine/cubeEngine';
 import { STICKERLESS_RENDERER } from '../cube/stickerless2/flag';
 import { V2_STUDIO } from '../cube/stickerless2/studio';
+import { LookPreparer, lookLighting, looksAhead, sameLook } from './lookPreparation';
+import type { StageLook } from './lookPreparation';
 
 const FOV = 27;
 /** Bounding-sphere radius of the cube (half its space diagonal, in world units). */
@@ -154,13 +156,15 @@ function CameraRig({ rig, reduced, transportOpen, zen, frame, floor }: CameraRig
 /**
  * Keep the shared scene environment independent of Stickerless's reflection
  * maps. Rebuild the latter only when the tier or Gloss lighting mode changes
- * (and, for v2, once a lost WebGL context is restored).
+ * (and, for v2, once a lost WebGL context is restored). Maps are installed in
+ * layout effects, before the next frame: a frame drawn with the new look's
+ * materials and the old look's maps would compile a variant used once.
  */
 function StudioEnvironment({ size, intensity, reflections, hybrid, hybridSize }: { size: number; intensity: number; reflections: StyleReflections; hybrid: boolean; hybridSize: number }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const invalidate = useThree((s) => s.invalidate);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const restore = installStudioEnvironment(gl, scene, intensity, size);
     invalidate();
     return restore;
@@ -176,7 +180,7 @@ function StudioEnvironment({ size, intensity, reflections, hybrid, hybridSize }:
   }, [gl]);
   const v2 = hybrid && STICKERLESS_RENDERER === 'v2';
   const rebuild = v2 ? restored : 0;
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (v2) {
       const maps = renderStickerlessEnvironment(gl, hybridSize, V2_STUDIO.panels, V2_STUDIO.room, { key: V2_STUDIO.key, fill: V2_STUDIO.fill });
       // Maps the context took with it are not freed again.
@@ -216,7 +220,9 @@ function StudioEnvironment({ size, intensity, reflections, hybrid, hybridSize }:
  * Classic and Matte retain their studio lights. Stickerless Gloss uses the
  * reviewed finite window, with a matching diffuse key and High-tier shadow.
  */
-function Lighting({ high, shadows, reflections, hybrid }: { high: boolean; shadows: boolean; reflections: StyleReflections; hybrid: boolean }) {
+function Lighting({ look, reflections }: { look: StageLook; reflections: StyleReflections }) {
+  // `lookPreparation` compiles each look under this same rig: keep the two in step.
+  const { hybrid, shadows, sceneSize, stickerlessSize } = lookLighting(look);
   // v2's studio brings its own key softbox, which the key light matches (production's window otherwise).
   const key = STICKERLESS_RENDERER === 'v2' ? V2_STUDIO.key : undefined;
   return (
@@ -254,7 +260,7 @@ function Lighting({ high, shadows, reflections, hybrid }: { high: boolean; shado
         shadow-camera-near={1}
         shadow-camera-far={24}
       />}
-      <StudioEnvironment size={high ? 256 : 128} intensity={1} reflections={reflections} hybrid={hybrid} hybridSize={shadows ? 512 : high ? 256 : 128} />
+      <StudioEnvironment size={sceneSize} intensity={1} reflections={reflections} hybrid={hybrid} hybridSize={stickerlessSize} />
     </>
   );
 }
@@ -353,6 +359,80 @@ function DebugBridge({ registry, frame, engine }: { registry: StickerRegistry; f
   return null;
 }
 
+interface LookPreparationProps {
+  readonly preparer: LookPreparer;
+  readonly requested: StageLook;
+  readonly shown: StageLook | null;
+  /** Auto quality, which may step down to the low tier. */
+  readonly auto: boolean;
+  readonly onShow: (look: StageLook) => void;
+}
+
+/**
+ * Shows the requested look once its shaders are ready (see `lookPreparation`);
+ * meanwhile the look before it stays on screen and the page stays responsive.
+ * With the requested look on screen and the page idle, prepares the looks one
+ * step away, and frees what no nearby look uses.
+ */
+function LookPreparation({ preparer, requested, shown, auto, onShow }: LookPreparationProps) {
+  const gl = useThree((s) => s.gl);
+  const camera = useThree((s) => s.camera);
+  useEffect(() => preparer.attach(gl, camera), [preparer, gl, camera]);
+  useEffect(() => () => preparer.dispose(), [preparer]);
+  // A restored context has none of the prepared programs: prepare the nearby looks again.
+  const [restored, setRestored] = useState(0);
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const onRestored = () => {
+      preparer.forgetCompiled();
+      setRestored((n) => n + 1);
+    };
+    canvas.addEventListener('webglcontextrestored', onRestored);
+    return () => canvas.removeEventListener('webglcontextrestored', onRestored);
+  }, [gl, preparer]);
+  const pending = !shown || !sameLook(shown, requested);
+  useEffect(() => {
+    if (!pending) return;
+    let current = true;
+    void preparer.prepare(requested).then(() => {
+      if (current) onShow(requested);
+    });
+    return () => {
+      current = false;
+    };
+  }, [preparer, requested, pending, onShow]);
+  useEffect(() => {
+    if (!shown) return;
+    const ahead = looksAhead(shown, auto);
+    preparer.keep(shown, [requested, ...ahead]);
+    if (pending) return;
+    let cancelled = false;
+    const run = async () => {
+      for (const look of ahead) {
+        if (cancelled) return;
+        await preparer.prepare(look);
+      }
+    };
+    const idle = window.requestIdleCallback?.(() => void run(), { timeout: 4000 }) ?? window.setTimeout(() => void run(), 1500);
+    return () => {
+      cancelled = true;
+      if (window.cancelIdleCallback) window.cancelIdleCallback(idle);
+      else window.clearTimeout(idle);
+    };
+    // `restored` is not read: a restore only asks for the nearby looks again.
+  }, [preparer, shown, requested, pending, auto, restored]);
+  useEffect(() => {
+    const api = (window as unknown as { __CUBELAB__?: Record<string, unknown> }).__CUBELAB__;
+    if (!api) return;
+    // Read-only: whether a requested look is still being prepared (the look before it is on screen).
+    api.lookPending = () => pending;
+    return () => {
+      delete api.lookPending;
+    };
+  }, [pending]);
+  return null;
+}
+
 function ReadySignal({ onReady }: { onReady: () => void }) {
   const fired = useRef(false);
   useFrame(() => {
@@ -362,6 +442,13 @@ function ReadySignal({ onReady }: { onReady: () => void }) {
     }
   });
   return null;
+}
+
+type Dpr = [number, number];
+
+/** Canvas resolution: lowest on the low tier, full on an explicit High. */
+function stageDpr(tier: RenderTier, highSetting: boolean): Dpr {
+  return tier === 'low' ? [1, 1.25] : highSetting ? [1, 2] : [1, 1.75];
 }
 
 export interface StageCanvasProps {
@@ -387,7 +474,15 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
       : settings.quality === 'auto' && coarse
         ? 'medium'
         : 'high';
-  const dpr: [number, number] = quality === 'low' ? [1, 1.25] : settings.quality === 'high' ? [1, 2] : [1, 1.75];
+  const highSetting = settings.quality === 'high';
+  // The look asked for, and the one on screen: a new look is shown once its shaders are ready.
+  const requested = useMemo<StageLook>(() => ({ style: settings.cubeStyle, finish: settings.finish, tier: quality }), [settings.cubeStyle, settings.finish, quality]);
+  const preparer = useMemo(() => new LookPreparer(), []);
+  const [shown, setShown] = useState<{ look: StageLook; dpr: Dpr } | null>(null);
+  const onShow = useCallback((look: StageLook) => setShown({ look, dpr: stageDpr(look.tier, highSetting) }), [highSetting]);
+  const look = shown?.look ?? null;
+  // The resolution changes with the look it belongs to.
+  const dpr = shown && !sameLook(shown.look, requested) ? shown.dpr : stageDpr(requested.tier, highSetting);
 
   useEffect(() => rig.setSensitivity(settings.orbitSensitivity), [rig, settings.orbitSensitivity]);
 
@@ -411,7 +506,7 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
       dpr={dpr}
       gl={{ antialias: true, alpha: true, powerPreference: 'high-performance', preserveDrawingBuffer: false }}
       camera={{ fov: FOV, near: 0.5, far: 80, position: [6, 5, 8] }}
-      shadows={quality === 'high' ? 'soft' : false}
+      shadows={look?.tier === 'high' ? 'soft' : false}
       onCreated={({ gl }) => {
         // Only three's built-in shaders are used; their info-log check stalls compilation and
         // merely echoes driver notes (e.g. ANGLE/D3D precision remarks) as console warnings.
@@ -423,37 +518,42 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
       aria-hidden
     >
       {settings.quality === 'auto' && <PerformanceMonitor onDecline={() => setAutoDegraded(true)} flipflops={2} />}
+      <LookPreparation preparer={preparer} requested={requested} shown={look} auto={settings.quality === 'auto'} onShow={onShow} />
       <CameraRig rig={rig} reduced={reduced} transportOpen={transportOpen} zen={zen} frame={frameRef} floor={floorRef} />
-      <Lighting high={quality !== 'low'} shadows={quality === 'high'} reflections={reflections} hybrid={settings.cubeStyle === 'stickerless' && settings.finish === 'gloss'} />
-      <group ref={frameRef} name="cube-frame">
-        <CubeModel
-          reflections={reflections}
-          engine={studio.engine}
-          quality={quality}
-          finish={settings.finish}
-          style={settings.cubeStyle}
-          faceLabels={settings.faceLabels}
-          registry={registry}
-        />
-        <HoverIndicator hover={hover} engine={studio.engine} style={settings.cubeStyle} />
-      </group>
-      <group ref={floorRef} name="floor">
-        {/* Mounted once and switched off below the high tier: drei's ContactShadows never frees its
-            render targets or plane, so remounting it on every tier change would leak GPU memory. */}
-        <ContactShadows
-          visible={quality === 'high'}
-          frames={quality === 'high' ? Infinity : 0}
-          position={[0, FLOOR_Y, 0]}
-          scale={8.5}
-          blur={2.4}
-          far={3.4}
-          opacity={0.82}
-          resolution={512}
-          color="#000000"
-        />
-        {quality !== 'high' && <BlobShadow />}
-        <Celebration reduced={reduced} zen={zen} />
-      </group>
+      {look && (
+        <>
+          <Lighting look={look} reflections={reflections} />
+          <group ref={frameRef} name="cube-frame">
+            <CubeModel
+              reflections={reflections}
+              engine={studio.engine}
+              visuals={preparer.visuals(look.tier, look.finish)}
+              style={look.style}
+              faceLabels={settings.faceLabels}
+              registry={registry}
+            />
+            <HoverIndicator hover={hover} engine={studio.engine} style={look.style} />
+          </group>
+          <group ref={floorRef} name="floor">
+            {/* Mounted once and switched off below the high tier: drei's ContactShadows never frees its
+                render targets or plane, so remounting it on every tier change would leak GPU memory. */}
+            <ContactShadows
+              visible={look.tier === 'high'}
+              frames={look.tier === 'high' ? Infinity : 0}
+              position={[0, FLOOR_Y, 0]}
+              scale={8.5}
+              blur={2.4}
+              far={3.4}
+              opacity={0.82}
+              resolution={512}
+              color="#000000"
+            />
+            {look.tier !== 'high' && <BlobShadow />}
+            <Celebration reduced={reduced} zen={zen} />
+          </group>
+          <ReadySignal onReady={onReady} />
+        </>
+      )}
       <Interaction
         studio={studio}
         rig={rig}
@@ -464,7 +564,6 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
         onFirstGesture={onFirstGesture}
       />
       <DebugBridge registry={registry} frame={frameRef} engine={studio.engine} />
-      <ReadySignal onReady={onReady} />
     </Canvas>
   );
 }

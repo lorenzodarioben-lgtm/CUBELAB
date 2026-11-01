@@ -9,10 +9,10 @@
  *   - Premium Stickerless (`stickerlessResources.ts`): moulded coloured pieces;
  *   - the face-letter overlays, shared by both.
  *
- * Each style's set is created the first time it is shown and then kept until
- * the tier or finish changes (or the stage unmounts), so switching back and
- * forth is instant and never recompiles shaders; GPU memory is bounded by the
- * two sets and released in `dispose()`.
+ * Each style's set is created the first time it is shown or prepared and then
+ * kept until the stage no longer needs this tier and finish, so switching back
+ * and forth is instant and never recompiles shaders; GPU memory is bounded by
+ * the two sets and released in `dispose()`.
  */
 import * as THREE from 'three';
 import { FACES } from '../../core/puzzle/notation';
@@ -24,6 +24,7 @@ import { STICKERLESS_SURFACE, createStickerlessResources } from './stickerlessRe
 import type { StickerlessResources } from './stickerlessResources';
 import type { RenderTier } from './renderTier';
 import type { VisualTurn } from '../../core/engine/cubeEngine';
+import { CUBIE_DEFS } from '../../core/puzzle/cubies';
 import type { CubieOrientations } from '../../core/puzzle/cubies';
 import { STICKERLESS_RENDERER } from './stickerless2/flag';
 import type { StickerlessRenderer } from './stickerless2/flag';
@@ -87,7 +88,6 @@ export class CubeVisuals {
   #stickerlessDiffuse: THREE.Texture | null = null;
   #textures: THREE.Texture[] = [];
   #disposed = false;
-  #compiling: Promise<unknown> | null = null;
 
   constructor(tier: RenderTier, finish: Finish, stickerlessRenderer: StickerlessRenderer = STICKERLESS_RENDERER) {
     this.tier = tier;
@@ -156,30 +156,39 @@ export class CubeVisuals {
   }
 
   /**
-   * Registers background shader compilation of these resources (the idle
-   * pre-warm). three.js keeps polling the compiling materials until they are
-   * ready, so disposal waits for it: freeing a material mid-poll would leave
-   * three dereferencing a program that no longer exists.
+   * Stand-ins for `style`'s pieces, core and face letters in a compile-only
+   * scene: they share the real geometry and materials, which together decide
+   * the shader variant. Until `restore()`, Stickerless reflects `environment`
+   * (a placeholder the size of the map it will be drawn with).
    */
-  trackCompile(compiling: Promise<unknown>): void {
-    const settled = compiling.then(
-      () => undefined,
-      () => undefined,
-    );
-    this.#compiling = this.#compiling ? Promise.all([this.#compiling, settled]) : settled;
+  compileStandIns(style: CubeStyle, environment: THREE.Texture): { meshes: THREE.Mesh[]; restore: () => void } {
+    const meshes: THREE.Mesh[] = [];
+    const add = (geometry: THREE.BufferGeometry, material: THREE.Material) => meshes.push(new THREE.Mesh(geometry, material));
+    let restore = () => {};
+    if (style === 'stickered') {
+      const res = this.stickered;
+      (['corner', 'edge', 'center'] as const).forEach((kind) => add(res.bodies[kind], res.bodyMaterials[kind]));
+      const tile = Object.values(res.tiles)[0]!;
+      Object.values(res.tileMaterials).flat().forEach((m) => add(tile, m));
+      add(res.core, res.coreMaterial);
+    } else {
+      const res = this.stickerless;
+      res.materials.forEach((m, id) => add(res.pieces[CUBIE_DEFS[id]!.kind], m));
+      add(res.core, res.coreMaterial);
+      res.setEnvironment(environment, environment);
+      restore = () => res.setEnvironment(this.#stickerlessEnv, this.#stickerlessDiffuse);
+    }
+    for (const face of FACES) add(this.label, this.labelMaterials[face]);
+    return { meshes, restore };
   }
 
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    const free = () => {
-      this.#stickered?.dispose();
-      this.#stickerless?.dispose();
-      this.label.dispose();
-      for (const face of FACES) this.labelMaterials[face].dispose();
-      this.#textures.forEach((t) => t.dispose());
-    };
-    if (this.#compiling) void this.#compiling.then(free);
-    else free();
+    this.#stickered?.dispose();
+    this.#stickerless?.dispose();
+    this.label.dispose();
+    for (const face of FACES) this.labelMaterials[face].dispose();
+    this.#textures.forEach((t) => t.dispose());
   }
 }
