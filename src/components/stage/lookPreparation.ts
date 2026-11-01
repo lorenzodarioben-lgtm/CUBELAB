@@ -18,6 +18,10 @@
  * today) a look is reported ready at once and the remaining compile, if any,
  * blocks its first frame, as it always did.
  *
+ * Preparation only saves time: if it fails, or three.js (pinned at r182) no
+ * longer offers what it reads, a look is shown at once and compiles as it is
+ * drawn, as it always did.
+ *
  * Programs are shared by every material with the same variant, so the prepared
  * sets are kept while a look may be shown (bounded by the caller: the look on
  * screen, the one requested, and the few prepared ahead), and freed after. A
@@ -79,17 +83,31 @@ const GIVE_UP_MS = 15_000;
 /**
  * Compiles the materials of `scene` as `scene` lights them and resolves once
  * the driver has linked every program. A material freed or a context lost
- * meanwhile simply stops being waited for. Never rejects.
+ * meanwhile simply stops being waited for. Never rejects: where three.js does
+ * not say what it compiled, or how far a program has got, there is nothing to
+ * wait for.
  */
 export function compileInBackground(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
-  const pending = renderer.compile(scene, camera);
+  let pending: Set<THREE.Material>;
+  try {
+    // three r182 returns the materials it compiled.
+    const compiled: unknown = renderer.compile(scene, camera);
+    if (!(compiled instanceof Set)) return Promise.resolve();
+    pending = compiled as Set<THREE.Material>;
+  } catch {
+    return Promise.resolve();
+  }
   const started = performance.now();
   return new Promise((resolve) => {
     const poll = () => {
-      const lost = renderer.getContext().isContextLost();
-      for (const material of pending) {
-        const program = (renderer.properties.get(material) as ProgramState).currentProgram;
-        if (lost || !program || program.isReady()) pending.delete(material);
+      try {
+        const lost = renderer.getContext().isContextLost();
+        for (const material of pending) {
+          const program = (renderer.properties.get(material) as ProgramState).currentProgram;
+          if (lost || typeof program?.isReady !== 'function' || program.isReady()) pending.delete(material);
+        }
+      } catch {
+        pending.clear();
       }
       if (pending.size === 0 || performance.now() - started > GIVE_UP_MS) resolve();
       else setTimeout(poll, POLL_MS);
@@ -144,13 +162,14 @@ class PrefilterPrograms {
     if (!entry) {
       const generator = new THREE.PMREMGenerator(renderer);
       const internals = generator as unknown as PmremInternals;
-      if (typeof internals._setSize !== 'function' || typeof internals._allocateTargets !== 'function') {
+      try {
+        internals._setSize!(size);
+        // Creates the shaders for this size; the targets are not allocated on the GPU until drawn into.
+        internals._allocateTargets!().dispose();
+      } catch {
         generator.dispose();
         return Promise.resolve();
       }
-      internals._setSize(size);
-      // Creates the shaders for this size; the targets are not allocated on the GPU until drawn into.
-      internals._allocateTargets().dispose();
       entry = { generator, ggx: compileFiltering(renderer, internals._ggxMaterial) };
       this.#sizes.set(size, entry);
     }
@@ -224,6 +243,17 @@ export class LookPreparer {
     const renderer = this.#renderer;
     const camera = this.#camera;
     if (!renderer || !camera) return Promise.resolve();
+    let ready: Promise<void>;
+    try {
+      ready = this.#compile(renderer, camera, look);
+    } catch {
+      ready = Promise.resolve();
+    }
+    this.#prepared.set(key, ready);
+    return ready;
+  }
+
+  #compile(renderer: THREE.WebGLRenderer, camera: THREE.Camera, look: StageLook): Promise<void> {
     const lighting = lookLighting(look);
     const rig = lightRig(look);
     const { meshes, restore } = this.visuals(look.tier, look.finish).compileStandIns(look.style, placeholderMap(lighting.stickerlessSize));
@@ -240,9 +270,7 @@ export class LookPreparer {
     }
     const maps = [this.#prefilter.prepare(renderer, lighting.sceneSize, true)];
     if (lighting.stickerlessSize !== lighting.sceneSize) maps.push(this.#prefilter.prepare(renderer, lighting.stickerlessSize, false));
-    const ready = Promise.all([cube, ...maps]).then(() => undefined);
-    this.#prepared.set(key, ready);
-    return ready;
+    return Promise.all([cube, ...maps]).then(() => undefined);
   }
 
   /**
