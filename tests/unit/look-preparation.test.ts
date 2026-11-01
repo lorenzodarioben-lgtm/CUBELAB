@@ -137,6 +137,30 @@ describe('background compile', () => {
       vi.useRealTimers();
     }
   });
+
+  it('waits for nothing where three.js does not report what it compiled or how far it got', async () => {
+    const scene = new THREE.Scene();
+    const material = new THREE.MeshBasicMaterial();
+    scene.add(new THREE.Mesh(new THREE.BufferGeometry(), material));
+    const camera = new THREE.PerspectiveCamera();
+    const noSet = fakeRenderer();
+    (noSet.renderer as unknown as { compile: () => void }).compile = () => undefined;
+    await expect(compileInBackground(noSet.renderer, scene, camera)).resolves.toBeUndefined();
+    const throws = fakeRenderer();
+    (throws.renderer as unknown as { compile: () => never }).compile = () => {
+      throw new Error('compile failed');
+    };
+    await expect(compileInBackground(throws.renderer, scene, camera)).resolves.toBeUndefined();
+    // A program without a readiness query: nothing to wait for.
+    const noQuery = fakeRenderer();
+    const compile = noQuery.renderer.compile.bind(noQuery.renderer);
+    (noQuery.renderer as unknown as { compile: typeof compile }).compile = (...args) => {
+      const compiled = compile(...args);
+      for (const m of compiled) (noQuery.renderer.properties.get(m) as { currentProgram?: object }).currentProgram = {};
+      return compiled;
+    };
+    await expect(compileInBackground(noQuery.renderer, scene, camera)).resolves.toBeUndefined();
+  });
 });
 
 describe('look preparation', () => {
@@ -202,6 +226,42 @@ describe('look preparation', () => {
     gl.readyAll();
     await ready;
     preparer.dispose();
+  });
+
+  it('shows a look at once, with the renderer as it was, if preparing it fails', async () => {
+    const gl = fakeRenderer();
+    const preparer = new LookPreparer();
+    preparer.attach(gl.renderer, new THREE.PerspectiveCamera());
+    const visuals = preparer.visuals('high', 'gloss');
+    visuals.compileStandIns = () => {
+      throw new Error('no stand-ins');
+    };
+    await expect(preparer.prepare(look('stickerless', 'gloss', 'high'))).resolves.toBeUndefined();
+    (gl.renderer as unknown as { compile: () => never }).compile = () => {
+      throw new Error('compile failed');
+    };
+    await expect(preparer.prepare(look('stickered', 'matte', 'low'))).resolves.toBeUndefined();
+    expect(gl.renderer.shadowMap.enabled).toBe(false);
+    preparer.dispose();
+  });
+
+  it('prepares no prefilter shaders, and still the cube, without PMREMGenerator internals', async () => {
+    const proto = THREE.PMREMGenerator.prototype as unknown as Record<string, unknown>;
+    const setSize = proto._setSize;
+    delete proto._setSize;
+    try {
+      const gl = fakeRenderer();
+      const preparer = new LookPreparer();
+      preparer.attach(gl.renderer, new THREE.PerspectiveCamera());
+      const ready = preparer.prepare(look('stickerless', 'gloss', 'high'));
+      expect(prefilters(gl)).toEqual([]);
+      expect(gl.compiled).toHaveLength(1);
+      gl.readyAll();
+      await ready;
+      preparer.dispose();
+    } finally {
+      proto._setSize = setSize;
+    }
   });
 
   it('keeps only what nearby looks use', () => {
