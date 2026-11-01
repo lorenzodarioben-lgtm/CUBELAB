@@ -18,6 +18,9 @@ bundle, puzzle definitions, fonts, audio, and scramble worker are cached for off
 | --- | --- | --- |
 | ![Macro](artifacts/after/cube-macro.png) | ![M slice mid-turn](artifacts/after/cube-midturn-M.png) | ![Phone](artifacts/after/mobile-390-scrambled.png) |
 
+The studio opens with Classic Stickered, shown above. Premium Stickerless is one setting away, drawn by
+its v1 renderer; its v2 renderer (Candidate Y) is opt-in with `?stickerless=v2` (see [Rendering](#rendering)).
+
 ## Quick start
 
 Requires Node.js ≥ 22.3 (cubing.js needs `process.getBuiltinModule`).
@@ -57,8 +60,8 @@ npm run test:e2e     # Playwright against the production build (builds + preview
 | `npm run test:e2e`    | Playwright: Chromium desktop 1440×900, Chromium phone 390×844 (touch), Firefox and WebKit smoke |
 | `npm run test:all`    | Everything above, in order                                                      |
 | `npm run screenshots` | Re-capture `artifacts/after/*.png` (needs `npm run preview` running)             |
-| `node scripts/capture-style-matrix.mjs` | Both cube styles side by side → `artifacts/styles/` (needs preview) |
-| `node scripts/capture-style-previews.mjs` | Re-render the Settings previews in `src/assets/cube-styles/` (needs preview) |
+| `node scripts/capture-style-matrix.mjs` | Classic, Stickerless v1 and Stickerless v2 side by side → `artifacts/styles/` (needs preview) |
+| `node scripts/capture-style-previews.mjs` | Re-render the Settings previews (Classic, Stickerless v1 and v2) in `src/assets/cube-styles/` (needs preview) |
 | `node scripts/render-audio-demo.mjs` | Render the turn-sound demonstration to `artifacts/audio/turn-demo.wav` (needs preview) |
 
 First Playwright run on a new machine: `npx playwright install chromium firefox webkit`.
@@ -257,15 +260,33 @@ facelet read-back all work in cube coordinates, so twists behave identically ups
 
 ### Rendering
 
-Two cube styles share everything except the physical model (Settings → Cube style):
+Two cube styles share everything except the physical model (Settings → Cube style). Classic
+Stickered is the default:
 
-| | Classic Stickered | Premium Stickerless (default) |
+| | Classic Stickered (default) | Premium Stickerless (v1 renderer) |
 | --- | --- | --- |
 | Pieces | Glossy black moulded bodies from the same SDF mesher (flat faces, rounded outer edges, honeycomb interior seen mid-turn) | Solid moulded parts from signed distance fields (`pieceGeometry.ts`), each face a gentle dome that rolls softly into its seams |
 | Colour | Thin vinyl stickers shaped like their piece (round centres, D-shaped edges, square corners) with a black border, four print batches per colour | The plastic itself: a shader (`pieceMaterial.ts`) gives each face a coloured cap over black mechanism, meeting on the cube edges' 45° lines, with a drawn parting line; satin sheen under a clear coat, its own reflector-card reflections, per-piece finish variation |
 | Signature | Black frame around every tile | GAN-style cuts where pieces meet the face centre: round centre caps and rounded edge ends, crisp near-square inner corners on the corner pieces, black openings at the diagonals |
 
-![Classic Stickered](artifacts/styles/stickered/scrambled.png) ![Premium Stickerless](artifacts/styles/stickerless/scrambled.png)
+| Classic Stickered (default) | Premium Stickerless, v1 (default renderer) | Premium Stickerless, v2: Candidate Y (opt-in) |
+| --- | --- | --- |
+| ![Classic Stickered](artifacts/styles/stickered/scrambled.png) | ![Premium Stickerless v1](artifacts/styles/stickerless/scrambled.png) | ![Premium Stickerless v2, Candidate Y](artifacts/styles/stickerless-v2/scrambled.png) |
+
+**Two Stickerless renderers.** Premium Stickerless is drawn by **v1** (`pieceMaterial.ts`,
+`stickerlessResources.ts`) unless the address carries `?stickerless=v2`; that parameter selects
+**v2, Candidate Y** (`src/components/cube/stickerless2/`) for that page load only. v2 is not the
+default and nothing saves it: without the parameter Premium Stickerless is v1 again. v2 keeps v1's
+piece shapes (pillowed faces, rounded cube edges, the Gloss centre cap), its exterior finish and its
+white, and changes what light and a turn reveal: its own product studio (key softbox and reflection
+panels), plastic coloured all the way through each piece, moulded scale grooves on the corner
+pieces' internal faces, analytic shading in the seams and gaps, and, while a layer is turning,
+reflections and shadows of the other layers on the surfaces it opens. Settings previews Premium
+Stickerless as the renderer in use. These are captures of v2:
+
+| v2 close-up | v2 mid-turn R | v2 on a phone (Auto → Medium) |
+| --- | --- | --- |
+| ![Stickerless v2 close-up](artifacts/styles/stickerless-v2/macro.png) | ![Stickerless v2 with R mid-turn](artifacts/styles/stickerless-v2/midturn-R.png) | ![Stickerless v2 on a phone](artifacts/styles/stickerless-v2/mobile.png) |
 
 **One state, two models.** There is one puzzle state, one move engine and one set of 26 cubie
 groups whose transforms the engine drives; a style only decides which meshes hang on those groups
@@ -276,7 +297,7 @@ an analytic cube; facelet read-back uses style-independent anchors), so both sty
 identically. `CubeVisuals` (`cubeResources.ts`) owns each style's GPU resources for the current tier
 and finish, creates them on first use, keeps them until the tier or finish changes, and pre-warms the
 hidden style's resources and shaders at idle so even the first switch is quick. The choice persists
-with the other settings; settings saved before styles existed load as Stickerless.
+with the other settings; settings saved before styles existed load as Classic Stickered, the default.
 
 Both styles share the scene lighting: a small photographic studio (dark graded cyclorama,
 overhead softbox, a strip box placed so the top face carries a half reflection, key and rim strips,
@@ -312,7 +333,7 @@ before cubing.js falls back).
 
 `window.__CUBELAB__` exposes read-only inspection (`facelets()`, `patternFacelets()`, `visualFacelets()`
 read from the three.js scene graph, `project(point)`, `moveLog()`, `renderInfo()`, `renderedStyle()`,
-`camera()`, `timer()`, `solver()`, `audio()`, `renderAudioDemo()` …) used by the browser tests. Nothing on it can change state.
+`stickerlessRenderer()`, `camera()`, `timer()`, `solver()`, `audio()`, `renderAudioDemo()` …) used by the browser tests. Nothing on it can change state.
 
 ## Known limitations
 

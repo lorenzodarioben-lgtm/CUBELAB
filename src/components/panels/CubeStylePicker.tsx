@@ -3,11 +3,14 @@
  * model (see scripts/capture-style-previews.mjs). A native radio group, so
  * arrow keys, focus and screen readers behave as expected. Choosing a style
  * only changes the physical model on screen — the cube, timer and history
- * carry on untouched.
+ * carry on untouched. Premium Stickerless shows the renderer this page load
+ * draws it with: v1, or v2 only while `?stickerless=v2` selects it.
  */
 import type { CubeStyle } from '../../core/persistence/settings';
 import stickeredPreview from '../../assets/cube-styles/stickered.webp';
 import stickerlessPreview from '../../assets/cube-styles/stickerless.webp';
+import stickerlessV2Preview from '../../assets/cube-styles/stickerless-v2.webp';
+import { STICKERLESS_RENDERER } from '../cube/stickerless2/flag';
 import { cx } from '../ui/cx';
 
 const OPTIONS: ReadonlyArray<{ value: CubeStyle; title: string; description: string; image: string }> = [
@@ -21,7 +24,7 @@ const OPTIONS: ReadonlyArray<{ value: CubeStyle; title: string; description: str
     value: 'stickerless',
     title: 'Premium Stickerless',
     description: 'Modern speedcube with moulded coloured plastic.',
-    image: stickerlessPreview,
+    image: STICKERLESS_RENDERER === 'v2' ? stickerlessV2Preview : stickerlessPreview,
   },
 ];
 
