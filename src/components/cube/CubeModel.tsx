@@ -14,7 +14,7 @@
  * Each group also carries an invisible anchor per facelet, independent of the
  * style, for the verification read-back.
  */
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { CubeEngine } from '../../core/engine/cubeEngine';
@@ -23,9 +23,9 @@ import { CUBIE_DEFS } from '../../core/puzzle/cubies';
 import type { CubieDef } from '../../core/puzzle/cubies';
 import { mulVec } from '../../core/puzzle/geometry';
 import type { Face } from '../../core/puzzle/notation';
-import type { CubeStyle, Finish } from '../../core/persistence/settings';
-import { ANCHOR_OFFSET, CubeVisuals, SPACING } from './cubeResources';
-import type { RenderTier } from './cubeResources';
+import type { CubeStyle } from '../../core/persistence/settings';
+import { ANCHOR_OFFSET, SPACING } from './cubeResources';
+import type { CubeVisuals } from './cubeResources';
 import type { StyleReflections } from './styleReflections';
 import { PIECE_FRAMES } from './pieceFrames';
 import { TILE_SEATS, TILE_TOP } from './stickeredResources';
@@ -106,66 +106,22 @@ function StickerlessPiece({ def, visuals, faceLabels }: PieceProps) {
   );
 }
 
-/**
- * Prepares the style that is not on screen once the stage is idle: builds its
- * resources (procedural textures, meshes) and compiles its shaders
- * asynchronously (off the main thread where the driver allows), so the first
- * switch is nearly as quick as any later one. Nothing is added to the visible
- * scene and nothing is uploaded until the style is actually shown.
- */
-function useWarmOtherStyle(visuals: CubeVisuals, style: CubeStyle): void {
-  const gl = useThree((s) => s.gl);
-  const camera = useThree((s) => s.camera);
-  const scene = useThree((s) => s.scene);
-  useEffect(() => {
-    let cancelled = false;
-    const warm = () => {
-      if (cancelled) return;
-      const staging = new THREE.Scene();
-      const add = (geometry: THREE.BufferGeometry, material: THREE.Material) => {
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.castShadow = mesh.receiveShadow = visuals.shadows;
-        staging.add(mesh);
-      };
-      if (style === 'stickered') {
-        const res = visuals.stickerless;
-        res.materials.forEach((m, id) => add(res.pieces[CUBIE_DEFS[id]!.kind], m));
-      } else {
-        const res = visuals.stickered;
-        (['corner', 'edge', 'center'] as const).forEach((kind) => add(res.bodies[kind], res.bodyMaterials[kind]));
-        const tile = Object.values(res.tiles)[0]!;
-        Object.values(res.tileMaterials).flat().forEach((m) => add(tile, m));
-      }
-      visuals.trackCompile(gl.compileAsync(staging, camera, scene));
-    };
-    const idle = window.requestIdleCallback?.(warm, { timeout: 4000 }) ?? window.setTimeout(warm, 1500);
-    return () => {
-      cancelled = true;
-      if (window.cancelIdleCallback) window.cancelIdleCallback(idle);
-      else window.clearTimeout(idle);
-    };
-  }, [visuals, style, gl, camera, scene]);
-}
-
 interface CubeModelProps {
   readonly engine: CubeEngine;
-  readonly quality: RenderTier;
-  readonly finish: Finish;
+  /** The resources for the tier and finish on screen (owned by the stage, which prepares their shaders). */
+  readonly visuals: CubeVisuals;
   readonly style: CubeStyle;
   readonly faceLabels: boolean;
   readonly registry: StickerRegistry;
   readonly reflections: StyleReflections;
 }
 
-export function CubeModel({ engine, quality, finish, style, faceLabels, registry, reflections }: CubeModelProps) {
+export function CubeModel({ engine, visuals, style, faceLabels, registry, reflections }: CubeModelProps) {
   const invalidate = useThree((s) => s.invalidate);
   const groups = useRef<Array<THREE.Group | null>>([]);
   const coreRef = useRef<THREE.Mesh>(null);
-  const visuals = useMemo(() => new CubeVisuals(quality, finish), [quality, finish]);
-  useEffect(() => () => visuals.dispose(), [visuals]);
   // A style change only swaps meshes; ask for a frame so it shows at once.
   useEffect(() => invalidate(), [style, invalidate]);
-  useWarmOtherStyle(visuals, style);
 
   // Per-frame working memory lives in refs: allocated once, mutated only inside useFrame.
   const baseRef = useRef(CUBIE_DEFS.map(() => ({ position: new THREE.Vector3(), quaternion: new THREE.Quaternion() })));

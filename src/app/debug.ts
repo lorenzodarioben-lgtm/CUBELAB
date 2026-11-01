@@ -44,6 +44,8 @@ export interface DebugApi {
   samplePixels?: (points: Array<{ x: number; y: number }>) => number[][];
   /** The cube style the 3D scene is actually showing (`null` before the stage mounts). */
   renderedStyle?: () => string | null;
+  /** Whether a requested look (style, finish, tier) is still being prepared, with the one before it on screen. */
+  lookPending?: () => boolean;
   /** Turn-audio state: context, voices started by kind, voices sounding now. */
   audio(): SoundStats;
   /** Renders the sound demonstration offline (same planner, voices and limiter as live). */
