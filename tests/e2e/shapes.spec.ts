@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 import type { TwistyPlayer } from 'cubing/twisty';
 import { trackErrors } from './helpers';
+import { EXPERIMENTAL_PUZZLES } from '../../src/core/features';
+
+// The other puzzles ship behind EXPERIMENTAL_PUZZLES (src/core/features.ts); with it off the build has the 3×3 only.
+test.skip(!EXPERIMENTAL_PUZZLES, 'experimental puzzles are switched off in this build');
 
 test.describe('shape puzzles', () => {
   for (const [event, name, face] of [['pyram', 'Pyraminx', 'U'], ['skewb', 'Skewb', 'R'], ['minx', 'Megaminx', 'R']] as const) {

@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { trackErrors } from './helpers';
+import { EXPERIMENTAL_PUZZLES } from '../../src/core/features';
+
+// The other puzzles ship behind EXPERIMENTAL_PUZZLES (src/core/features.ts); with it off the build has the 3×3 only.
+test.skip(!EXPERIMENTAL_PUZZLES, 'experimental puzzles are switched off in this build');
 
 test.use({ launchOptions: { args: ['--disable-3d-apis', '--disable-webgl'] } });
 

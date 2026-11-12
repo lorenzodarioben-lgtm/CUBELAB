@@ -333,7 +333,7 @@ describe('Premium Stickerless realism', () => {
   });
 });
 
-describe('resource disposal never races background shader compilation', () => {
+describe('cube resources in a compile-only scene', () => {
   // The face-letter textures draw on a canvas; a context-less stub is enough here.
   beforeAll(() => {
     (globalThis as Record<string, unknown>).document = { createElement: () => ({ width: 0, height: 0, getContext: () => null }) };
@@ -342,34 +342,40 @@ describe('resource disposal never races background shader compilation', () => {
     delete (globalThis as Record<string, unknown>).document;
   });
 
-  it('waits for an in-flight compile before freeing anything, then frees everything once', async () => {
+  it('stand in with the real geometry and materials, and give Stickerless its map back afterwards', async () => {
     const { CubeVisuals } = await import('../../src/components/cube/cubeResources');
-    const visuals = new CubeVisuals('medium', 'gloss');
-    const materials = visuals.stickerless.materials;
-    let disposed = 0;
-    for (const m of materials) m.addEventListener('dispose', () => disposed++);
-    let finish!: () => void;
-    visuals.trackCompile(new Promise<void>((resolve) => (finish = resolve)));
+    const visuals = new CubeVisuals('high', 'gloss');
+    const map = new THREE.Texture();
+    visuals.setStickerlessEnvironment(map);
+    const placeholder = new THREE.Texture();
+    const res = visuals.stickerless;
+    const stickerless = visuals.compileStandIns('stickerless', placeholder);
+    for (const [i, m] of res.materials.entries()) {
+      const mesh = stickerless.meshes[i]!;
+      expect(mesh.material).toBe(m);
+      expect(mesh.geometry).toBe(res.pieces[CUBIE_DEFS[i]!.kind]);
+      expect((m as THREE.MeshStandardMaterial).envMap).toBe(placeholder);
+    }
+    expect(stickerless.meshes.some((mesh) => mesh.material === res.coreMaterial && mesh.geometry === res.core)).toBe(true);
+    expect(stickerless.meshes.filter((mesh) => mesh.geometry === visuals.label)).toHaveLength(6);
+    stickerless.restore();
+    for (const m of res.materials) expect((m as THREE.MeshStandardMaterial).envMap).toBe(map);
+    // Classic stand-ins leave Stickerless's map alone.
+    const stickered = visuals.compileStandIns('stickered', placeholder);
+    expect(stickered.meshes.some((mesh) => mesh.material === visuals.stickered.coreMaterial)).toBe(true);
+    for (const m of res.materials) expect((m as THREE.MeshStandardMaterial).envMap).toBe(map);
     visuals.dispose();
-    await Promise.resolve();
-    expect(disposed).toBe(0); // still compiling: nothing freed yet
-    finish();
-    await new Promise((r) => setTimeout(r, 0));
-    expect(disposed).toBe(materials.length);
-    visuals.dispose(); // idempotent
-    await new Promise((r) => setTimeout(r, 0));
-    expect(disposed).toBe(materials.length);
   });
 
-  it('a failed compile still lets disposal happen', async () => {
+  it('frees everything once, at once', async () => {
     const { CubeVisuals } = await import('../../src/components/cube/cubeResources');
     const visuals = new CubeVisuals('low', 'matte');
-    const material = visuals.stickered.bodyMaterials.edge;
-    let freed = false;
-    material.addEventListener('dispose', () => (freed = true));
-    visuals.trackCompile(Promise.reject(new Error('lost context')));
+    const materials = [...visuals.stickerless.materials, visuals.stickered.bodyMaterials.edge];
+    let disposed = 0;
+    for (const m of materials) m.addEventListener('dispose', () => disposed++);
     visuals.dispose();
-    await new Promise((r) => setTimeout(r, 0));
-    expect(freed).toBe(true);
+    expect(disposed).toBe(materials.length);
+    visuals.dispose();
+    expect(disposed).toBe(materials.length);
   });
 });

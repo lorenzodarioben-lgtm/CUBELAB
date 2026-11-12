@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { trackErrors } from './helpers';
+import { EXPERIMENTAL_PUZZLES } from '../../src/core/features';
+
+// The other puzzles ship behind EXPERIMENTAL_PUZZLES (src/core/features.ts); with it off the build has the 3×3 only.
+test.skip(!EXPERIMENTAL_PUZZLES, 'experimental puzzles are switched off in this build');
 
 test.describe('NxN practice studio', () => {
   test('2×2 renders, turns, and returns to solved', async ({ page }) => {
