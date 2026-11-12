@@ -245,10 +245,20 @@ float v2Closed;
   v2Closed = v2GapOcclusion(v2Depth, length(abs(q) - 0.5));
 }
 // A layer turn in flight opens the cube around its cut planes: nearby internal surfaces see the opening.
+// v2Opening: how near this surface is to an opened cut (1 at the cut, 0 from 0.4 away).
+float v2Opening = 0.0;
 if (uTurnActive > 0.5 && uTurnLayer < 5.0) {
   float along = dot(v2P, uTurnAxis);
   float near = min(abs(along - uTurnLayer - 0.5), abs(along - uTurnLayer + 0.5));
-  v2Closed = mix(v2Closed, max(v2Closed, 0.5), uExposure * (1.0 - smoothstep(0.08, 0.4, near)));
+#ifdef V2_OPEN_CUTS
+  // Only the cut planes inside the cube open: a face turn's other plane (±1.5) is
+  // the cube's own outer surface, whose seams stay as closed as at rest.
+  float v2Lo = uTurnLayer - 0.5;
+  float v2Hi = uTurnLayer + 0.5;
+  near = min(abs(v2Lo) < 1.0 ? abs(along - v2Lo) : 9.0, abs(v2Hi) < 1.0 ? abs(along - v2Hi) : 9.0);
+#endif
+  v2Opening = 1.0 - smoothstep(0.08, 0.4, near);
+  v2Closed = mix(v2Closed, max(v2Closed, 0.5), uExposure * v2Opening);
 }
 // A cut plane: lit where the turned layer no longer covers it, darker under and near the overhang.
 // The exposed part sees a wedge of the studio, opening quickly away from the
@@ -289,7 +299,12 @@ float v2Facing = 0.0;
   for (int i = 0; i < 6; i++) if (uFaceOn[i] < 0.5) v2Facing = max(v2Facing, facing[i]);
 }
 float v2Seam = 1.0 - smoothstep(0.35, 0.9, v2Facing);
+#ifdef V2_OPEN_CUTS
+// Only near an opened cut: elsewhere the seams stay as closed as at rest, whatever the turn angle.
+float v2ExtOcc = mix(mix(0.22, 1.0, v2Seam), mix(0.6, 1.0, v2Seam), uExposure * v2Opening);
+#else
 float v2ExtOcc = mix(mix(0.22, 1.0, v2Seam), mix(0.6, 1.0, v2Seam), uExposure);
+#endif
 float v2Occ = mix(v2Internal, v2ExtOcc, v2Ext);
 
 #ifdef V2_SCALES
@@ -547,6 +562,8 @@ export function createPieceMaterialV2(kind: number, slotColors: readonly (THREE.
   }
   // The studio lights Gloss only (its maps and key light; Matte keeps production's matte lighting).
   if (!look.matte) Object.assign(defines, fixedStudioDefines());
+  // Gloss: a turn lifts the seam shading only around the cut planes it opens (Matte keeps the whole-cube lift).
+  if (!look.matte) defines.V2_OPEN_CUTS = '';
   material.defines = { ...material.defines, ...defines };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
