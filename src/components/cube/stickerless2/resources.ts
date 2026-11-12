@@ -4,7 +4,7 @@
  * `materials[id]` on each cubie).
  *
  * The geometry is production's: the shared corner and edge meshes and, for
- * Gloss, the production chamfer centre (Matte: its continuous centre), from the
+ * Gloss, the production chamfer centre on v2's plan (`V2_CENTRE_PLAN`; Matte: its continuous centre), from the
  * same reference-counted caches. The finish and lighting are production's too:
  * the same material values and per-piece variation, and for Gloss the Strong
  * Hybrid shell response under the production stickerless lighting. v2 changes
@@ -39,7 +39,7 @@ import { acquireStickerlessChamferGeometry, releaseStickerlessChamferGeometry } 
 import { applyStrongHybrid } from '../stickerlessHybrid';
 import { PIECE_DETAIL } from '../stickerlessResources';
 import type { StickerlessResources } from '../stickerlessResources';
-import { KIND_INDEX } from './shape';
+import { KIND_INDEX, V2_CENTRE_PLAN } from './shape';
 import { createMechanismMaterialV2, createPieceMaterialV2, createTurnUniforms } from './material';
 import type { PieceMaterialV2 } from './material';
 import { V2_MECHANISM, V2_PALETTE } from './palette';
@@ -62,7 +62,7 @@ export function createStickerlessV2Resources(tier: RenderTier, finish: Finish): 
   const detail = PIECE_DETAIL[tier];
   const gloss = finish === 'gloss';
   const shared = acquirePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
-  const pieces = gloss ? { ...shared, center: acquireStickerlessChamferGeometry(detail) } : shared;
+  const pieces = gloss ? { ...shared, center: acquireStickerlessChamferGeometry(detail, V2_CENTRE_PLAN) } : shared;
   const palette = Object.fromEntries(FACES.map((face) => [face, new THREE.Color(V2_PALETTE[face])])) as Record<Face, THREE.Color>;
   const turn = createTurnUniforms();
   // Production's deterministic per-piece finish variation (same seed and order).
@@ -146,7 +146,7 @@ export function createStickerlessV2Resources(tier: RenderTier, finish: Finish): 
       if (disposed) return;
       disposed = true;
       releasePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
-      if (gloss) releaseStickerlessChamferGeometry(detail);
+      if (gloss) releaseStickerlessChamferGeometry(detail, V2_CENTRE_PLAN);
       materials.forEach((m) => m.dispose());
       core.dispose();
       coreMaterial.dispose();

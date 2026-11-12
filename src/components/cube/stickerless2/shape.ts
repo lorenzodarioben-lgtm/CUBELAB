@@ -8,11 +8,22 @@
  * What v2 adds here is a GLSL twin of the production corner/edge SDF, built
  * from the same constants, so the shader takes exact per-pixel normals of the
  * production surface (pillow included) at any tessellation. The centre keeps
- * production's own analytic normal function.
+ * production's own analytic normal function, for v2's own plan of it.
  */
 import type { CubieKind } from '../../../core/puzzle/cubies';
 import { CANONICAL_HOME, CAP_DEPTH, CUBE_EDGE_RADIUS, PIECE_HALF, PILLOW, RIM_RADIUS, STICKERLESS_SHAPE, outlineCornerRadius } from '../pieceGeometry';
-import { STICKERLESS_CHAMFER_NORMALS } from '../stickerlessChamferGeometry';
+import { CHAMFER_PLAN, chamferNormalsGlsl } from '../stickerlessChamferGeometry';
+import type { ChamferPlan } from '../stickerlessChamferGeometry';
+
+/**
+ * v2's Gloss centre: production's chamfer centre with its flat disc a touch
+ * wider (radius 0.4255 → 0.4315) and the rounded-square body under the lip a
+ * touch less rounded (corner radius 0.3589 → 0.3445). Height, drop, lip
+ * softening and bow, and the walls are production's.
+ */
+export const V2_CENTRE_PLAN: ChamferPlan = { radius: 0.4315, cornerRadius: 0.3445 };
+/** Production's plan, for reference in tests. */
+export const PRODUCTION_CENTRE_PLAN: ChamferPlan = CHAMFER_PLAN;
 
 export const KIND_INDEX: Readonly<Record<CubieKind, number>> = { corner: 0, edge: 1, center: 2 };
 
@@ -66,8 +77,8 @@ function pieceTerm(kind: 'corner' | 'edge'): string {
  * analytic normal `pieceAnalyticRimNormal(p, face)`.
  */
 export function sdfGlsl(): string {
-  // Production's centre normal function, without the declarations v2 makes itself.
-  const centreNormals = STICKERLESS_CHAMFER_NORMALS.replace('uniform mat3 normalMatrix;', '').replace('uniform vec4 uCentreSurface;', '');
+  // Production's centre normal function for v2's centre, without the declarations v2 makes itself.
+  const centreNormals = chamferNormalsGlsl(V2_CENTRE_PLAN).replace('uniform mat3 normalMatrix;', '').replace('uniform vec4 uCentreSurface;', '');
   return /* glsl */ `
 #define V2_HALF ${glsl(PIECE_HALF)}
 float v2RoundRect(vec2 q, vec4 r) {

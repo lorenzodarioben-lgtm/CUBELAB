@@ -23,10 +23,19 @@ export const STICKERLESS_CHAMFER_SURFACE = {
   drop: APPROVED.drop, softening: APPROVED.softening, cornerRadius: HOUSING_CORNER_RADIUS,
 } as const;
 
+/**
+ * The two plan dimensions a renderer may refine: the flat disc's radius and the
+ * corner radius of the rounded-square body under the lip. Everything else (top,
+ * drop, softening, bow, walls) is the approved centre. Production (v1) uses
+ * `CHAMFER_PLAN`, the approved values.
+ */
+export interface ChamferPlan { readonly radius: number; readonly cornerRadius: number }
+export const CHAMFER_PLAN: ChamferPlan = { radius: APPROVED.radius, cornerRadius: HOUSING_CORNER_RADIUS };
+
 /** Exact original rounded-square outline, including its angular derivative. */
-export function chamferOutline(angle: number) {
+export function chamferOutline(angle: number, plan: ChamferPlan = CHAMFER_PLAN) {
   const x = Math.cos(angle), z = Math.sin(angle), ax = Math.abs(x), az = Math.abs(z);
-  const h = PIECE_HALF, r = HOUSING_CORNER_RADIUS, k = h - r;
+  const h = PIECE_HALF, r = plan.cornerRadius, k = h - r;
   let radius: number, nx: number, nz: number;
   if (Math.min(ax, az) * h <= k * Math.max(ax, az)) {
     radius = h / Math.max(ax, az); nx = ax > az ? Math.sign(x) : 0; nz = ax > az ? 0 : Math.sign(z);
@@ -45,8 +54,8 @@ function softenedLine(s: number, w: number) {
   return { value: s / 2 - w / (2 * Math.PI) * Math.sin(a), derivative: .5 - .5 * Math.cos(a) };
 }
 
-export function sampleChamferSurface(angle: number, region: 'plateau' | 'lip', t: number) {
-  const p = APPROVED, ex = Math.cos(angle), ez = Math.sin(angle), o = chamferOutline(angle);
+export function sampleChamferSurface(angle: number, region: 'plateau' | 'lip', t: number, plan: ChamferPlan = CHAMFER_PLAN) {
+  const p = { ...APPROVED, radius: plan.radius }, ex = Math.cos(angle), ez = Math.sin(angle), o = chamferOutline(angle, plan);
   const span = o.radius - p.radius, radius = region === 'plateau' ? p.radius * t : p.radius + span * t;
   if (region === 'plateau') return { position: [radius * ex, TOP, radius * ez] as const, normal: [0, 1, 0] as const, radius };
   const f = softenedLine(span * t, p.softening), denominator = span - p.softening / 2;
@@ -60,14 +69,14 @@ export function sampleChamferSurface(angle: number, region: 'plateau' | 'lip', t
 }
 
 /** Exact approved mesh buffers. Coincident lower-junction vertices retain the separate lip/body normals. */
-export function buildStickerlessChamferGeometry(detail: number): THREE.BufferGeometry {
-  const p = APPROVED, sectors = detail * 4;
+export function buildStickerlessChamferGeometry(detail: number, plan: ChamferPlan = CHAMFER_PLAN): THREE.BufferGeometry {
+  const p = { ...APPROVED, radius: plan.radius }, sectors = detail * 4;
   const positions: number[] = [0, TOP, 0], normals: number[] = [0, 1, 0], indices: number[] = [];
   const lipSteps = Math.max(16, Math.round(detail * .5)), ringCount = 1 + 12 + lipSteps;
   for (let j = 0; j < ringCount; j++) for (let i = 0; i < sectors; i++) {
-    const angle = i * Math.PI * 2 / sectors, span = chamferOutline(angle).radius - p.radius;
+    const angle = i * Math.PI * 2 / sectors, span = chamferOutline(angle, plan).radius - p.radius;
     const distance = j === 0 ? 0 : j <= 12 ? p.softening * j / 12 : p.softening + (span - p.softening) * (j - 12) / lipSteps;
-    const point = sampleChamferSurface(angle, j === 0 ? 'plateau' : 'lip', j === 0 ? 1 : distance / span);
+    const point = sampleChamferSurface(angle, j === 0 ? 'plateau' : 'lip', j === 0 ? 1 : distance / span, plan);
     positions.push(...point.position); normals.push(...point.normal);
   }
   for (let i = 0; i < sectors; i++) {
@@ -79,7 +88,7 @@ export function buildStickerlessChamferGeometry(detail: number): THREE.BufferGeo
   }
   const wallStart = positions.length / 3;
   for (const y of [SIDE, 0, -PIECE_HALF]) for (let i = 0; i < sectors; i++) {
-    const a = i * Math.PI * 2 / sectors, o = chamferOutline(a);
+    const a = i * Math.PI * 2 / sectors, o = chamferOutline(a, plan);
     positions.push(o.radius * Math.cos(a), y, o.radius * Math.sin(a)); normals.push(o.nx, 0, o.nz);
   }
   const bottom = positions.length / 3; positions.push(0, -PIECE_HALF, 0); normals.push(0, -1, 0);
@@ -98,35 +107,38 @@ export function buildStickerlessChamferGeometry(detail: number): THREE.BufferGeo
 }
 
 // Own only the replacement centre; edges/corners continue sharing the existing cache with Matte.
-const cache = new Map<number, { geometry: THREE.BufferGeometry; users: number }>();
-export function acquireStickerlessChamferGeometry(detail: number): THREE.BufferGeometry {
-  let entry = cache.get(detail);
-  if (!entry) { entry = { geometry: buildStickerlessChamferGeometry(detail), users: 0 }; cache.set(detail, entry); }
+const cache = new Map<string, { geometry: THREE.BufferGeometry; users: number }>();
+const cacheKey = (detail: number, plan: ChamferPlan) => `${detail}:${plan.radius}:${plan.cornerRadius}`;
+export function acquireStickerlessChamferGeometry(detail: number, plan: ChamferPlan = CHAMFER_PLAN): THREE.BufferGeometry {
+  let entry = cache.get(cacheKey(detail, plan));
+  if (!entry) { entry = { geometry: buildStickerlessChamferGeometry(detail, plan), users: 0 }; cache.set(cacheKey(detail, plan), entry); }
   entry.users++; return entry.geometry;
 }
-export function releaseStickerlessChamferGeometry(detail: number): void {
-  const entry = cache.get(detail);
+export function releaseStickerlessChamferGeometry(detail: number, plan: ChamferPlan = CHAMFER_PLAN): void {
+  const entry = cache.get(cacheKey(detail, plan));
   if (entry && entry.users > 0 && --entry.users === 0) entry.geometry.dispose();
 }
 
-/** Exact derivative of the approved geometry, preserving all production material response. */
-export const STICKERLESS_CHAMFER_NORMALS = /* glsl */ `
+/** Exact derivative of a centre's geometry (`plan`), preserving all production material response. */
+export function chamferNormalsGlsl(plan: ChamferPlan = CHAMFER_PLAN): string {
+  const centre = { ...APPROVED, radius: plan.radius }, corner = plan.cornerRadius;
+  return /* glsl */ `
 uniform mat3 normalMatrix;
 uniform vec4 uCentreSurface;
 vec3 pieceAnalyticRimNormal(vec3 p, int face) {
-  float r=length(p.xz); if(r<=${APPROVED.radius.toFixed(9)}) return vec3(0.,1.,0.);
+  float r=length(p.xz); if(r<=${centre.radius.toFixed(9)}) return vec3(0.,1.,0.);
   vec2 e=p.xz/r, a=abs(e), tangent=vec2(-e.y,e.x);
-  float h=${PIECE_HALF}, c=${HOUSING_CORNER_RADIUS}, k=h-c, outer; vec2 n;
+  float h=${PIECE_HALF}, c=${corner}, k=h-c, outer; vec2 n;
   if(min(a.x,a.y)*h<=k*max(a.x,a.y)){outer=h/max(a.x,a.y);n=a.x>a.y?vec2(sign(e.x),0.):vec2(0.,sign(e.y));}
   else {float sum=a.x+a.y;outer=k*sum+sqrt(c*c-2.*k*k+k*k*sum*sum);n=sign(e)*(outer*a-k)/c;}
   if(p.y<${(TOP - APPROVED.drop - 1e-6).toFixed(9)}) return vec3(n.x,0.,n.y);
   float angular=-outer*dot(n,tangent)/dot(n,e);
-  float span=outer-${APPROVED.radius.toFixed(9)}, w=${APPROVED.softening.toFixed(9)}, s=max(0.,r-${APPROVED.radius.toFixed(9)});
+  float span=outer-${centre.radius.toFixed(9)}, w=${centre.softening.toFixed(9)}, s=max(0.,r-${centre.radius.toFixed(9)});
   float f=s-w*.5, df=1.;
   if(s<w){float angle=3.141592653589793*s/w;f=s*.5-w/(2.*3.141592653589793)*sin(angle);df=.5-.5*cos(angle);}
   float denominator=span-w*.5;
-  float radial=${APPROVED.drop.toFixed(9)}*df/denominator;
-  float around=-${APPROVED.drop.toFixed(9)}*f*angular/(denominator*denominator*r);
+  float radial=${centre.drop.toFixed(9)}*df/denominator;
+  float around=-${centre.drop.toFixed(9)}*f*angular/(denominator*denominator*r);
   // Exact radial/angular derivatives of the same experimental height offset.
   float lipLength=span-w, u=(s-w)/lipLength;
   if(u>0. && u<1.) {
@@ -138,3 +150,7 @@ vec3 pieceAnalyticRimNormal(vec3 p, int face) {
   vec2 horizontal=radial*e+around*tangent;
   return normalize(vec3(horizontal.x,1.,horizontal.y));
 }`;
+}
+
+/** The approved (production) centre's normals. */
+export const STICKERLESS_CHAMFER_NORMALS = chamferNormalsGlsl();

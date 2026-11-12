@@ -11,7 +11,7 @@ import { parseAlg } from '../../src/core/puzzle/notation';
 import type { CubieKind } from '../../src/core/puzzle/cubies';
 import { CubeVisuals } from '../../src/components/cube/cubeResources';
 import { STICKERLESS_RENDERER } from '../../src/components/cube/stickerless2/flag';
-import { KIND_INDEX, outlineRadii, sdfGlsl } from '../../src/components/cube/stickerless2/shape';
+import { KIND_INDEX, PRODUCTION_CENTRE_PLAN, V2_CENTRE_PLAN, outlineRadii, sdfGlsl } from '../../src/components/cube/stickerless2/shape';
 import { createStickerlessV2Resources, setTurnBack, writeCellFaces, writeCellTints } from '../../src/components/cube/stickerless2/resources';
 import { SEAM } from '../../src/components/cube/stickerless2/material';
 import type { PieceMaterialV2 } from '../../src/components/cube/stickerless2/material';
@@ -20,9 +20,10 @@ import { DIAGONAL, SCALES, scaleLayout, scaleRows, scalesGlsl, shaftClearance } 
 import { GAPS, gapOcclusion } from '../../src/components/cube/stickerless2/gaps';
 import { FACE_COLORS } from '../../src/core/puzzle/colors';
 import { V2_STUDIO, fixedStudioDefines } from '../../src/components/cube/stickerless2/studio';
-import { PRODUCTION_ROOM, stickerlessWindowIntensity, stickerlessWindowPosition } from '../../src/components/stage/stickerlessEnvironment';
+import { STICKERLESS_CHAMFER_NORMALS, buildStickerlessChamferGeometry, chamferNormalsGlsl, chamferOutline, sampleChamferSurface } from '../../src/components/cube/stickerlessChamferGeometry';
+import { PRODUCTION_ROOM, fromHomeCamera, stickerlessWindowIntensity, stickerlessWindowPosition } from '../../src/components/stage/stickerlessEnvironment';
 import { CAP_DEPTH, CUBE_EDGE_RADIUS, INNER_RADIUS, PILLOW, RIM_RADIUS } from '../../src/components/cube/pieceGeometry';
-import { createStickerlessResources } from '../../src/components/cube/stickerlessResources';
+import { PIECE_DETAIL, createStickerlessResources } from '../../src/components/cube/stickerlessResources';
 
 const KINDS: CubieKind[] = ['corner', 'edge', 'center'];
 
@@ -68,14 +69,49 @@ describe('Stickerless v2 selection', () => {
 });
 
 describe('Stickerless v2 is anchored to production', () => {
-  it('uses the production piece meshes and, for Gloss, the production chamfer centre', () => {
+  it('uses the production piece meshes and, for Gloss, the production chamfer centre on its own plan', () => {
     for (const finish of ['gloss', 'matte'] as const) {
       const production = createStickerlessResources('medium', finish);
       const v2 = createStickerlessV2Resources('medium', finish);
-      for (const kind of KINDS) expect(v2.pieces[kind]).toBe(production.pieces[kind]);
+      for (const kind of KINDS) {
+        if (finish === 'gloss' && kind === 'center') continue;
+        expect(v2.pieces[kind]).toBe(production.pieces[kind]);
+      }
+      if (finish === 'gloss') {
+        // v2's Gloss centre is production's chamfer centre built on V2_CENTRE_PLAN, and only that differs.
+        expect(v2.pieces.center).not.toBe(production.pieces.center);
+        const expected = buildStickerlessChamferGeometry(PIECE_DETAIL.medium, V2_CENTRE_PLAN);
+        expect(Array.from(v2.pieces.center.getAttribute('position').array)).toEqual(Array.from(expected.getAttribute('position').array));
+        expect(Array.from(v2.pieces.center.getAttribute('normal').array)).toEqual(Array.from(expected.getAttribute('normal').array));
+        expected.dispose();
+      }
       production.dispose();
       v2.dispose();
     }
+  });
+
+  it("refines the Gloss centre by a hair: a slightly wider disc and a slightly squarer body, nothing else", () => {
+    expect(PRODUCTION_CENTRE_PLAN).toEqual({ radius: 0.4255, cornerRadius: 0.37 * 0.97 });
+    expect(V2_CENTRE_PLAN).toEqual({ radius: 0.4315, cornerRadius: 0.3445 });
+    // Under 1.5% wider disc, under 5% tighter corners: a micro-refinement.
+    expect(V2_CENTRE_PLAN.radius / PRODUCTION_CENTRE_PLAN.radius - 1).toBeLessThan(0.015);
+    expect(1 - V2_CENTRE_PLAN.cornerRadius / PRODUCTION_CENTRE_PLAN.cornerRadius).toBeLessThan(0.05);
+    // The body still fits its cell (half 0.493), and the diagonal grows by under 0.01.
+    const v1 = chamferOutline(Math.PI / 4).radius, v2 = chamferOutline(Math.PI / 4, V2_CENTRE_PLAN).radius;
+    expect(v2 - v1).toBeGreaterThan(0);
+    expect(v2 - v1).toBeLessThan(0.01);
+    for (let i = 0; i < 64; i++) {
+      const a = (i * Math.PI) / 32, r = chamferOutline(a, V2_CENTRE_PLAN).radius;
+      expect(Math.max(Math.abs(r * Math.cos(a)), Math.abs(r * Math.sin(a)))).toBeLessThanOrEqual(0.493 + 1e-12);
+    }
+    // Same top, drop and walls: the disc sits at the same height, the lip ends at the same side height.
+    expect(sampleChamferSurface(0.3, 'plateau', 0.5, V2_CENTRE_PLAN).position[1]).toBe(sampleChamferSurface(0.3, 'plateau', 0.5).position[1]);
+    expect(sampleChamferSurface(0.3, 'lip', 1, V2_CENTRE_PLAN).position[1]).toBeCloseTo(sampleChamferSurface(0.3, 'lip', 1).position[1], 12);
+    // The shader's analytic normals follow the same plan; production's are untouched.
+    expect(chamferNormalsGlsl(V2_CENTRE_PLAN)).toContain('r<=0.431500000');
+    expect(chamferNormalsGlsl(V2_CENTRE_PLAN)).toContain('c=0.3445,');
+    expect(chamferNormalsGlsl()).toBe(STICKERLESS_CHAMFER_NORMALS);
+    expect(STICKERLESS_CHAMFER_NORMALS).toContain('r<=0.425500000');
   });
 
   it('uses production white; the shared face colours are unchanged', () => {
@@ -120,8 +156,8 @@ describe('Stickerless v2 materials and resources', () => {
       const keys = new Set(res.materials.map((m) => m.customProgramCacheKey()));
       expect(keys.size).toBe(1);
       const defines = Object.keys((res.materials[0] as THREE.MeshPhysicalMaterial).defines ?? {}).filter((d) => d.startsWith('V2_')).sort();
-      // Y, the default studio, compiles in its exposure and its near-field transport on every tier.
-      const studio = ['V2_EXPOSURE_FIXED', 'V2_TRANSPORT', 'V2_TRANSPORT_FLAGS'];
+      // k2, the default studio, compiles in its exposure and its near-field transport on every tier; a turn lifts seams only at its cuts.
+      const studio = ['V2_EXPOSURE_FIXED', 'V2_OPEN_CUTS', 'V2_TRANSPORT', 'V2_TRANSPORT_FLAGS'];
       const detail = tier === 'low' ? ['V2_BOUNCE', 'V2_MULTIBOUNCE', 'V2_SEAM'] : ['V2_BOUNCE', 'V2_CHAMFER_CENTRE', 'V2_MULTIBOUNCE', 'V2_SCALES', 'V2_SDF_NORMALS', 'V2_SEAM'];
       expect(defines).toEqual([...detail, ...studio].sort());
       res.dispose();
@@ -420,10 +456,11 @@ describe('Stickerless v2 assembly seam', () => {
 });
 
 describe('Stickerless v2 studios', () => {
-  it('lights Gloss with Y, the approved lighting, its values compiled in', () => {
+  it('lights Gloss with k2, the approved lighting, its values compiled in', () => {
     expect(V2_STUDIO.transport).toEqual({ specular: true, bounce: false, internal: true, sheen: false });
     expect(V2_STUDIO.exposure).toBe(1.15);
     expect(V2_STUDIO.innerLight).toBe(1);
+    expect(V2_STUDIO.keyLight).toBe(1.5);
     // Constants: none of the bounce or gain code.
     const res = createStickerlessV2Resources('high', 'gloss');
     for (const material of res.materials) {
@@ -432,10 +469,10 @@ describe('Stickerless v2 studios', () => {
       expect(material.customProgramCacheKey()).toBe('cubelab-v2-piece-detailed-studio-y-strong-hybrid');
     }
     res.dispose();
-    // Matte has no studio (its lighting is production's matte lighting): none of Y's values or transport.
+    // Matte has no studio (its lighting is production's matte lighting): none of k2's values or transport.
     const matte = createStickerlessV2Resources('high', 'matte');
     for (const material of matte.materials) {
-      for (const define of ['V2_TRANSPORT', 'V2_TRANSPORT_FLAGS', 'V2_EXPOSURE_FIXED', 'V2_INNER_FIXED']) expect(material.defines).not.toHaveProperty(define);
+      for (const define of ['V2_TRANSPORT', 'V2_TRANSPORT_FLAGS', 'V2_EXPOSURE_FIXED', 'V2_INNER_FIXED', 'V2_OPEN_CUTS']) expect(material.defines).not.toHaveProperty(define);
       expect(material.customProgramCacheKey()).toBe('cubelab-v2-piece-detailed-matte');
     }
     matte.dispose();
@@ -480,20 +517,23 @@ describe('Stickerless v2 studios', () => {
     expect(stickerlessWindowPosition().length()).toBeCloseTo(Math.sqrt(d2), 10);
   });
 
-  it('builds Y on a neutral dark studio of white softboxes, without the rejected glint strip', () => {
+  it('builds k2 on a neutral grey studio of white softboxes, without the low-left ring softbox', () => {
     const studio = V2_STUDIO;
     expect(studio.fill).toBe(false);
     expect(studio.key.tint).toBe('#ffffff');
+    expect(studio.key.radiance).toBe(9);
     for (const panel of studio.panels) expect(panel.tint).toBe('#ffffff');
-    // Y as approved (c3baeaa): eight panels; the rejected glint strip (Y refined) is not among them.
+    // k2 as approved: seven panels; the low-left softbox of Y's ring (the peach wash) is a broad dim fill instead.
     expect(studio.panels).toHaveLength(7);
-    // The room is a neutral dark surround: every wall grey.
-    for (const color of studio.room.colors) {
-      const c = new THREE.Color(color);
-      expect(c.r).toBe(c.g);
-      expect(c.g).toBe(c.b);
-      expect(c.r).toBeLessThan(0.05);
-    }
+    const lowFill = fromHomeCamera([-5, -6, 4]);
+    expect(studio.panels.some((p) => new THREE.Vector3(...p.position).distanceTo(fromHomeCamera([-6, -4.5, 4.5])) < 1e-9)).toBe(false);
+    expect(studio.panels.at(-1)).toMatchObject({ size: [7, 3], radiance: 1.6, falloff: 0.7 });
+    expect(new THREE.Vector3(...studio.panels.at(-1)!.position).distanceTo(lowFill)).toBeLessThan(1e-9);
+    // The overhead sheet is a dim graded strip.
+    expect(studio.panels.filter((p) => p.grade === 0.8)).toEqual([expect.objectContaining({ size: [8, 3], radiance: 2.2 })]);
+    // The room is a neutral mid-grey surround: every wall the same grey.
+    expect(studio.room.radiance).toBe(3);
+    for (const color of studio.room.colors) expect(color).toBe('#5a5a5a');
   });
 
   it('places every panel between the cube and the room walls, emitting light', () => {
