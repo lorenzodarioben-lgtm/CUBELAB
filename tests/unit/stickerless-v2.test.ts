@@ -20,7 +20,7 @@ import { DIAGONAL, SCALES, scaleLayout, scaleRows, scalesGlsl, shaftClearance } 
 import { GAPS, gapOcclusion } from '../../src/components/cube/stickerless2/gaps';
 import { FACE_COLORS } from '../../src/core/puzzle/colors';
 import { V2_STUDIO, fixedStudioDefines } from '../../src/components/cube/stickerless2/studio';
-import { PRODUCTION_ROOM, stickerlessWindowIntensity, stickerlessWindowPosition } from '../../src/components/stage/stickerlessEnvironment';
+import { PRODUCTION_ROOM, fromHomeCamera, stickerlessWindowIntensity, stickerlessWindowPosition } from '../../src/components/stage/stickerlessEnvironment';
 import { CAP_DEPTH, CUBE_EDGE_RADIUS, INNER_RADIUS, PILLOW, RIM_RADIUS } from '../../src/components/cube/pieceGeometry';
 import { createStickerlessResources } from '../../src/components/cube/stickerlessResources';
 
@@ -420,10 +420,11 @@ describe('Stickerless v2 assembly seam', () => {
 });
 
 describe('Stickerless v2 studios', () => {
-  it('lights Gloss with Y, the approved lighting, its values compiled in', () => {
+  it('lights Gloss with k2, the approved lighting, its values compiled in', () => {
     expect(V2_STUDIO.transport).toEqual({ specular: true, bounce: false, internal: true, sheen: false });
     expect(V2_STUDIO.exposure).toBe(1.15);
     expect(V2_STUDIO.innerLight).toBe(1);
+    expect(V2_STUDIO.keyLight).toBe(1.5);
     // Constants: none of the bounce or gain code.
     const res = createStickerlessV2Resources('high', 'gloss');
     for (const material of res.materials) {
@@ -432,7 +433,7 @@ describe('Stickerless v2 studios', () => {
       expect(material.customProgramCacheKey()).toBe('cubelab-v2-piece-detailed-studio-y-strong-hybrid');
     }
     res.dispose();
-    // Matte has no studio (its lighting is production's matte lighting): none of Y's values or transport.
+    // Matte has no studio (its lighting is production's matte lighting): none of k2's values or transport.
     const matte = createStickerlessV2Resources('high', 'matte');
     for (const material of matte.materials) {
       for (const define of ['V2_TRANSPORT', 'V2_TRANSPORT_FLAGS', 'V2_EXPOSURE_FIXED', 'V2_INNER_FIXED']) expect(material.defines).not.toHaveProperty(define);
@@ -480,20 +481,23 @@ describe('Stickerless v2 studios', () => {
     expect(stickerlessWindowPosition().length()).toBeCloseTo(Math.sqrt(d2), 10);
   });
 
-  it('builds Y on a neutral dark studio of white softboxes, without the rejected glint strip', () => {
+  it('builds k2 on a neutral grey studio of white softboxes, without the low-left ring softbox', () => {
     const studio = V2_STUDIO;
     expect(studio.fill).toBe(false);
     expect(studio.key.tint).toBe('#ffffff');
+    expect(studio.key.radiance).toBe(9);
     for (const panel of studio.panels) expect(panel.tint).toBe('#ffffff');
-    // Y as approved (c3baeaa): eight panels; the rejected glint strip (Y refined) is not among them.
+    // k2 as approved: seven panels; the low-left softbox of Y's ring (the peach wash) is a broad dim fill instead.
     expect(studio.panels).toHaveLength(7);
-    // The room is a neutral dark surround: every wall grey.
-    for (const color of studio.room.colors) {
-      const c = new THREE.Color(color);
-      expect(c.r).toBe(c.g);
-      expect(c.g).toBe(c.b);
-      expect(c.r).toBeLessThan(0.05);
-    }
+    const lowFill = fromHomeCamera([-5, -6, 4]);
+    expect(studio.panels.some((p) => new THREE.Vector3(...p.position).distanceTo(fromHomeCamera([-6, -4.5, 4.5])) < 1e-9)).toBe(false);
+    expect(studio.panels.at(-1)).toMatchObject({ size: [7, 3], radiance: 1.6, falloff: 0.7 });
+    expect(new THREE.Vector3(...studio.panels.at(-1)!.position).distanceTo(lowFill)).toBeLessThan(1e-9);
+    // The overhead sheet is a dim graded strip.
+    expect(studio.panels.filter((p) => p.grade === 0.8)).toEqual([expect.objectContaining({ size: [8, 3], radiance: 2.2 })]);
+    // The room is a neutral mid-grey surround: every wall the same grey.
+    expect(studio.room.radiance).toBe(3);
+    for (const color of studio.room.colors) expect(color).toBe('#5a5a5a');
   });
 
   it('places every panel between the cube and the room walls, emitting light', () => {

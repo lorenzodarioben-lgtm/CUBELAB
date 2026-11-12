@@ -1,6 +1,6 @@
 // Side-by-side captures of the cube styles in identical conditions: Classic
 // Stickered, Premium Stickerless as drawn by default (v1) and as drawn with
-// ?stickerless=v2 (Candidate Y, opt-in).
+// ?stickerless=v2 (Candidate Y with the k2 lighting, opt-in).
 // Usage: npm run build && npm run preview (port 4317) in another shell, then:
 //        node scripts/capture-style-matrix.mjs [outDir]
 // Writes <outDir>/{stickered,stickerless,stickerless-v2}/*.png plus selector and switching shots.

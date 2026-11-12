@@ -223,7 +223,7 @@ function StudioEnvironment({ size, intensity, reflections, hybrid, hybridSize }:
 function Lighting({ look, reflections }: { look: StageLook; reflections: StyleReflections }) {
   // `lookPreparation` compiles each look under this same rig: keep the two in step.
   const { hybrid, shadows, sceneSize, stickerlessSize } = lookLighting(look);
-  // v2's studio brings its own key softbox, which the key light matches (production's window otherwise).
+  // v2's studio brings its own key softbox, which the key light matches at its own gain (production's window otherwise).
   const key = STICKERLESS_RENDERER === 'v2' ? V2_STUDIO.key : undefined;
   return (
     <>
@@ -247,7 +247,7 @@ function Lighting({ look, reflections }: { look: StageLook; reflections: StyleRe
       <directionalLight visible={!hybrid} position={[6.5, 2.5, 4.5]} intensity={1.05} color="#f4f6ff" />
       {hybrid && <directionalLight
         position={stickerlessWindowPosition(key)}
-        intensity={stickerlessWindowIntensity(key)}
+        intensity={stickerlessWindowIntensity(key) * (key ? V2_STUDIO.keyLight : 1)}
         color={key?.tint ?? '#fffaf0'}
         castShadow={shadows}
         shadow-mapSize={[2048, 2048]}

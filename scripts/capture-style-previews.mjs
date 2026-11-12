@@ -1,6 +1,6 @@
 // Renders the Settings previews of the cube styles from the real 3D model:
 // Classic Stickered, Premium Stickerless as drawn by default (v1) and as drawn
-// with ?stickerless=v2 (Candidate Y), which the picker shows instead while that
+// with ?stickerless=v2 (Candidate Y with the k2 lighting), which the picker shows instead while that
 // renderer is active.
 // Usage: npm run build && npm run preview (port 4317) in another shell, then:
 //        node scripts/capture-style-previews.mjs

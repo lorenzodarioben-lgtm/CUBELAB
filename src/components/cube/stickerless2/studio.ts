@@ -1,14 +1,15 @@
 /**
- * Stickerless v2's studio, Y (approved at c3baeaa): a product set with its own
- * room, key softbox and reflection panels in place of production's Stickerless
- * studio, plus near-field transport: each surface a turn opens sees the other
- * layers as geometry (they hide part of the studio and cast the key's shadow)
- * and mirrors them in its gloss. It is built once per tier into the same two
+ * Stickerless v2's studio, k2 (Y's layout, restrained; approved after the
+ * lighting review on exp/y-lighting): a product set with its own room, key
+ * softbox and reflection panels in place of production's Stickerless studio,
+ * plus near-field transport: each surface a turn opens sees the other layers
+ * as geometry (they hide part of the studio and cast the key's shadow) and
+ * mirrors them in its gloss. It is built once per tier into the same two
  * prefiltered maps as production, so it costs the same per frame.
  *
- * The other studios compared during the review, and the lighting review
- * itself, are kept on the development branch (stickerless-v2-phase01), not
- * here.
+ * The other studios compared during the reviews, and the reviews themselves,
+ * are kept on the development branches (stickerless-v2-phase01,
+ * exp/y-lighting), not here.
  *
  * Panels are placed in the studio's world frame, from the home view: at home
  * the camera looks from (0.50, 0.54, 0.67); U mirrors toward up-back-left, F
@@ -39,6 +40,8 @@ export interface StudioV2 {
   readonly innerLight: number;
   /** The key softbox (home camera frame) in place of production's window; it also drives the key light. */
   readonly key: Panel;
+  /** Gain on the key light's intensity over the key softbox's own (1: the softbox's first moment). */
+  readonly keyLight: number;
   /** Whether production's fill strips are part of the studio. */
   readonly fill: boolean;
   /** Exposure of the v2 plastic before tone mapping (the stage's own exposure is unchanged). */
@@ -55,37 +58,35 @@ function onCamera(panel: Panel): Panel {
 }
 
 /**
- * The studio: a product set with a dark surround, all emitters neutral white.
- * Four soft-edged softboxes ring the lens about 50° off the view axis (the key
- * upper left, which also drives the key light, a little the strongest), so a
- * face turned any way is lit from at least two of them and the cube reads
- * evenly bright whichever way it is held, as in a product photograph. Faces
- * seen square-on mirror the dark surround around the lens and keep their depth
- * of colour; the softboxes are small and bright enough that what does mirror
- * them (rims, curved lobes, faces at an angle) shows a defined gloss rather
- * than a grey wash. An overhead box behind lights the faces turned away (the
- * plastic a turn exposes mirrors them), two strips behind give the silhouette
- * its rim lines, and a dim card low right gives the right-hand faces a soft
- * sheen at grazing angles; the left low back is flagged dark, so the left
- * faces stay deep.
+ * The studio: a product set in a mid-grey surround, all emitters neutral white.
+ * The key softbox upper left, which also drives the key light, does most of
+ * the diffuse work, so lit faces read clean without a ring of equal
+ * reflections. Two smaller, dimmer softboxes upper right and low right give
+ * the faces turned that way a defined gloss, and a broad dim fill low left
+ * lifts the faces tipped toward the viewer without a coloured wash. A dim,
+ * graded strip overhead behind lights the faces turned away (the plastic a
+ * turn exposes mirrors it) without a pale sheet on the top face, two strips
+ * behind give the silhouette its rim lines, and a dim card low right gives the
+ * right-hand faces a soft sheen at grazing angles.
  */
-const PRODUCT_ROOM: Room = { colors: ['#2c2c2c', '#2c2c2c', '#3a3a3a', '#303030', '#2c2c2c', '#262626'], radiance: 1 };
-const PRODUCT_KEY: Panel = { position: [-6, 4.5, 4.5], size: [4.5, 4.5], radiance: 9.5, tint: WHITE, falloff: 0.35 };
+const PRODUCT_ROOM: Room = { colors: ['#5a5a5a', '#5a5a5a', '#5a5a5a', '#5a5a5a', '#5a5a5a', '#5a5a5a'], radiance: 3 };
+const PRODUCT_KEY: Panel = { position: [-6, 4.5, 4.5], size: [4.5, 4.5], radiance: 9, tint: WHITE, falloff: 0.35 };
 const PRODUCT_PANELS: readonly Panel[] = [
-  onCamera({ position: [6, 4.5, 4.5], size: [4.5, 4.5], radiance: 7.5, tint: WHITE, falloff: 0.35 }),
-  onCamera({ position: [-6, -4.5, 4.5], size: [4.5, 4.5], radiance: 8.5, tint: WHITE, falloff: 0.35 }),
-  onCamera({ position: [6, -4.5, 4.5], size: [4.5, 4.5], radiance: 9, tint: WHITE, falloff: 0.35 }),
-  onCamera({ position: [0, 7, -6], size: [11, 4], radiance: 7, tint: WHITE, falloff: 0.4, grade: 0.4 }),
+  onCamera({ position: [6, 4.5, 4.5], size: [3.6, 3.6], radiance: 4.125, tint: WHITE, falloff: 0.45 }),
+  onCamera({ position: [6, -4.5, 4.5], size: [3.6, 3.6], radiance: 4.95, tint: WHITE, falloff: 0.45 }),
+  onCamera({ position: [0, 7, -6], size: [8, 3], radiance: 2.2, tint: WHITE, falloff: 0.55, grade: 0.8 }),
   onCamera({ position: [7, -5, -6], size: [6, 6], radiance: 0.8, tint: WHITE, falloff: 0.7, grade: 0.7 }),
   onCamera({ position: [-7, 1, -5], size: [1.2, 10], radiance: 7, tint: WHITE, falloff: 0.3 }),
   onCamera({ position: [7, 1, -5], size: [1.2, 10], radiance: 7, tint: WHITE, falloff: 0.3 }),
+  onCamera({ position: [-5, -6, 4], size: [7, 3], radiance: 1.6, tint: WHITE, falloff: 0.7 }),
 ];
 
-/** Y, the approved v2 lighting. */
+/** k2, the approved v2 lighting. */
 export const V2_STUDIO: StudioV2 = {
   room: PRODUCT_ROOM,
   panels: PRODUCT_PANELS,
   key: PRODUCT_KEY,
+  keyLight: 1.5,
   fill: false,
   innerLight: 1,
   exposure: 1.15,

@@ -18,7 +18,7 @@ bundle, puzzle definitions, fonts, audio, and scramble worker are cached for off
 | ![Macro](artifacts/after/cube-macro.png) | ![M slice mid-turn](artifacts/after/cube-midturn-M.png) | ![Phone](artifacts/after/mobile-390-scrambled.png) |
 
 The studio opens with Classic Stickered, shown above. Premium Stickerless is one setting away, drawn by
-its v1 renderer; its v2 renderer (Candidate Y) is opt-in with `?stickerless=v2` (see [Rendering](#rendering)).
+its v1 renderer; its v2 renderer (Candidate Y with the k2 lighting) is opt-in with `?stickerless=v2` (see [Rendering](#rendering)).
 
 ## Quick start
 
@@ -273,13 +273,13 @@ Stickered is the default:
 | Colour | Thin vinyl stickers shaped like their piece (round centres, D-shaped edges, square corners) with a black border, four print batches per colour | The plastic itself: a shader (`pieceMaterial.ts`) gives each face a coloured cap over black mechanism, meeting on the cube edges' 45° lines, with a drawn parting line; satin sheen under a clear coat, its own reflector-card reflections, per-piece finish variation |
 | Signature | Black frame around every tile | GAN-style cuts where pieces meet the face centre: round centre caps and rounded edge ends, crisp near-square inner corners on the corner pieces, black openings at the diagonals |
 
-| Classic Stickered (default) | Premium Stickerless, v1 (default renderer) | Premium Stickerless, v2: Candidate Y (opt-in) |
+| Classic Stickered (default) | Premium Stickerless, v1 (default renderer) | Premium Stickerless, v2: Candidate Y, k2 lighting (opt-in) |
 | --- | --- | --- |
-| ![Classic Stickered](artifacts/styles/stickered/scrambled.png) | ![Premium Stickerless v1](artifacts/styles/stickerless/scrambled.png) | ![Premium Stickerless v2, Candidate Y](artifacts/styles/stickerless-v2/scrambled.png) |
+| ![Classic Stickered](artifacts/styles/stickered/scrambled.png) | ![Premium Stickerless v1](artifacts/styles/stickerless/scrambled.png) | ![Premium Stickerless v2, Candidate Y with the k2 lighting](artifacts/styles/stickerless-v2/scrambled.png) |
 
 **Two Stickerless renderers.** Premium Stickerless is drawn by **v1** (`pieceMaterial.ts`,
 `stickerlessResources.ts`) unless the address carries `?stickerless=v2`; that parameter selects
-**v2, Candidate Y** (`src/components/cube/stickerless2/`) for that page load only. v2 is not the
+**v2, Candidate Y with the k2 lighting** (`src/components/cube/stickerless2/`) for that page load only. v2 is not the
 default and nothing saves it: without the parameter Premium Stickerless is v1 again. v2 keeps v1's
 piece shapes (pillowed faces, rounded cube edges, the Gloss centre cap), its exterior finish and its
 white, and changes what light and a turn reveal: its own product studio (key softbox and reflection
