@@ -25,6 +25,7 @@ import { intersectCube, previewFamily, previewLabel, resolveTwist, snapTwist, tw
 import type { CubeHit, ScreenPoint, TwistResolution } from '../cube/gestures';
 import type { HoverState } from '../cube/hoverState';
 import type { OrbitRig } from './orbitRig';
+import { PRECISION_ORBIT_MULTIPLIER, TwoFingerMotion } from './twoFingerMotion';
 
 type TwistInfo = Extract<TwistResolution, { kind: 'twist' }>;
 
@@ -37,7 +38,8 @@ type Gesture =
   | { kind: 'pending'; id: number; start: ScreenPoint; hit: CubeHit; touch: boolean }
   | { kind: 'twist'; id: number; start: ScreenPoint; info: TwistInfo; angle: number; samples: Array<{ t: number; a: number }> }
   | { kind: 'orbit'; id: number; last: ScreenPoint }
-  | { kind: 'pinch'; distance: number; mid: ScreenPoint }
+  | { kind: 'pinch'; ids: [number, number]; motion: TwoFingerMotion }
+  | { kind: 'blocked' }
   | { kind: 'dead'; id: number };
 
 export interface PreviewSink {
@@ -76,6 +78,7 @@ export function Interaction({ studio, rig, frame, touchMode, preview, hover, onF
     const projected = new THREE.Vector3();
     const toCube = new THREE.Matrix4();
     let gesture: Gesture = { kind: 'idle' };
+    let pinchFrame = 0;
     let rect = el.getBoundingClientRect();
 
     const local = (e: PointerEvent | WheelEvent): ScreenPoint => ({ x: e.clientX - rect.left, y: e.clientY - rect.top });
@@ -107,10 +110,25 @@ export function Interaction({ studio, rig, frame, touchMode, preview, hover, onF
     };
 
     const startPinch = () => {
-      const [a, b] = [...pointers.values()];
+      const [a, b] = [...pointers.entries()];
       if (!a || !b) return;
       cancelTwist();
-      gesture = { kind: 'pinch', distance: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+      gesture = { kind: 'pinch', ids: [a[0],b[0]], motion: new TwoFingerMotion(a[1],b[1]) };
+    };
+
+    const applyPinch = (final = false) => {
+      if (gesture.kind !== 'pinch') return;
+      const delta = gesture.motion.flush(final);
+      if (!delta) return;
+      rig.rotateBy(delta.dx, delta.dy, rect.height, PRECISION_ORBIT_MULTIPLIER);
+      if (delta.zoom !== 1) rig.zoomBy(delta.zoom);
+      onFirstGesture();
+      invalidate();
+    };
+    const flushPinch = () => {
+      pinchFrame = 0;
+      applyPinch();
+      if (gesture.kind === 'pinch' && gesture.motion.pending) pinchFrame = requestAnimationFrame(flushPinch);
     };
 
     const onPointerDown = (e: PointerEvent) => {
@@ -125,6 +143,7 @@ export function Interaction({ studio, rig, frame, touchMode, preview, hover, onF
         /* capture can fail for synthetic events; gesture still works */
       }
       e.preventDefault();
+      if (gesture.kind === 'blocked') return;
       if (pointers.size === 2) {
         startPinch();
         return;
@@ -153,17 +172,13 @@ export function Interaction({ studio, rig, frame, touchMode, preview, hover, onF
         return;
       }
       if (gesture.kind === 'pinch') {
-        const [a, b] = [...pointers.values()];
-        if (!a || !b) return;
-        const distance = Math.hypot(a.x - b.x, a.y - b.y);
-        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-        if (distance > 0 && gesture.distance > 0) rig.zoomBy(gesture.distance / distance);
-        rig.rotateBy(mid.x - gesture.mid.x, mid.y - gesture.mid.y, rect.height);
-        gesture = { kind: 'pinch', distance, mid };
-        onFirstGesture();
-        invalidate();
+        const index = gesture.ids.indexOf(e.pointerId);
+        if (index < 0) return; // Extra fingers never replace the active pair.
+        gesture.motion.move(index as 0 | 1, p);
+        if (!pinchFrame) pinchFrame = requestAnimationFrame(flushPinch);
         return;
       }
+      if (gesture.kind === 'blocked') return;
       if ('id' in gesture && gesture.id !== e.pointerId) return;
 
       if (gesture.kind === 'orbit') {
@@ -216,9 +231,16 @@ export function Interaction({ studio, rig, frame, touchMode, preview, hover, onF
       }
       if (!wasTracked) return;
       if (gesture.kind === 'pinch') {
-        // Remaining finger does nothing until lifted — avoids a jump into orbit/twist.
-        const remaining = [...pointers.keys()][0];
-        gesture = remaining === undefined ? { kind: 'idle' } : { kind: 'dead', id: remaining };
+        if (!gesture.ids.includes(e.pointerId)) return;
+        if (!cancelled) applyPinch(true);
+        cancelAnimationFrame(pinchFrame); pinchFrame = 0;
+        // All remaining fingers must lift before a fresh gesture can begin.
+        gesture = pointers.size === 0 ? { kind: 'idle' } : { kind: 'blocked' };
+        setCursor(el, 'grab');
+        return;
+      }
+      if (gesture.kind === 'blocked') {
+        if (pointers.size === 0) gesture = { kind: 'idle' };
         return;
       }
       if ('id' in gesture && gesture.id !== e.pointerId) return;
@@ -273,6 +295,7 @@ export function Interaction({ studio, rig, frame, touchMode, preview, hover, onF
     el.addEventListener('wheel', onWheel, { passive: false });
     el.addEventListener('contextmenu', onContextMenu);
     return () => {
+      cancelAnimationFrame(pinchFrame);
       cancelTwist();
       hover.clear();
       el.removeEventListener('pointerdown', onPointerDown);
@@ -283,6 +306,10 @@ export function Interaction({ studio, rig, frame, touchMode, preview, hover, onF
       el.removeEventListener('pointerleave', onLeave);
       el.removeEventListener('wheel', onWheel);
       el.removeEventListener('contextmenu', onContextMenu);
+      for (const id of pointers.keys()) {
+        if (el.hasPointerCapture(id)) el.releasePointerCapture(id);
+      }
+      pointers.clear();
     };
   }, [gl, camera, invalidate, studio, rig, frame, touchMode, preview, hover, onFirstGesture]);
 

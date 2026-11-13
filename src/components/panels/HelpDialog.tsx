@@ -27,7 +27,7 @@ export function HelpDialog() {
               <Kbd>C</Kbd> brings the view home.
             </li>
             <li>
-              <strong>Zoom</strong> — scroll, or pinch with two fingers (two fingers also orbit). On phones, the Twist / Orbit switch makes
+              <strong>Two-finger drag</strong> — precision orbit. <strong>Pinch</strong> — zoom. Scroll also zooms. On phones, the Twist / Orbit switch makes
               single-finger drags unambiguous.
             </li>
           </ul>

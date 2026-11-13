@@ -91,8 +91,8 @@ export class OrbitRig {
   }
 
   /** Drag in pixels → rotation; `viewport` is the stage height for scale invariance. */
-  rotateBy(dx: number, dy: number, viewport: number): void {
-    const k = (Math.PI / Math.max(320, viewport)) * 1.15 * this.#sensitivity;
+  rotateBy(dx: number, dy: number, viewport: number, sensitivityMultiplier = 1): void {
+    const k = (Math.PI / Math.max(320, viewport)) * 1.15 * this.#sensitivity * sensitivityMultiplier;
     this.#rotateLocal(-dx * k, -dy * k);
   }
 
