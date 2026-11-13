@@ -73,7 +73,6 @@ describe('look lighting', () => {
     expect(lookLighting(look('stickerless', 'gloss', 'high'))).toEqual({ hybrid: true, shadows: true, sceneSize: 256, stickerlessSize: 512 });
     expect(lookLighting(look('stickerless', 'gloss', 'medium'))).toEqual({ hybrid: true, shadows: false, sceneSize: 256, stickerlessSize: 256 });
     expect(lookLighting(look('stickerless', 'gloss', 'low'))).toEqual({ hybrid: true, shadows: false, sceneSize: 128, stickerlessSize: 128 });
-    expect(lookLighting(look('stickerless', 'matte', 'high'))).toEqual({ hybrid: false, shadows: true, sceneSize: 256, stickerlessSize: 256 });
     expect(lookLighting(look('stickered', 'gloss', 'low'))).toEqual({ hybrid: false, shadows: false, sceneSize: 128, stickerlessSize: 128 });
   });
 
@@ -81,7 +80,7 @@ describe('look lighting', () => {
     const shown = look('stickered', 'gloss', 'high');
     expect(looksAhead(shown, false)).toEqual([look('stickerless', 'gloss', 'high')]);
     expect(looksAhead(shown, true)).toEqual([look('stickerless', 'gloss', 'high'), look('stickered', 'gloss', 'low')]);
-    expect(looksAhead(look('stickerless', 'matte', 'low'), true)).toEqual([look('stickered', 'matte', 'low')]);
+    expect(looksAhead(look('stickerless', 'gloss', 'low'), true)).toEqual([look('stickered', 'gloss', 'low')]);
   });
 });
 
@@ -216,7 +215,7 @@ describe('look preparation', () => {
     const preparer = new LookPreparer();
     preparer.attach(gl.renderer, new THREE.PerspectiveCamera());
     gl.renderer.shadowMap.enabled = true;
-    const ready = preparer.prepare(look('stickered', 'matte', 'low'));
+    const ready = preparer.prepare(look('stickered', 'gloss', 'low'));
     const cube = gl.compiled[0]!;
     expect(cube.lights.sort()).toEqual(['DirectionalLight', 'DirectionalLight', 'HemisphereLight']);
     expect(cube.shadowMap).toBe(false);
@@ -240,7 +239,7 @@ describe('look preparation', () => {
     (gl.renderer as unknown as { compile: () => never }).compile = () => {
       throw new Error('compile failed');
     };
-    await expect(preparer.prepare(look('stickered', 'matte', 'low'))).resolves.toBeUndefined();
+    await expect(preparer.prepare(look('stickered', 'gloss', 'low'))).resolves.toBeUndefined();
     expect(gl.renderer.shadowMap.enabled).toBe(false);
     preparer.dispose();
   });

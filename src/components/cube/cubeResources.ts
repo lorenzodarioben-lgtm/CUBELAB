@@ -6,7 +6,7 @@
  * GPU-backed for one render tier and finish:
  *
  *   - Classic Stickered (`stickeredResources.ts`): black bodies + raised tiles;
- *   - Premium Stickerless (`stickerlessResources.ts`): moulded coloured pieces;
+ *   - Modern Stickerless (`stickerlessResources.ts`): moulded coloured pieces;
  *   - the face-letter overlays, shared by both.
  *
  * Each style's set is created the first time it is shown or prepared and then
@@ -116,7 +116,7 @@ export class CubeVisuals {
     return this.#stickered;
   }
 
-  /** The Premium Stickerless set (v1, or the experimental v2 when selected), created on first use. */
+  /** The Modern Stickerless set (v1, or the experimental v2 when selected), created on first use. */
   get stickerless(): StickerlessResources {
     if (!this.#stickerless) {
       this.#stickerless =

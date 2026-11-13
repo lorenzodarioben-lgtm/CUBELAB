@@ -217,7 +217,7 @@ function StudioEnvironment({ size, intensity, reflections, hybrid, hybridSize }:
 }
 
 /**
- * Classic and Matte retain their studio lights. Stickerless Gloss uses the
+ * Classic retains its studio lights. Stickerless uses the
  * reviewed finite window, with a matching diffuse key and High-tier shadow.
  */
 function Lighting({ look, reflections }: { look: StageLook; reflections: StyleReflections }) {
@@ -476,7 +476,7 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
         : 'high';
   const highSetting = settings.quality === 'high';
   // The look asked for, and the one on screen: a new look is shown once its shaders are ready.
-  const requested = useMemo<StageLook>(() => ({ style: settings.cubeStyle, finish: settings.finish, tier: quality }), [settings.cubeStyle, settings.finish, quality]);
+  const requested = useMemo<StageLook>(() => ({ style: settings.cubeStyle, finish: 'gloss', tier: quality }), [settings.cubeStyle, quality]);
   const preparer = useMemo(() => new LookPreparer(), []);
   const [shown, setShown] = useState<{ look: StageLook; dpr: Dpr } | null>(null);
   const onShow = useCallback((look: StageLook) => setShown({ look, dpr: stageDpr(look.tier, highSetting) }), [highSetting]);

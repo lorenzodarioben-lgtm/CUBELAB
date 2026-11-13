@@ -80,7 +80,7 @@ export interface PieceShape {
   readonly cubeEdgeRadius: number;
 }
 
-/** The Premium Stickerless piece design. */
+/** The Modern Stickerless piece design. */
 export const STICKERLESS_SHAPE: PieceShape = {
   id: 'stickerless',
   innerRadius: INNER_RADIUS,

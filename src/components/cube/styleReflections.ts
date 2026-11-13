@@ -1,7 +1,7 @@
 import type * as THREE from 'three';
 
 /**
- * The Premium Stickerless cube's own reflection map, published by the stage's
+ * The Modern Stickerless cube's own reflection map, published by the stage's
  * lighting (which owns the renderer and disposes the texture) and read by the
  * cube model each frame. `null` until rendered, and after disposal; the
  * stickerless materials then fall back to the shared scene environment.

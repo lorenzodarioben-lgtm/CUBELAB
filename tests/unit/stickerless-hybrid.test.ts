@@ -55,15 +55,8 @@ describe('production Strong Hybrid', () => {
     resources.dispose(); specular.dispose(); diffuse.dispose();
   });
 
-  it('leaves Matte and Classic outside the hybrid shader and material paths', () => {
+  it('leaves Classic outside the hybrid shader and material paths', () => {
     for (const tier of ['high', 'medium', 'low'] as const) {
-      const matte = createStickerlessResources(tier, 'matte');
-      for (const material of matte.materials as THREE.MeshPhysicalMaterial[]) {
-        expect(material.roughness).toBeGreaterThanOrEqual(0.42 * 0.93);
-        expect(material.roughness).toBeLessThanOrEqual(0.42 * 1.07);
-        expect(compile(material).uniforms).not.toHaveProperty('uPlasticDiffuseEnvironment');
-        if (tier !== 'low') expect(material.clearcoat).toBe(0.12);
-      }
       const classic = createStickeredResources(tier, 'gloss');
       for (const material of Object.values(classic.bodyMaterials)) {
         const shader = compile(material);
@@ -71,7 +64,7 @@ describe('production Strong Hybrid', () => {
         expect(shader.fragmentShader).not.toContain('plasticWindowVisibility');
         expect(shader.fragmentShader).not.toContain('pieceAnalyticRimNormal');
       }
-      matte.dispose(); classic.dispose();
+      classic.dispose();
     }
   });
 

@@ -5,7 +5,8 @@ export type TurnSpeed = 'relaxed' | 'normal' | 'snappy' | 'instant';
 export type PlaybackSpeed = 'slow' | 'normal' | 'fast';
 export type ScrambleStyle = 'animate' | 'instant';
 export type Quality = 'auto' | 'high' | 'low';
-export type Finish = 'gloss' | 'matte';
+/** Internal rendering contract: public cubes always use the approved Gloss finish. */
+export type Finish = 'gloss';
 export type MotionPreference = 'system' | 'reduce' | 'full';
 export type KeyMap = 'faces' | 'speed';
 export type TouchMode = 'twist' | 'orbit';
@@ -23,7 +24,6 @@ export interface Settings {
   readonly timerMode: TimerMode;
   readonly inspection: boolean;
   readonly quality: Quality;
-  readonly finish: Finish;
   readonly faceLabels: boolean;
   readonly sound: boolean;
   /** Turn-sound volume, 0…1 (applied perceptually). */
@@ -45,7 +45,6 @@ export const DEFAULT_SETTINGS: Settings = {
   timerMode: 'casual',
   inspection: true,
   quality: 'auto',
-  finish: 'gloss',
   faceLabels: false,
   sound: false,
   soundVolume: 0.7,
@@ -100,7 +99,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     timerMode: pick(r.timerMode, ['casual', 'spacebar'], d.timerMode),
     inspection: bool(r.inspection, d.inspection),
     quality: pick(r.quality, ['auto', 'high', 'low'], d.quality),
-    finish: pick(r.finish, ['gloss', 'matte'], d.finish),
+    // Legacy finish preferences are deliberately ignored; every cube is Gloss.
     faceLabels: bool(r.faceLabels, d.faceLabels),
     sound: bool(r.sound, d.sound),
     soundVolume: num(r.soundVolume, 0, 1, d.soundVolume),

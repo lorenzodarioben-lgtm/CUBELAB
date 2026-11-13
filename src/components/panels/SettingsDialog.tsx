@@ -59,9 +59,6 @@ export function SettingsDialog() {
           </div>
           <CubeStylePicker value={settings.cubeStyle} onChange={(cubeStyle) => set({ cubeStyle })} />
         </div>
-        <Row title="Finish" description="Gloss or satin plastic, for either style.">
-          <Segmented label="Finish" value={settings.finish} onChange={(finish) => set({ finish })} options={[{ value: 'gloss', label: 'Gloss' }, { value: 'matte', label: 'Matte' }]} />
-        </Row>
         <Row title="Sticker letters" description="Prints each sticker's face letter — helpful for colour vision differences.">
           <Switch label="Sticker letters" checked={settings.faceLabels} onChange={(faceLabels) => set({ faceLabels })} />
         </Row>

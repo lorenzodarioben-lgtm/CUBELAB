@@ -514,7 +514,6 @@ gl_FragColor.rgb *= V2_EXPOSURE;
 
 export interface PieceLookV2 {
   readonly tier: RenderTier;
-  readonly matte: boolean;
   /** Deterministic per-piece finish variation, as production: relative roughness and coat-roughness offsets. */
   readonly variation: { readonly roughness: number; readonly coat: number };
 }
@@ -530,12 +529,12 @@ export function createPieceMaterialV2(kind: number, slotColors: readonly (THREE.
   const material = new THREE.MeshPhysicalMaterial({
     color: '#ffffff',
     metalness: 0,
-    roughness: look.matte ? 0.42 : 0.26,
-    clearcoat: look.matte ? 0.12 : 0.35,
-    clearcoatRoughness: look.matte ? 0.4 : 0.07,
+    roughness: 0.26,
+    clearcoat: 0.35,
+    clearcoatRoughness: 0.07,
     specularIntensity: 0.75,
     ior: 1.5,
-    envMapIntensity: look.matte ? 0.9 : 1,
+    envMapIntensity: 1,
   }) as THREE.MeshPhysicalMaterial & { pieceToCube: THREE.Matrix4 };
   material.roughness *= 1 + look.variation.roughness;
   material.clearcoatRoughness *= 1 + look.variation.coat;
@@ -557,13 +556,13 @@ export function createPieceMaterialV2(kind: number, slotColors: readonly (THREE.
   if (detailed) {
     defines.V2_SDF_NORMALS = '';
     defines.V2_SCALES = '';
-    // Gloss carries production's chamfer centre and its analytic normals; Matte its continuous centre.
-    if (!look.matte) defines.V2_CHAMFER_CENTRE = '';
+    // Gloss carries production's chamfer centre and its analytic normals; the finish is always Gloss.
+    defines.V2_CHAMFER_CENTRE = '';
   }
-  // The studio lights Gloss only (its maps and key light; Matte keeps production's matte lighting).
-  if (!look.matte) Object.assign(defines, fixedStudioDefines());
-  // Gloss: a turn lifts the seam shading only around the cut planes it opens (Matte keeps the whole-cube lift).
-  if (!look.matte) defines.V2_OPEN_CUTS = '';
+  // The studio lights Gloss only with its existing maps and key light.
+  Object.assign(defines, fixedStudioDefines());
+  // Gloss: a turn lifts the seam shading only around the cut planes it opens.
+  defines.V2_OPEN_CUTS = '';
   material.defines = { ...material.defines, ...defines };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -581,7 +580,7 @@ export function createPieceMaterialV2(kind: number, slotColors: readonly (THREE.
       .replace('#include <tonemapping_fragment>', EXPOSURE)
       .replace('void main() {', `#if defined(V2_TRANSPORT) && defined(USE_ENVMAP)\n${transportFunctionsGlsl()}\n#endif\nvoid main() {`);
   };
-  material.customProgramCacheKey = () => `cubelab-v2-piece${detailed ? '-detailed' : ''}${look.matte ? '-matte' : '-studio-y'}`;
+  material.customProgramCacheKey = () => `cubelab-v2-piece${detailed ? '-detailed' : ''}-studio-y`;
   return material;
 }
 

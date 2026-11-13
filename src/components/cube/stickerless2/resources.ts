@@ -4,7 +4,7 @@
  * `materials[id]` on each cubie).
  *
  * The geometry is production's: the shared corner and edge meshes and, for
- * Gloss, the production chamfer centre on v2's plan (`V2_CENTRE_PLAN`; Matte: its continuous centre), from the
+ * Gloss, the production chamfer centre on v2's plan (`V2_CENTRE_PLAN`), from the
  * same reference-counted caches. The finish and lighting are production's too:
  * the same material values and per-piece variation, and for Gloss the Strong
  * Hybrid shell response under the production stickerless lighting. v2 changes
@@ -58,11 +58,10 @@ function buildMechanism(tier: RenderTier): THREE.BufferGeometry {
   return merged;
 }
 
-export function createStickerlessV2Resources(tier: RenderTier, finish: Finish): StickerlessResources {
+export function createStickerlessV2Resources(tier: RenderTier, _finish: Finish): StickerlessResources {
   const detail = PIECE_DETAIL[tier];
-  const gloss = finish === 'gloss';
   const shared = acquirePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
-  const pieces = gloss ? { ...shared, center: acquireStickerlessChamferGeometry(detail, V2_CENTRE_PLAN) } : shared;
+  const pieces = { ...shared, center: acquireStickerlessChamferGeometry(detail, V2_CENTRE_PLAN) };
   const palette = Object.fromEntries(FACES.map((face) => [face, new THREE.Color(V2_PALETTE[face])])) as Record<Face, THREE.Color>;
   const turn = createTurnUniforms();
   // Production's deterministic per-piece finish variation (same seed and order).
@@ -71,7 +70,7 @@ export function createStickerlessV2Resources(tier: RenderTier, finish: Finish): 
     createPieceMaterialV2(
       KIND_INDEX[frame.kind],
       frame.slots.map((face) => (face ? palette[face] : null)),
-      { tier, matte: !gloss, variation: { roughness: (vary() - 0.5) * 0.14, coat: (vary() - 0.5) * 0.4 } },
+      { tier, variation: { roughness: (vary() - 0.5) * 0.14, coat: (vary() - 0.5) * 0.4 } },
       turn,
     ),
   );
@@ -79,10 +78,8 @@ export function createStickerlessV2Resources(tier: RenderTier, finish: Finish): 
   const coreMaterial = createMechanismMaterialV2(V2_MECHANISM);
   // Gloss: production's Strong Hybrid shell response and window lighting, on every tier.
   const diffuseEnvironment = { value: null as THREE.Texture | null };
-  if (gloss) {
-    for (const material of materials) applyStrongHybrid(material, diffuseEnvironment);
-    applyStrongHybrid(coreMaterial, diffuseEnvironment, false);
-  }
+  for (const material of materials) applyStrongHybrid(material, diffuseEnvironment);
+  applyStrongHybrid(coreMaterial, diffuseEnvironment, false);
   const toCube = new THREE.Matrix4();
   const cubeToView = new THREE.Matrix4();
   const tintTexture = turn.uCellTint.value;
@@ -146,7 +143,7 @@ export function createStickerlessV2Resources(tier: RenderTier, finish: Finish): 
       if (disposed) return;
       disposed = true;
       releasePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
-      if (gloss) releaseStickerlessChamferGeometry(detail, V2_CENTRE_PLAN);
+      releaseStickerlessChamferGeometry(detail, V2_CENTRE_PLAN);
       materials.forEach((m) => m.dispose());
       core.dispose();
       coreMaterial.dispose();

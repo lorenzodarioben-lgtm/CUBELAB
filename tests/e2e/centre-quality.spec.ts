@@ -4,6 +4,7 @@ import type { Page } from '@playwright/test';
 import type { RootState } from '@react-three/fiber';
 import type { Mesh, BufferGeometry, Material } from 'three';
 import { buildStickerlessChamferGeometry } from '../../src/components/cube/stickerlessChamferGeometry';
+import { V2_CENTRE_PLAN } from '../../src/components/cube/stickerless2/shape';
 import { expectRenderMatchesModel, openStudio, trackErrors, waitIdle } from './helpers';
 
 const PIECE_DETAIL = { high: 40, medium: 30, low: 24 } as const;
@@ -67,7 +68,7 @@ async function centres(page: Page, expectedNormals?: number[]) {
         index: await hash(mesh.geometry.index!.array),
         vertices: mesh.geometry.getAttribute('position').count,
         material: mesh.material.type,
-        analytic: fragment.includes('pieceAnalyticRimNormal'),
+        analytic: fragment.includes('#define V2_CHAMFER_CENTRE'),
         hybrid: fragment.includes('plasticWindowVisibility'),
         linked: Boolean(context.getProgramParameter(program.program, context.LINK_STATUS)),
         compiled: shaders.every(s => context.getShaderParameter(s, context.COMPILE_STATUS)),
@@ -78,7 +79,7 @@ async function centres(page: Page, expectedNormals?: number[]) {
 }
 
 async function expectProfile(page: Page, tier: keyof typeof PIECE_DETAIL) {
-  const geometry = buildStickerlessChamferGeometry(PIECE_DETAIL[tier]);
+  const geometry = buildStickerlessChamferGeometry(PIECE_DETAIL[tier], V2_CENTRE_PLAN);
   const hash = (a: ArrayBufferView) => createHash('sha256').update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength)).digest('hex');
   const expected = {
     position: hash(geometry.getAttribute('position').array), index: hash(geometry.index!.array), matchingNormals: true,

@@ -399,7 +399,6 @@ export function createPieceMaterial(
   seed: number,
   options: PieceMaterialOptions = {},
 ): THREE.Material {
-  const gloss = look.finish === 'gloss';
   const detailed = look.tier !== 'low';
   const physical = detailed || options.physicalFinish === true;
   const honeycomb = options.honeycomb === true && detailed;
@@ -412,7 +411,7 @@ export function createPieceMaterial(
     uFaceColor: { value: slotColors.map((c) => (c ? c.clone() : BLACK.clone())) },
     uFaceOn: { value: slotColors.map((c) => (c ? 1 : 0)) },
     uBlack: { value: options.interiorColor !== undefined ? new THREE.Color(options.interiorColor) : BLACK.clone() },
-    uBlackRoughness: { value: options.blackRoughness ?? (gloss ? 0.34 : 0.5) },
+    uBlackRoughness: { value: options.blackRoughness ?? (0.34) },
     uBlackCoat: { value: 0.35 },
     uSeed: { value: seed },
     uSeamRange: { value: new THREE.Vector2(...(options.seamRange ?? [0.08, 0.6])) },
@@ -441,12 +440,12 @@ export function createPieceMaterial(
   if (continuousCentre) Object.assign(uniforms, {
     uCentreSurface: { value: new THREE.Vector4(centre.plateauRadius, centre.top, centre.side, centre.cornerRadius) },
   });
-  const common = { color: '#ffffff', roughness: options.capRoughness ?? (gloss ? 0.2 : 0.42), metalness: 0 };
+  const common = { color: '#ffffff', roughness: options.capRoughness ?? (0.2), metalness: 0 };
   const material = physical
     ? new THREE.MeshPhysicalMaterial({
         ...common,
-        clearcoat: options.capCoat ?? (gloss ? 0.6 : 0.12),
-        clearcoatRoughness: options.capCoatRoughness ?? (gloss ? 0.1 : 0.4),
+        clearcoat: options.capCoat ?? (0.6),
+        clearcoatRoughness: options.capCoatRoughness ?? (0.1),
         specularIntensity: 0.75,
         ior: 1.5,
       })

@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { buildStickerlessChamferGeometry, chamferOutline, sampleChamferSurface, CONVEXITY_AMPLITUDE, CONVEXITY_BOUND, STICKERLESS_CHAMFER_NORMALS, STICKERLESS_CHAMFER_SURFACE as profile } from '../../src/components/cube/stickerlessChamferGeometry';
-import { buildStickerlessCenterGeometry, CONTINUOUS_CENTRE_NORMALS } from '../../src/components/cube/stickerlessCenterGeometry';
 import { createStickerlessResources, PIECE_DETAIL } from '../../src/components/cube/stickerlessResources';
 import { CUBIE_DEFS } from '../../src/core/puzzle/cubies';
 
@@ -119,40 +118,33 @@ describe('production chamfer routing', () => {
     expected.dispose(); r.dispose();
   });
 
-  for (const [tier, finish] of [['high', 'matte'], ['medium', 'matte'], ['low', 'matte']] as const) it(`retains the previous centre and shader on ${tier} ${finish}`, () => {
-    const r = createStickerlessResources(tier, finish), old = buildStickerlessCenterGeometry(PIECE_DETAIL[tier]);
-    for (const key of ['position', 'normal']) expect(hash(r.pieces.center.getAttribute(key).array)).toBe(hash(old.getAttribute(key).array));
-    const shader = compile(r.materials[centreId]!);
-    expect(shader.fragmentShader).not.toContain(STICKERLESS_CHAMFER_NORMALS);
-    if (tier !== 'low') expect(shader.fragmentShader).toContain(CONTINUOUS_CENTRE_NORMALS);
-    old.dispose(); r.dispose();
-  });
-
-  it('releases each tier centre only after its last Gloss owner, independently of Matte', () => {
+  it('releases each tier centre only after its last Gloss owner, with overlapping resource sets', () => {
     // Adjacent resource sets can overlap while the previous shaders finish warming.
     const tiers = ['high', 'medium', 'low', 'high'] as const;
     const sets = tiers.map(tier => createStickerlessResources(tier, 'gloss'));
-    const matte = createStickerlessResources('low', 'matte');
+    const overlap = createStickerlessResources('low', 'gloss');
     expect(sets[0]!.pieces.center).toBe(sets[3]!.pieces.center);
-    expect(sets[2]!.pieces.center).not.toBe(matte.pieces.center);
-    expect(sets[2]!.pieces.corner).toBe(matte.pieces.corner);
+    expect(sets[2]!.pieces.center).toBe(overlap.pieces.center);
+    expect(sets[2]!.pieces.corner).toBe(overlap.pieces.corner);
     const centers = [...new Set(sets.map(r => r.pieces.center))];
     const released = centers.map(g => { const fn = vi.fn(); g.addEventListener('dispose', fn); return fn; });
-    const bodyReleased = vi.fn(); matte.pieces.corner.addEventListener('dispose', bodyReleased);
+    const bodyReleased = vi.fn(); overlap.pieces.corner.addEventListener('dispose', bodyReleased);
     try {
       sets[0]!.dispose(); expect(released[0]).not.toHaveBeenCalled();
       for (const r of sets.slice(1)) { r.dispose(); r.dispose(); }
-      for (const fn of released) expect(fn).toHaveBeenCalledTimes(1);
+      expect(released[0]).toHaveBeenCalledTimes(1);
+      expect(released[1]).toHaveBeenCalledTimes(1);
+      expect(released[2]).not.toHaveBeenCalled();
       expect(bodyReleased).not.toHaveBeenCalled();
-      matte.dispose(); expect(bodyReleased).toHaveBeenCalledTimes(1);
+      overlap.dispose(); expect(bodyReleased).toHaveBeenCalledTimes(1);
       // Cached CPU geometry can be uploaded again on Low -> High -> Low.
       const low = createStickerlessResources('low', 'gloss');
       expect(low.pieces.center).toBe(sets[2]!.pieces.center);
       low.dispose(); expect(released[2]).toHaveBeenCalledTimes(2);
     } finally {
-      for (const r of sets) r.dispose(); matte.dispose();
+      for (const r of sets) r.dispose(); overlap.dispose();
       centers.forEach((g, i) => g.removeEventListener('dispose', released[i]!));
-      matte.pieces.corner.removeEventListener('dispose', bodyReleased);
+      overlap.pieces.corner.removeEventListener('dispose', bodyReleased);
     }
   });
 });

@@ -17,7 +17,7 @@ bundle, puzzle definitions, fonts, audio, and scramble worker are cached for off
 | --- | --- | --- |
 | ![Macro](artifacts/after/cube-macro.png) | ![M slice mid-turn](artifacts/after/cube-midturn-M.png) | ![Phone](artifacts/after/mobile-390-scrambled.png) |
 
-The studio opens with Classic Stickered, shown above. Select Premium Stickerless in Settings for
+The studio opens with Classic Stickered, shown above. Select Modern Stickerless in Settings for
 the approved V2 renderer, featuring k2 studio lighting, refined centre caps and stable seams.
 No URL parameter is needed (see [Rendering](#rendering)).
 
@@ -60,8 +60,8 @@ npm run test:e2e     # Playwright against the production build (builds + preview
 | `npm run test:e2e`    | Playwright: Chromium desktop 1440×900, Chromium phone 390×844 (touch), Firefox and WebKit smoke |
 | `npm run test:all`    | Everything above, in order                                                      |
 | `npm run screenshots` | Re-capture `artifacts/after/*.png` (needs `npm run preview` running)             |
-| `node scripts/capture-style-matrix.mjs` | Classic Stickered and Premium Stickerless side by side → `artifacts/styles/` (needs preview) |
-| `node scripts/capture-style-previews.mjs` | Re-render the two Settings previews (Classic and Premium Stickerless) in `src/assets/cube-styles/` (needs preview) |
+| `node scripts/capture-style-matrix.mjs` | Classic Stickered and Modern Stickerless side by side → `artifacts/styles/` (needs preview) |
+| `node scripts/capture-style-previews.mjs` | Re-render the two Settings previews (Classic and Modern Stickerless) in `src/assets/cube-styles/` (needs preview) |
 | `node scripts/render-audio-demo.mjs` | Render the turn-sound demonstration to `artifacts/audio/turn-demo.wav` (needs preview) |
 
 First Playwright run on a new machine: `npx playwright install chromium firefox webkit`.
@@ -145,7 +145,7 @@ History supports details, delete, clear-all and CSV export.
 Animated or instant scrambles (with skip), solver playback with Play/Pause, Step, Replay, Stop and
 three speeds, Reset (confirms if it would discard a running attempt), camera reset, copy scramble and
 share links (`?scramble=R%20M%27%20U`), Zen mode, two cube styles (Classic Stickered / Premium
-Stickerless), sticker letters for colour-vision differences, gloss/matte finish, render quality (auto/high/low), reduced motion, orbit sensitivity, optional
+Stickerless), sticker letters for colour-vision differences, render quality (auto/high/low), reduced motion, orbit sensitivity, optional
 speedcube turning sounds with volume and preview (off by default), and a 2D net fallback when WebGL is unavailable.
 
 ### Other puzzles (switched off)
@@ -268,17 +268,17 @@ facelet read-back all work in cube coordinates, so twists behave identically ups
 Two cube styles share everything except the physical model (Settings → Cube style). Classic
 Stickered is the default:
 
-| | Classic Stickered (default) | Premium Stickerless (approved V2) |
+| | Classic Stickered (default) | Modern Stickerless (approved V2) |
 | --- | --- | --- |
 | Pieces | Glossy black moulded bodies with shaped stickers | Solid, gently pillowed coloured-plastic cubies with a finely refined Gloss centre cap |
 | Colour | Raised vinyl-style coloured stickers, black borders | Moulded coloured plastic, controlled k2 studio reflections, realistic depth and near-field bounce |
 | Signature | Black frame around each tile | Moulded internal scales, assembly grooves and consistent shading around turning-layer cuts |
 
-| Classic Stickered (default) | Premium Stickerless (V2, default Stickerless renderer) |
+| Classic Stickered (default) | Modern Stickerless (V2, default Stickerless renderer) |
 | --- | --- |
-| ![Classic Stickered](artifacts/styles/stickered/scrambled.png) | ![Premium Stickerless](artifacts/styles/stickerless-v2/scrambled.png) |
+| ![Classic Stickered](artifacts/styles/stickered/scrambled.png) | ![Modern Stickerless](artifacts/styles/stickerless-v2/scrambled.png) |
 
-**Premium Stickerless now uses V2 automatically.** Select it normally in Settings: neither
+**Modern Stickerless now uses V2 automatically.** Select it normally in Settings: neither
 `?stickerless=v2` nor any other renderer flag is needed. The former V1 implementation
 is no longer selectable in the public UI or via its old URL flag. V2 uses the approved
 Candidate Y geometry and the k2 lighting studio, with the minute centre-cap refinement,
@@ -297,7 +297,7 @@ inspection, a timed attempt or solver playback — and changes nothing else: not
 the move log, undo/redo, the view or the history. Interaction is model-independent (twists hit-test
 an analytic cube; facelet read-back uses style-independent anchors), so both styles behave
 identically. `CubeVisuals` (`cubeResources.ts`) owns each style's GPU resources for the current tier
-and finish, creates them on first use, keeps them until the tier or finish changes, and pre-warms the
+in the approved Gloss finish, creates them on first use, keeps them until the tier changes, and pre-warms the
 hidden style's resources and shaders at idle so even the first switch is quick. The choice persists
 with the other settings; settings saved before styles existed load as Classic Stickered, the default.
 
@@ -344,3 +344,5 @@ the other puzzles are switched off, and 4×4–7×7 have no auto-solver even whe
 training tool, not WCA-certified;
 history is per-browser; touch was verified with
 Chromium touch emulation (not physical devices); Firefox/WebKit are covered by a smoke test only.
+
+Both public cube styles use their approved Gloss appearance exclusively. Legacy saved finish preferences are ignored during settings loading; other preferences, cube sessions and solve history are preserved.

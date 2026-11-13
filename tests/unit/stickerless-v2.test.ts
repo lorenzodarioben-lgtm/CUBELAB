@@ -1,5 +1,5 @@
 /**
- * Premium Stickerless v2 (`src/components/cube/stickerless2/`): default
+ * Modern Stickerless v2 (`src/components/cube/stickerless2/`): default
  * selection; production anchoring (geometry, centre, finish, white);
  * material programs, turn state and GPU resource ownership; and isolation
  * from v1 and Classic Stickered.
@@ -70,7 +70,7 @@ describe('Stickerless v2 selection', () => {
 
 describe('Stickerless v2 is anchored to production', () => {
   it('uses the production piece meshes and, for Gloss, the production chamfer centre on its own plan', () => {
-    for (const finish of ['gloss', 'matte'] as const) {
+    for (const finish of ['gloss'] as const) {
       const production = createStickerlessResources('medium', finish);
       const v2 = createStickerlessV2Resources('medium', finish);
       for (const kind of KINDS) {
@@ -469,13 +469,6 @@ describe('Stickerless v2 studios', () => {
       expect(material.customProgramCacheKey()).toBe('cubelab-v2-piece-detailed-studio-y-strong-hybrid');
     }
     res.dispose();
-    // Matte has no studio (its lighting is production's matte lighting): none of k2's values or transport.
-    const matte = createStickerlessV2Resources('high', 'matte');
-    for (const material of matte.materials) {
-      for (const define of ['V2_TRANSPORT', 'V2_TRANSPORT_FLAGS', 'V2_EXPOSURE_FIXED', 'V2_INNER_FIXED', 'V2_OPEN_CUTS']) expect(material.defines).not.toHaveProperty(define);
-      expect(material.customProgramCacheKey()).toBe('cubelab-v2-piece-detailed-matte');
-    }
-    matte.dispose();
     // Only what a studio changes is compiled in.
     const off = { specular: false, bounce: false, internal: false, sheen: false };
     expect(fixedStudioDefines({ ...V2_STUDIO, exposure: 1, transport: off })).toEqual({});

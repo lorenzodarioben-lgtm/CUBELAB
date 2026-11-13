@@ -1,10 +1,10 @@
 /**
- * Default Premium Stickerless v2 in the real browser: its
+ * Default Modern Stickerless v2 in the real browser: its
  * shaders compile and draw the puzzle state (pixel colours on screen match the
  * model after face, slice and rotation moves, and during a held turn), it
  * survives quality changes without leaking GPU resources, Classic Stickered
  * renders identically with or without legacy parameters, Settings previews
- * Premium Stickerless as the renderer in use, and the build ignores the
+ * Modern Stickerless as the renderer in use, and the build ignores the
  * development branch's diagnostic and review parameters.
  */
 import { expect, test } from '@playwright/test';
@@ -65,7 +65,7 @@ async function setQuality(page: Page, name: 'Auto' | 'High' | 'Low') {
   await page.keyboard.press('Escape');
 }
 
-test('Premium Stickerless renders v2 by default, and legacy v1 query cannot select the old renderer', async ({ page }) => {
+test('Modern Stickerless renders v2 by default, and legacy v1 query cannot select the old renderer', async ({ page }) => {
   await openStudio(page, { settings: STICKERLESS, path: '/' });
   expect(await page.evaluate(() => window.__CUBELAB__.stickerlessRenderer!())).toBe('v2');
   await page.goto('/?stickerless=v1');
@@ -178,7 +178,7 @@ test('Classic Stickered draws the same pixels with or without the v2 flag', asyn
   expect(differing).toBe(0);
 });
 
-test('Settings previews the approved Premium Stickerless v2 with or without a legacy flag', async ({ browser, baseURL }) => {
+test('Settings previews the approved Modern Stickerless v2 with or without a legacy flag', async ({ browser, baseURL }) => {
   const previews = async (path: string) => {
     const context = await browser.newContext({ baseURL, viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();

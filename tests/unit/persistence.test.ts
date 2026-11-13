@@ -55,7 +55,7 @@ describe('settings', () => {
     expect(loaded.sound).toBe(DEFAULT_SETTINGS.sound);
     expect(loaded.quality).toBe(DEFAULT_SETTINGS.quality);
     expect(loaded.orbitSensitivity).toBe(2);
-    expect(loaded.finish).toBe('matte');
+    expect(loaded).not.toHaveProperty('finish');
   });
 
   it('handles corrupt JSON and missing data safely, keeping a backup', () => {

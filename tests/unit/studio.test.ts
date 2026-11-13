@@ -13,7 +13,7 @@ import { isFaceletStringSolved } from '../../src/core/puzzle/facelets';
 import { loadKPuzzle } from '../../src/core/puzzle/kpattern';
 import { formatAlg, invertAlg, mv, parseAlg } from '../../src/core/puzzle/notation';
 import type { Move } from '../../src/core/puzzle/notation';
-import { createMemoryStore } from '../../src/core/persistence/storage';
+import { createMemoryStore, STORAGE_KEYS } from '../../src/core/persistence/storage';
 import type { KeyValueStore } from '../../src/core/persistence/storage';
 import { silentPlayer } from '../../src/core/audio/sound';
 import type { SoundPlayer } from '../../src/core/audio/sound';
@@ -276,14 +276,19 @@ describe('persistence', () => {
     await first.studio.newScramble();
     await first.settle();
     first.turnAll(invertAlg(parseAlg(SCRAMBLE)));
-    first.studio.updateSettings({ finish: 'matte', sound: false, timerMode: 'spacebar' });
+    first.studio.updateSettings({ sound: false, timerMode: 'spacebar' });
     first.studio.turn(mv('R', 1));
     first.run();
     first.studio.flushPersistence();
 
+    // A previously saved Matte preference must not reset a session or other settings.
+    const saved = JSON.parse(storage.getItem(STORAGE_KEYS.settings)!);
+    saved.data.finish = 'matte';
+    storage.setItem(STORAGE_KEYS.settings, JSON.stringify(saved));
+
     const second = setup({}, storage);
     expect(second.studio.state.history).toHaveLength(1);
-    expect(second.studio.state.settings.finish).toBe('matte');
+    expect(second.studio.state.settings).not.toHaveProperty('finish');
     expect(second.studio.state.timer.mode).toBe('spacebar');
     expect(second.studio.engine.state.pattern.isIdentical(createSolvedState(kpuzzle).pattern.applyAlg('R'))).toBe(true);
   });
@@ -535,7 +540,7 @@ describe('turn audio is driven by real cube motion only', () => {
     const { studio } = setup({ sound: rec.player });
     const before = rec.log.length;
     studio.updateSettings({ cubeStyle: 'stickered' });
-    studio.updateSettings({ cubeStyle: 'stickerless', finish: 'matte', soundVolume: 0.4 });
+    studio.updateSettings({ cubeStyle: 'stickerless', soundVolume: 0.4 });
     studio.previewSound();
     expect(rec.log.length).toBe(before);
     expect(rec.calls).toContain('volume:0.4');

@@ -1,5 +1,5 @@
 /**
- * Premium Stickerless style: solid moulded pieces (`pieceGeometry.ts`,
+ * Modern Stickerless style: solid moulded pieces (`pieceGeometry.ts`,
  * `STICKERLESS_SHAPE`) whose colour is the plastic, decided per fragment by
  * `pieceMaterial.ts`. Piece meshes come from the shared, reference-counted
  * cache in `pieceMeshes.ts`.
@@ -60,11 +60,9 @@ export interface StickerlessResources {
 
 export function createStickerlessResources(tier: RenderTier, finish: Finish): StickerlessResources {
   const detail = PIECE_DETAIL[tier];
-  const gloss = finish === 'gloss';
-  const hybrid = gloss;
   const sharedPieces = acquirePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
   // Gloss keeps its approved shape at every resolution; Hybrid only controls shading.
-  const pieces = gloss ? { ...sharedPieces, center: acquireStickerlessChamferGeometry(detail) } : sharedPieces;
+  const pieces = { ...sharedPieces, center: acquireStickerlessChamferGeometry(detail) };
   const palette = Object.fromEntries(FACES.map((face) => [face, new THREE.Color(FACE_COLORS[face].hex)])) as Record<Face, THREE.Color>;
   // How far the turn in flight has opened the cube (shared by every piece).
   const exposure = { value: 0 };
@@ -76,20 +74,20 @@ export function createStickerlessResources(tier: RenderTier, finish: Finish): St
       { tier, finish },
       (id * 7.31) % 13,
       {
-        physicalFinish: gloss,
-        capRoughness: gloss ? 0.26 : 0.42,
-        capCoat: gloss ? 0.35 : 0.12,
-        capCoatRoughness: gloss ? 0.07 : 0.4,
+        physicalFinish: true,
+        capRoughness: 0.26,
+        capCoat: 0.35,
+        capCoatRoughness: 0.07,
         // Applies with the stickerless reflection map (three.js uses the scene's
         // own intensity for materials that fall back to the scene environment).
-        envIntensity: gloss ? 1 : 0.9,
+        envIntensity: 1,
         seamRange: [0.35, 0.9],
         rimNormals: { home: CANONICAL_HOME[frame.kind], shape: STICKERLESS_SHAPE, continuousCentre: frame.kind === 'center' },
         interiorColor: '#17171a',
         honeycomb: true,
         track: CANONICAL_HOME[frame.kind],
         capSeam: true,
-        waviness: gloss ? 0.0009 : 0.0006,
+        waviness: 0.0009,
         variation: { roughness: (vary() - 0.5) * 0.14, coat: (vary() - 0.5) * 0.4 },
         open: { cavityMin: 0.42, seamFloor: [0.85, 0.55, 0.8, 0.35] },
         exposure,
@@ -101,20 +99,18 @@ export function createStickerlessResources(tier: RenderTier, finish: Finish): St
   const coreMaterial = new THREE.MeshStandardMaterial({ color: '#050506', roughness: 0.7, metalness: 0 });
   // Strong Hybrid is the Gloss identity; tier controls detail, not illumination.
   const diffuseEnvironment = { value: null as THREE.Texture | null };
-  if (hybrid) {
-    for (const [id, frame] of PIECE_FRAMES.entries()) if (tier !== 'low' && frame.kind === 'center') {
-      const material = materials[id]!, compile = material.onBeforeCompile, key = material.customProgramCacheKey();
-      material.onBeforeCompile = (shader, renderer) => {
-        compile.call(material, shader, renderer);
-        shader.fragmentShader = shader.fragmentShader.replace(CONTINUOUS_CENTRE_NORMALS, STICKERLESS_CHAMFER_NORMALS);
-        const p = STICKERLESS_CHAMFER_SURFACE;
-        (shader.uniforms.uCentreSurface!.value as THREE.Vector4).set(p.plateauRadius, p.top, p.side, p.cornerRadius);
-      };
-      material.customProgramCacheKey = () => key + '-chamfer-centre-v1';
-    }
-    for (const material of materials) applyStrongHybrid(material as THREE.MeshStandardMaterial, diffuseEnvironment);
-    applyStrongHybrid(coreMaterial, diffuseEnvironment, false);
+  for (const [id, frame] of PIECE_FRAMES.entries()) if (tier !== 'low' && frame.kind === 'center') {
+    const material = materials[id]!, compile = material.onBeforeCompile, key = material.customProgramCacheKey();
+    material.onBeforeCompile = (shader, renderer) => {
+      compile.call(material, shader, renderer);
+      shader.fragmentShader = shader.fragmentShader.replace(CONTINUOUS_CENTRE_NORMALS, STICKERLESS_CHAMFER_NORMALS);
+      const p = STICKERLESS_CHAMFER_SURFACE;
+      (shader.uniforms.uCentreSurface!.value as THREE.Vector4).set(p.plateauRadius, p.top, p.side, p.cornerRadius);
+    };
+    material.customProgramCacheKey = () => key + '-chamfer-centre-v1';
   }
+  for (const material of materials) applyStrongHybrid(material as THREE.MeshStandardMaterial, diffuseEnvironment);
+  applyStrongHybrid(coreMaterial, diffuseEnvironment, false);
   let disposed = false;
   return {
     pieces,
@@ -126,16 +122,14 @@ export function createStickerlessResources(tier: RenderTier, finish: Finish): St
     },
     setEnvironment(texture, diffuse = null) {
       for (const m of materials) (m as THREE.MeshStandardMaterial).envMap = texture;
-      if (hybrid) {
-        diffuseEnvironment.value = diffuse ?? texture;
-        coreMaterial.envMap = texture;
-      }
+      diffuseEnvironment.value = diffuse ?? texture;
+      coreMaterial.envMap = texture;
     },
     dispose() {
       if (disposed) return;
       disposed = true;
       releasePieceMeshes(STICKERLESS_SHAPE, detail, STICKERLESS_CENTRE_MESH);
-      if (gloss) releaseStickerlessChamferGeometry(detail);
+      releaseStickerlessChamferGeometry(detail);
       materials.forEach((m) => m.dispose());
       core.dispose();
       coreMaterial.dispose();

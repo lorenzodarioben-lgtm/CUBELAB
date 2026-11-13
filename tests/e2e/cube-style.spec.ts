@@ -9,7 +9,7 @@ const renderedStyle = (page: Page) => page.evaluate(() => window.__CUBELAB__.ren
 /** Picks a style in Settings and closes the dialog, waiting until the 3D scene shows it. */
 async function chooseStyle(page: Page, style: Style): Promise<void> {
   await page.getByRole('button', { name: 'Settings' }).first().click();
-  await page.getByRole('radio', { name: style === 'stickered' ? /Classic Stickered/ : /Premium Stickerless/ }).check();
+  await page.getByRole('radio', { name: style === 'stickered' ? /Classic Stickered/ : /Modern Stickerless/ }).check();
   await page.waitForFunction((s) => window.__CUBELAB__.renderedStyle?.() === s, style);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toBeHidden();
@@ -43,7 +43,7 @@ test.describe('cube styles', () => {
     await page.reload();
     await page.waitForFunction(() => window.__CUBELAB__?.renderedStyle?.() === 'stickerless', null, { timeout: 60_000 });
     await page.getByRole('button', { name: 'Settings' }).first().click();
-    await expect(page.getByRole('radio', { name: /Premium Stickerless/ })).toBeChecked();
+    await expect(page.getByRole('radio', { name: /Modern Stickerless/ })).toBeChecked();
     await page.keyboard.press('Escape');
     expect(errors()).toEqual([]);
   });
@@ -133,7 +133,7 @@ test.describe('cube styles', () => {
     await page.getByRole('button', { name: /New Scramble/ }).click();
     await page.waitForFunction(() => window.__CUBELAB__.timer().phase === 'ready', null, { timeout: 30_000 });
     await page.getByRole('button', { name: 'Settings' }).first().click();
-    const radio = (style: Style) => page.getByRole('radio', { name: style === 'stickered' ? /Classic Stickered/ : /Premium Stickerless/ });
+    const radio = (style: Style) => page.getByRole('radio', { name: style === 'stickered' ? /Classic Stickered/ : /Modern Stickerless/ });
     const flip = async (i: number) => {
       const style: Style = i % 2 === 0 ? 'stickered' : 'stickerless';
       await radio(style).check();

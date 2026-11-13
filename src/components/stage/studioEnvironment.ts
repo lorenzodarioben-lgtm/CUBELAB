@@ -13,7 +13,7 @@
  * Values are linear HDR radiance (the target is half-float), so panels can be
  * many times brighter than the surroundings, like real lights.
  *
- * The Premium Stickerless cube also gets its own reflection map: the same
+ * The Modern Stickerless cube also gets its own reflection map: the same
  * studio plus large, soft-edged reflector cards where its front and right faces
  * mirror from the home view (what a photographer does for coloured gloss), so
  * the domed faces carry soft highlight bands. Only the stickerless materials

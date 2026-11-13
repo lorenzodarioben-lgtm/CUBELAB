@@ -1,5 +1,5 @@
 // Side-by-side captures of the two public cube styles: Classic Stickered
-// and Premium Stickerless with the approved v2 renderer and k2 lighting.
+// and Modern Stickerless with the approved v2 renderer and k2 lighting.
 // Usage: npm run build && npm run preview (port 4317) in another shell, then:
 //        node scripts/capture-style-matrix.mjs [outDir]
 // Writes <outDir>/{stickered,stickerless-v2}/*.png plus selector and switching shots.

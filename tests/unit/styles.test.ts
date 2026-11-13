@@ -38,7 +38,7 @@ describe('cube style setting', () => {
     const store = createMemoryStore({ [STORAGE_KEYS.settings]: JSON.stringify({ v: 1, data: legacy }) });
     const loaded = loadSettings(store);
     expect(loaded.cubeStyle).toBe('stickered');
-    expect(loaded.finish).toBe('matte');
+    expect(loaded).not.toHaveProperty('finish');
     expect(loaded.turnSpeed).toBe('snappy');
     expect(loaded.sound).toBe(true);
   });
@@ -215,18 +215,18 @@ describe('GPU resource ownership', () => {
 
   it('stickerless: piece meshes are shared and freed only when the last user lets go', () => {
     const first = createStickerlessResources('medium', 'gloss');
-    const second = createStickerlessResources('medium', 'matte');
-    // Matte shares the canonical bodies; Gloss owns its approved replacement centre separately.
+    const second = createStickerlessResources('medium', 'gloss');
+    // Overlapping Gloss owners share all three approved piece buffers.
     expect(second.pieces.corner).toBe(first.pieces.corner);
     expect(second.pieces.edge).toBe(first.pieces.edge);
-    expect(second.pieces.center).not.toBe(first.pieces.center);
+    expect(second.pieces.center).toBe(first.pieces.center);
     const disposedPieces = watchDisposals(Object.values(first.pieces));
     const disposedMaterials = watchDisposals([...first.materials, first.core, first.coreMaterial]);
     first.dispose();
     expect(disposedMaterials()).toBe(first.materials.length + 2);
-    expect(disposedPieces()).toBe(1); // only the Gloss centre; shared bodies remain in use by Matte
+    expect(disposedPieces()).toBe(0); // all buffers remain in use by the second owner
     first.dispose(); // idempotent: must not release twice
-    expect(disposedPieces()).toBe(1);
+    expect(disposedPieces()).toBe(0);
     second.dispose();
     expect(disposedPieces()).toBe(3);
     // A later set reuses the cached CPU meshes; they simply upload again.
@@ -246,7 +246,7 @@ describe('GPU resource ownership', () => {
   });
 });
 
-describe('Premium Stickerless realism', () => {
+describe('Modern Stickerless realism', () => {
   const definesOf = (m: THREE.Material) =>
     Object.keys((m as THREE.MeshStandardMaterial).defines ?? {})
       .filter((d) => d.startsWith('PIECE_'))
@@ -369,7 +369,7 @@ describe('cube resources in a compile-only scene', () => {
 
   it('frees everything once, at once', async () => {
     const { CubeVisuals } = await import('../../src/components/cube/cubeResources');
-    const visuals = new CubeVisuals('low', 'matte');
+    const visuals = new CubeVisuals('low', 'gloss');
     const materials = [...visuals.stickerless.materials, visuals.stickered.bodyMaterials.edge];
     let disposed = 0;
     for (const m of materials) m.addEventListener('dispose', () => disposed++);

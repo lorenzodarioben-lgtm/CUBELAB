@@ -1,6 +1,8 @@
+> Current finish policy (2026-11-14): both public cube styles use approved Gloss only. Historical Matte references below describe removed functionality. Legacy finish preferences are ignored without resetting sessions or history.
+
 # CUBELAB — Handoff
 
-Current release: Classic Stickered remains the initial style. Premium Stickerless now uses the approved V2 renderer with k2 lighting by default, with no URL flag; legacy V1 is no longer selectable. Older development history below is preserved for reference.
+Current release: Classic Stickered remains the initial style. Modern Stickerless now uses the approved V2 renderer with k2 lighting by default, with no URL flag; legacy V1 is no longer selectable. Older development history below is preserved for reference.
 
 Status (2026-10-13): turn audio now uses [CC0 recordings of a real cube](src/assets/audio/README.md),
 replacing the procedural sources described in the historical eighth-pass notes below. The current
@@ -11,7 +13,7 @@ audio** (synthesised sliding friction, rattle and magnetic snaps, driven by real
 Seventh pass: the **Classic Stickered cube rebuilt as a premium GAN-style stickered cube** (moulded
 glossy-black bodies, shaped stickers, honeycomb interior). Sixth pass: softly
 domed ("pillowy") stickerless faces. Fifth pass: **two cube styles** (Classic Stickered, recovered from the
-third pass, and Premium Stickerless, the default) on one shared puzzle state, switchable live from
+third pass, and Modern Stickerless, the default) on one shared puzzle state, switchable live from
 Settings and persisted; the stickerless **corner pieces' inner corners** made crisp to match the GAN
 references (centres and edges unchanged).
 Earlier passes: stickerless GAN-style pieces (fourth), free-tumbling view and `x y z` rotations
@@ -27,12 +29,12 @@ about what was and was not verified.
     (`git checkout main && git merge premium-slices-upgrade`).
 - `.gitattributes` normalises line endings to LF.
 - Screenshots: `artifacts/before/` (v1), `artifacts/after/` (current default style) and
-  `artifacts/styles/` (Classic and the current Premium Stickerless V2 captures, selector,
+  `artifacts/styles/` (Classic and the current Modern Stickerless V2 captures, selector,
   live switch; historical V1 captures remain for reference).
 
 ## Eighth pass — photoreal stickerless plastic + speedcube turn audio
 
-Brief: make the Premium Stickerless cube as physically convincing as the stickered one (without
+Brief: make the Modern Stickerless cube as physically convincing as the stickered one (without
 re-opening its geometry), keep the Classic Stickered look exactly, and replace the turn "click" with a
 convincing speedcube sound — sliding plastic, rattle and magnetic snap, responsive to speed.
 
@@ -346,7 +348,7 @@ where they did. It is lit by today's studio and uses today's palette (very close
 ### Selector
 
 Settings → Cube → **Cube style**: two cards (Classic Stickered — "Black-frame cube with raised coloured
-tiles."; Premium Stickerless — "Modern speedcube with moulded coloured plastic.") in a native radio
+tiles."; Modern Stickerless — "Modern speedcube with moulded coloured plastic.") in a native radio
 group (arrow keys, focus ring, screen-reader names). Previews are renders of the real models with a
 transparent background (`scripts/capture-style-previews.mjs` → `src/assets/cube-styles/*.webp`,
 13–17 KB each), so no extra WebGL renderers run in Settings. Selected = ivory border and filled mark.
@@ -649,7 +651,7 @@ cards everywhere, lavender gradient button); no move list.
 | Style resource owner (`CubeVisuals`), surfaces | `src/components/cube/cubeResources.ts` |
 | Classic Stickered model (bodies, stickers, materials) | `src/components/cube/stickeredResources.ts` |
 | Piece/facelet frames, shared mesh cache | `src/components/cube/pieceFrames.ts`, `pieceMeshes.ts` |
-| Premium Stickerless resources, piece frames | `src/components/cube/stickerlessResources.ts` |
+| Modern Stickerless resources, piece frames | `src/components/cube/stickerlessResources.ts` |
 | Piece shapes (SDF + mesher, inner cuts) | `src/components/cube/pieceGeometry.ts` |
 | Stickerless material (caps, cavity, seams) | `src/components/cube/pieceMaterial.ts` |
 | Cube style setting | `src/core/persistence/settings.ts` |

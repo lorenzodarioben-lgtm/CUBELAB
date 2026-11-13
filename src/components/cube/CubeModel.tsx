@@ -6,7 +6,7 @@
  * Nothing accumulates frame to frame, so there is no drift and no gaps.
  *
  * A cube style only decides what hangs on each group: the Classic Stickered
- * body and tiles, or the Premium Stickerless moulded piece. Because the
+ * body and tiles, or the Modern Stickerless moulded piece. Because the
  * groups (and so every transform, including a turn in flight) are untouched by
  * a style change, switching is safe at any moment, mid-turn included: the new
  * model simply appears on the same groups in the same pose on the next frame.
@@ -82,7 +82,7 @@ function StickeredPiece({ def, visuals, faceLabels }: PieceProps) {
   );
 }
 
-/** Premium Stickerless: one moulded piece, its canonical shape turned to this cubie's home pose. */
+/** Modern Stickerless: one moulded piece, its canonical shape turned to this cubie's home pose. */
 function StickerlessPiece({ def, visuals, faceLabels }: PieceProps) {
   const res = visuals.stickerless;
   const shadows = visuals.shadows;

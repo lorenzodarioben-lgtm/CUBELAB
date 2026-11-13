@@ -3,7 +3,7 @@
  * to grab — outer face or middle slice — is visible before you press. It
  * follows the shown cube style: a ring around the shaped sticker on the Classic
  * Stickered cube, the piece's own outline (round cuts on centres and edges, a
- * crisp corner on corner pieces) on the Premium Stickerless cube.
+ * crisp corner on corner pieces) on the Modern Stickerless cube.
  * Mouse only; hidden while anything animates, during drags and on touch input.
  */
 import { useEffect, useMemo, useRef } from 'react';

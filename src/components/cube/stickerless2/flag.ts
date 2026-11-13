@@ -1,5 +1,5 @@
 /**
- * Premium Stickerless always uses the approved v2 renderer.
+ * Modern Stickerless always uses the approved v2 renderer.
  *
  * The former v1 implementation is no longer selected by any URL or settings
  * choice. Existing style preferences still work: Classic Stickered is separate.

@@ -178,7 +178,6 @@ const BODY_BLACK = new THREE.Color('#09090b');
 
 export function createStickeredResources(tier: RenderTier, finish: Finish): StickeredResources {
   const physical = tier !== 'low';
-  const gloss = finish === 'gloss';
   const detail = PIECE_DETAIL[tier];
   const bodies = acquirePieceMeshes(STICKERED_SHAPE, detail);
   // How far the turn in flight has opened the cube (shared by all body materials).
@@ -190,10 +189,10 @@ export function createStickeredResources(tier: RenderTier, finish: Finish): Stic
   const bodyMaterial = (kind: CubieKind, seed: number) =>
     createPieceMaterial(kindSlots(kind), { tier, finish }, seed, {
       // A broad sheen under a sharp coat: flat black reads as polished plastic, not a void.
-      capRoughness: gloss ? 0.3 : 0.45,
-      capCoat: gloss ? 0.85 : 0.2,
-      capCoatRoughness: gloss ? 0.06 : 0.35,
-      blackRoughness: gloss ? 0.32 : 0.48,
+      capRoughness: 0.3,
+      capCoat: 0.85,
+      capCoatRoughness: 0.06,
+      blackRoughness: 0.32,
       // Let the glossy edge roll keep its highlight further into the seam; keep
       // seams fully shaded while the cube is closed (no glints), and the faces a
       // turn exposes lit enough to show their form while it is open.
@@ -214,7 +213,7 @@ export function createStickeredResources(tier: RenderTier, finish: Finish): Stic
   const core = new THREE.SphereGeometry(0.5, physical ? 32 : 16, physical ? 24 : 12);
   const coreMaterial = new THREE.MeshStandardMaterial({ color: '#050506', roughness: 0.6, metalness: 0 });
 
-  // Vinyl stickers: smooth and glossy (gloss) or satin (matte), a touch less
+  // Vinyl stickers: smooth and glossy, a touch less
   // glossy than the black body so the two plastics read as different parts.
   const Material = physical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
   const rand = seededRandom(97);
@@ -228,10 +227,10 @@ export function createStickeredResources(tier: RenderTier, finish: Finish): Stic
       variants.push(
         new Material({
           color: tint.clone(),
-          roughness: (gloss ? 0.24 : 0.52) + sheen,
+          roughness: (0.24) + sheen,
           metalness: 0,
           ...(physical
-            ? { clearcoat: gloss ? 0.55 : 0.08, clearcoatRoughness: gloss ? 0.14 + sheen * 0.3 : 0.45, specularIntensity: 0.6, ior: 1.5 }
+            ? { clearcoat: 0.55, clearcoatRoughness: 0.14 + sheen * 0.3, specularIntensity: 0.6, ior: 1.5 }
             : {}),
         }),
       );

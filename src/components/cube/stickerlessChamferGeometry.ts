@@ -106,7 +106,7 @@ export function buildStickerlessChamferGeometry(detail: number, plan: ChamferPla
   geometry.setIndex(indices); geometry.computeBoundingSphere(); return geometry;
 }
 
-// Own only the replacement centre; edges/corners continue sharing the existing cache with Matte.
+// Own only the replacement centre; edges/corners continue sharing the existing piece cache.
 const cache = new Map<string, { geometry: THREE.BufferGeometry; users: number }>();
 const cacheKey = (detail: number, plan: ChamferPlan) => `${detail}:${plan.radius}:${plan.cornerRadius}`;
 export function acquireStickerlessChamferGeometry(detail: number, plan: ChamferPlan = CHAMFER_PLAN): THREE.BufferGeometry {

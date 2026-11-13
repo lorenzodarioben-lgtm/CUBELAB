@@ -50,11 +50,11 @@ const visualsKey = (look: Pick<StageLook, 'tier' | 'finish'>): string => `${look
 /**
  * The light rig and environment maps a look is drawn with. Stickerless Gloss
  * (the hybrid) is lit by one key light and its own maps; everything else by the
- * studio lights and the scene environment, with Stickerless Matte's reflector
+ * studio lights and the scene environment, with the existing reflector
  * map at the scene size. The key light casts shadows on the high tier.
  */
 export function lookLighting(look: StageLook): { hybrid: boolean; shadows: boolean; sceneSize: number; stickerlessSize: number } {
-  const hybrid = look.style === 'stickerless' && look.finish === 'gloss';
+  const hybrid = look.style === 'stickerless';
   const shadows = look.tier === 'high';
   const sceneSize = look.tier === 'low' ? 128 : 256;
   return { hybrid, shadows, sceneSize, stickerlessSize: hybrid ? (shadows ? 512 : sceneSize) : sceneSize };

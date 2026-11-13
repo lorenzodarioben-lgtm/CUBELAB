@@ -3,7 +3,7 @@
  * model (see scripts/capture-style-previews.mjs). A native radio group, so
  * arrow keys, focus and screen readers behave as expected. Choosing a style
  * only changes the physical model on screen — the cube, timer and history
- * carry on untouched. Premium Stickerless shows the renderer this page load
+ * carry on untouched. Modern Stickerless shows the renderer this page load
  * draws with the approved v2 renderer by default.
  */
 import type { CubeStyle } from '../../core/persistence/settings';
@@ -20,7 +20,7 @@ const OPTIONS: ReadonlyArray<{ value: CubeStyle; title: string; description: str
   },
   {
     value: 'stickerless',
-    title: 'Premium Stickerless',
+    title: 'Modern Stickerless',
     description: 'Modern speedcube with moulded coloured plastic.',
     image: stickerlessV2Preview,
   },
