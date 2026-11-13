@@ -11,7 +11,7 @@ const voices = async (page: Page) => {
 test.describe('speedcube turn audio', () => {
   test('only real turns make sound: not rotations, the view, style switches or a muted cube', async ({ page }) => {
     const errors = trackErrors(page);
-    await openStudio(page);
+    await openStudio(page, { settings: { sound: false } });
     expect((await audio(page)).context).toBe('none'); // nothing exists until sound is enabled
     // Enable with a real click (a user gesture, so the browser lets audio start).
     await page.getByRole('button', { name: 'Enable sound' }).click();
@@ -68,7 +68,7 @@ test.describe('speedcube turn audio', () => {
   });
 
   test('a rapid burst stays bounded and every voice is released afterwards', async ({ page }) => {
-    await openStudio(page);
+    await openStudio(page, { settings: { sound: false } });
     await page.getByRole('button', { name: 'Enable sound' }).click();
     await page.waitForFunction(() => window.__CUBELAB__.audio().context === 'running', null, { timeout: 10_000 });
     for (let i = 0; i < 40; i++) await page.keyboard.press(['r', 'u', 'Shift+R', 'Shift+U'][i % 4]!);

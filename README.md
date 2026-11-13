@@ -144,9 +144,13 @@ History supports details, delete, clear-all and CSV export.
 
 Animated or instant scrambles (with skip), solver playback with Play/Pause, Step, Replay, Stop and
 three speeds, Reset (confirms if it would discard a running attempt), camera reset, copy scramble and
-share links (`?scramble=R%20M%27%20U`), Zen mode, two cube styles (Classic Stickered / Premium
+share links (`?scramble=R%20M%27%20U`), Zen mode, two cube styles (Classic Stickered / Modern
 Stickerless), sticker letters for colour-vision differences, render quality (auto/high/low), reduced motion, orbit sensitivity, optional
-speedcube turning sounds with volume and preview (off by default), and a 2D net fallback when WebGL is unavailable.
+speedcube turning sounds with volume and preview (on by default; saved mute preferences are respected), and a 2D net fallback when WebGL is unavailable.
+
+On phones, the timer and primary action dock leave the cube's stage clear. Auto Solve uses a compact
+progress/summary strip and collapses on completion; Details opens the notation, replay, stepping and
+saved playback-speed controls without interrupting playback. The dock remains the single Scramble action.
 
 ### Other puzzles (switched off)
 
@@ -321,7 +325,7 @@ a pure planner (`turnPlanner.ts`) turns those into voices whose level and bright
 actual angular speed, and the Web Audio player (`sound.ts`) schedules them from an embedded sound bank
 through a volume control and limiter. Double turns tick faintly at the half-way magnet, slices
 are a shade darker, whole-cube rotations and camera moves are silent, a drag's friction follows your
-finger and a cancelled drag springs back without a snap. Off by default; Settings has volume and
+finger and a cancelled drag springs back without a snap. On by default; Settings has volume and
 Preview. The bank can be rebuilt with `node scripts/build-cube-samples.mjs`.
 
 ### Bundling cubing.js's worker

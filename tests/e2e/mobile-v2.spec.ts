@@ -34,6 +34,11 @@ test('compact layouts reserve the timer, cube and controls at every requested si
         expect(p.x).toBeGreaterThanOrEqual(canvas.left); expect(p.x).toBeLessThanOrEqual(canvas.right);
         expect(p.y).toBeGreaterThanOrEqual(canvas.top); expect(p.y).toBeLessThanOrEqual(canvas.bottom);
       }
+      if (width <= 430) {
+        const cubeWidth = Math.max(...layout.points.map(p=>p.x))-Math.min(...layout.points.map(p=>p.x));
+        expect(cubeWidth).toBeGreaterThan(width === 320 ? 225 : width * .85);
+      }
+      await page.screenshot({path:`artifacts/mobile-v21/after/${width}-normal.png`});
       for (const selector of ['.topbar .icon-btn','.panel-actions button','.stage__camera']) {
         for (const el of await page.locator(selector).all()) if (await el.isVisible()) {
           const r = (await el.boundingBox())!; expect(r.width).toBeGreaterThanOrEqual(44); expect(r.height).toBeGreaterThanOrEqual(44);
@@ -113,7 +118,7 @@ test('mobile touch gestures, on-demand moves, persistence, style switches and so
     await page.getByRole('button',{name:'Auto Solve',exact:true}).click();
     await page.waitForFunction(()=>window.__CUBELAB__.solver().status==='done',null,{timeout:60000});
     expect(await expectRenderMatchesModel(page)).toBe(SOLVED);
-    const playback = (await page.locator('.panel-playback').boundingBox())!;
+    const playback = (await page.locator('.mobile-solution').boundingBox())!;
     const stage = (await page.locator('.studio__stage').boundingBox())!;
     expect(playback.y).toBeGreaterThanOrEqual(stage.y+stage.height);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBe(0);

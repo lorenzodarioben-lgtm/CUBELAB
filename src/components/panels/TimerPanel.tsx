@@ -41,11 +41,10 @@ function describe(timer: TimerState, scrambling: boolean): { label: string; tone
 
 function guidance(timer: TimerState, scrambling: boolean, solved: boolean, compact = false): string {
   if (compact) {
-    if (scrambling || timer.phase === 'scrambling') return 'Preparing your scramble…';
-    if (timer.phase === 'idle') return solved ? 'Scramble to start a timed solve.' : 'Free play · scramble for a timed solve.';
-    if (timer.phase === 'ready') return timer.mode === 'casual' ? 'Turn a face to start.' : timer.inspection ? 'Tap the timer to inspect.' : 'Hold the timer, then release to start.';
+    if (timer.phase === 'ready') return timer.mode === 'casual' ? 'Turn to start.' : timer.inspection ? 'Tap timer to inspect.' : 'Hold, then release to start.';
     if (timer.phase === 'inspecting') return 'Hold the timer, then release to start.';
-    if (timer.phase === 'running') return timer.mode === 'spacebar' ? 'Solve to finish · tap timer for DNF.' : 'Solve the cube to stop the clock.';
+    if (timer.phase === 'arming') return 'Release when green.';
+    return '';
   }
   if (scrambling || timer.phase === 'scrambling') return 'Applying a random-state scramble…';
   const spacebar = timer.mode === 'spacebar';
@@ -155,6 +154,7 @@ export function TimerPanel() {
   }, [history, timer.phase]);
 
   const pressable = spacebar && ['ready', 'inspecting', 'arming', 'running'].includes(timer.phase);
+  const hintText = compact && hint ? hint.text : guidance(timer, scrambling, solved, compact);
 
   return (
     <section className={cx('panel-timer', celebration && timer.phase === 'solved' && 'is-celebrating')} aria-label="Timer" key={celebration?.id ?? 0}>
@@ -164,7 +164,7 @@ export function TimerPanel() {
           {status.label}
         </span>
         <span className="panel-timer__mode">
-          {spacebar ? `${compact ? 'Touch timer' : 'Spacebar'}${timer.inspection ? ' · 15 s inspection' : ''}` : 'Casual timer'}
+          {!compact && (spacebar ? `Spacebar${timer.inspection ? ' · 15 s inspection' : ''}` : 'Casual timer')}
           {timer.penalty === '+2' && timer.phase !== 'idle' && <span className="tag tag--warn">+2</span>}
           {isPB && <span className="tag tag--accent">Personal best</span>}
         </span>
@@ -195,9 +195,9 @@ export function TimerPanel() {
       >
         <TimerReadout timer={timer} />
       </div>
-      <p className="panel-timer__hint" aria-live={compact ? 'polite' : 'off'} aria-atomic={compact || undefined}>
-        {compact && hint ? hint.text : guidance(timer, scrambling, solved, compact)}
-      </p>
+      {(!compact || hintText) && <p className="panel-timer__hint" aria-live={compact ? 'polite' : 'off'} aria-atomic={compact || undefined}>
+        {hintText}
+      </p>}
       {gestureHint && (
         <p className="panel-timer__gesture">
           Drag stickers to twist — middle rows turn slices

@@ -38,6 +38,13 @@ const record = (over: Partial<SolveRecord> = {}): SolveRecord => ({
 });
 
 describe('settings', () => {
+  it('enables sound for new users at the existing volume without overriding saved mute', () => {
+    const store = createMemoryStore();
+    expect(loadSettings(store)).toMatchObject({ sound: true, soundVolume: 0.7 });
+    saveSettings(store, { ...DEFAULT_SETTINGS, sound: false, soundVolume: 0.35, playbackSpeed: 'slow', cubeStyle: 'stickerless' });
+    expect(loadSettings(store)).toMatchObject({ sound: false, soundVolume: 0.35, playbackSpeed: 'slow', cubeStyle: 'stickerless' });
+  });
+
   it('round-trips and survives a reload', () => {
     const store = createMemoryStore();
     saveSettings(store, { ...DEFAULT_SETTINGS, sound: true, timerMode: 'spacebar', orbitSensitivity: 1.4 });

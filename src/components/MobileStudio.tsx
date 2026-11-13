@@ -27,7 +27,7 @@ export function MobileStudio() {
       <h1 className="sr-only">CUBELAB — interactive 3×3×3 cube studio</h1>
       <TimerPanel />
       <section className="studio__stage" aria-label="Interactive cube. Twist a layer or orbit the view."><Stage /></section>
-      <div className="mobile-playback"><PlaybackPanel /></div>
+      <div className="mobile-playback"><PlaybackPanel mobile /></div>
       {!zen && <ActionPanel mobile onOpenTools={() => setOpen(true)} />}
       <Dialog open={open} onClose={close} title="Cube tools" className="mobile-tools">
         <Segmented label="Cube tools section" value={tab} onChange={setTab} options={[

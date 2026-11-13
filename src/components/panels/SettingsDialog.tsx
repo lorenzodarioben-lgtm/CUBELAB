@@ -155,7 +155,7 @@ export function SettingsDialog() {
             ]}
           />
         </Row>
-        <Row title="Sound" description="Recorded cube turning sounds — plastic slides and clicks — and a solved chime. Off by default.">
+        <Row title="Sound" description="Recorded cube turning sounds — plastic slides and clicks — and a solved chime. On by default; your preference is saved.">
           <Switch label="Sound" checked={settings.sound} onChange={(sound) => set({ sound })} />
         </Row>
         <Row title="Volume" description={settings.sound ? `${Math.round(settings.soundVolume * 100)} %` : 'Turn sound on to adjust.'}>

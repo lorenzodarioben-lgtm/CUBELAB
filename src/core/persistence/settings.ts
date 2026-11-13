@@ -46,7 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   inspection: true,
   quality: 'auto',
   faceLabels: false,
-  sound: false,
+  sound: true,
   soundVolume: 0.7,
   motion: 'system',
   orbitSensitivity: 1,

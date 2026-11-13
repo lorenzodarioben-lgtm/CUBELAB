@@ -1,17 +1,25 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Pause, Play, RefreshCw, RotateCcw, Shuffle, Square, X } from 'lucide-react';
 import { useServices, useStudio } from '../../app/context';
 import { requestAutoSolve, requestNewScramble } from '../../app/actions';
 import { formatMove } from '../../core/puzzle/notation';
-import { Button, IconButton, Segmented, Spinner } from '../ui/primitives';
+import { Button, Dialog, IconButton, Segmented, Spinner } from '../ui/primitives';
 import { cx } from '../ui/cx';
 
-export function PlaybackPanel() {
+export function PlaybackPanel({ mobile = false }: { mobile?: boolean }) {
   const services = useServices();
   const { studio } = services;
   const solver = useStudio((s) => s.solver);
   const speed = useStudio((s) => s.settings.playbackSpeed);
   const stripRef = useRef<HTMLOListElement>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [previousStatus, setPreviousStatus] = useState(solver.status);
+  // Completion closes mobile details before paint. Opening/closing details never
+  // calls the controller, so playback continues independently of presentation.
+  if (previousStatus !== solver.status) {
+    setPreviousStatus(solver.status);
+    if (solver.status === 'done' || solver.status === 'idle') setDetailsOpen(false);
+  }
 
   useEffect(() => {
     const strip = stripRef.current;
@@ -20,7 +28,7 @@ export function PlaybackPanel() {
       const left = current.offsetLeft - strip.clientWidth / 2 + current.clientWidth / 2;
       strip.scrollTo({ left, behavior: 'smooth' });
     }
-  }, [solver.cursor, solver.moves]);
+  }, [solver.cursor, solver.moves, detailsOpen]);
 
   if (solver.status === 'idle') return null;
 
@@ -40,7 +48,7 @@ export function PlaybackPanel() {
     idle: '',
   }[solver.status];
 
-  return (
+  const panel = (
     <section className={cx('panel panel-playback', `is-${solver.status}`)} aria-label="Auto Solve playback">
       <header className="panel-playback__header">
         <div className="panel-playback__title">
@@ -55,7 +63,7 @@ export function PlaybackPanel() {
             <strong>{solver.cursor}</strong> / {total}
           </span>
         )}
-        {!playing && solver.status !== 'solving' && (
+        {!mobile && !playing && solver.status !== 'solving' && (
           <IconButton label="Close solution" size="sm" onClick={() => studio.dismissSolver()}>
             <X size={15} />
           </IconButton>
@@ -118,7 +126,7 @@ export function PlaybackPanel() {
           </Button>
         </div>
       )}
-      {done && (
+      {done && !mobile && (
         <div className="panel-playback__actions">
           <Button size="sm" variant="primary" icon={<Shuffle size={14} />} onClick={() => requestNewScramble(services)}>
             New Scramble
@@ -127,4 +135,24 @@ export function PlaybackPanel() {
       )}
     </section>
   );
+  if (!mobile) return panel;
+  const active = playing || paused || solver.status === 'solving';
+  return <>
+    <section className="mobile-solution" aria-label="Auto Solve playback">
+      <span className="mobile-solution__status" role="status">
+        {solver.status === 'solving' && <Spinner size={14} />}
+        {done ? `Solved · ${total} moves` : solver.status === 'solving' ? 'Finding solution…' : hasSession ? `${paused ? 'Paused' : 'Playing'} · ${solver.cursor}/${total}` : solver.status === 'stale' ? 'Solution out of date' : 'Solution unavailable'}
+      </span>
+      {(playing || paused) && <IconButton label={playing ? 'Pause (P)' : 'Play (P)'} onClick={() => playing ? studio.playbackPause() : studio.playbackPlay()}>
+        {playing ? <Pause size={17} /> : <Play size={17} />}
+      </IconButton>}
+      {solver.status !== 'solving' && <Button size="sm" variant="quiet" aria-haspopup="dialog" aria-expanded={detailsOpen} onClick={() => setDetailsOpen(true)}>Details</Button>}
+      <IconButton label={active ? 'Stop — keep the cube as it is' : 'Close solution'} onClick={() => active ? studio.playbackStop() : studio.dismissSolver()}>
+        {active ? <Square size={15} /> : <X size={17} />}
+      </IconButton>
+    </section>
+    <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} title="Solution details" className="playback-details">
+      {panel}
+    </Dialog>
+  </>;
 }

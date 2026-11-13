@@ -18,13 +18,14 @@
   .mobile-studio > .panel-timer {
     grid-column: 1; grid-row: 1;
     position: static; transform: none; width: 100% !important; min-width: 0;
-    padding: 12px 16px 4px; gap: 0; pointer-events: auto;
+    padding: 6px 16px 0; gap: 0; pointer-events: auto;
   }
   .mobile-studio .panel-timer__meta { min-height: 20px; gap: 8px; flex-wrap: wrap; }
   .mobile-studio .panel-timer__mode { display: flex; font-size: 11px; color: var(--text-2); }
+  .mobile-studio .panel-timer__mode:empty { display: none; }
   .mobile-studio .readout { font-size: clamp(52px, 13vw, 70px); line-height: 1.05; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .mobile-studio .panel-timer__clock { min-height: 64px; display: grid; place-items: center; min-width: 0; touch-action: none; }
-  .mobile-studio .panel-timer__hint { color: var(--text-2); min-height: 18px; max-width: none; font-size: 12px; line-height: 1.5; margin-top: 2px; }
+  .mobile-studio .panel-timer__clock { min-height: 52px; display: grid; place-items: center; min-width: 0; touch-action: none; }
+  .mobile-studio .panel-timer__hint { color: var(--text-2); min-height: 0; max-width: none; font-size: 12px; line-height: 1.5; margin-top: 2px; }
   .mobile-studio .panel-timer__gesture { display: none; }
   .mobile-studio > .studio__stage { grid-column: 1; grid-row: 2; position: relative; inset: auto; height: auto; width: 100%; min-width: 0; min-height: 230px; margin: 0; }
   .mobile-studio .stage__canvas { bottom: 56px; }
@@ -56,6 +57,14 @@
   .mobile-playback .icon-btn { width: 44px; height: 44px; }
   .mobile-playback .panel-playback__header { flex-wrap: wrap; }
   .mobile-playback .panel-playback__status { overflow-wrap: anywhere; }
+  .mobile-solution { display: flex; align-items: center; gap: 4px; min-width: 0; padding: 4px 0; border-top: 1px solid var(--line); }
+  .mobile-solution__status { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-size: 13px; color: var(--text-2); }
+  .mobile-solution .icon-btn { width: 44px; height: 44px; flex-shrink: 0; }
+  .mobile-solution .btn { min-height: 44px; padding-inline: 8px; }
+  .playback-details .panel-playback { padding: 0; border: 0; box-shadow: none; background: none; animation: none; }
+  .playback-details .panel-playback__header { flex-wrap: wrap; }
+  .playback-details .transport { flex-wrap: wrap; gap: 12px; }
+  .playback-details .icon-btn { width: 44px; height: 44px; }
   .mobile-tools .dialog__body > .segmented { display: flex; width: 100%; margin-bottom: 14px; }
   .mobile-tools .dialog__body > .segmented .segmented__option { flex: 1; }
   .mobile-tools .panel { padding-block: 16px; min-width: 0; }
