@@ -22,6 +22,8 @@ import { cx } from '../components/ui/cx';
 import { EXPERIMENTAL_PUZZLES } from '../core/features';
 import { publicPuzzleId, puzzleEvent } from '../core/puzzleCatalog';
 import type { PuzzleEventId } from '../core/puzzleCatalog';
+import { useCompactLayout } from '../hooks/useCompactLayout';
+import { MobileStudio } from '../components/MobileStudio';
 
 const NxNStudio = lazy(() => import('../components/nxn/NxNStudio').then((module) => ({ default: module.NxNStudio })));
 const ShapeStudio = lazy(() => import('../components/shapes/ShapeStudio').then((module) => ({ default: module.ShapeStudio })));
@@ -41,6 +43,7 @@ function dropGatedPuzzleParam() {
 export function App() {
   const services = useServices();
   const zen = useUi((s) => s.zen);
+  const compact = useCompactLayout();
   const [puzzle, setPuzzle] = useState<PuzzleEventId>(puzzleFromUrl);
   useKeyboard(services, puzzle === '333');
   useEnvironmentSync(services);
@@ -70,7 +73,7 @@ export function App() {
       <div className="backdrop" aria-hidden />
       <Header puzzle={puzzle} onPuzzleChange={choosePuzzle} />
       {!EXPERIMENTAL_PUZZLES || puzzle === '333' ? <>
-      <main className="studio" id="studio">
+      {compact ? <MobileStudio /> : <main className="studio" id="studio">
         <h1 className="sr-only">CUBELAB — interactive 3×3×3 cube studio</h1>
         <section className="studio__stage" aria-label="3D cube. Drag stickers to twist, drag the background to orbit.">
           <Stage />
@@ -88,7 +91,7 @@ export function App() {
         <div className="studio__playback">
           <PlaybackPanel />
         </div>
-      </main>
+      </main>}
       {zen && (
         <Button className="zen-exit" variant="ghost" size="sm" icon={<Minimize2 size={15} />} onClick={() => toggleZen(services, false)} kbd="Esc">
           Exit zen

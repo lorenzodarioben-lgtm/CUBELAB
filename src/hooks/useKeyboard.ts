@@ -33,7 +33,7 @@ export function useKeyboard(services: AppServices, enabled = true): void {
     };
     const dialogOpen = () => {
       const s = ui.getState();
-      return s.helpOpen || s.settingsOpen || s.historyOpen || s.confirm !== null;
+      return s.helpOpen || s.settingsOpen || s.historyOpen || s.confirm !== null || document.querySelector('dialog[open]') !== null;
     };
 
     const onKeyDown = (e: KeyboardEvent) => {

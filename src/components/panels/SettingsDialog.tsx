@@ -79,7 +79,7 @@ export function SettingsDialog() {
       </Group>
 
       <Group title="Timer">
-        <Row title="Timer mode" description="Casual starts on your first turn. Spacebar: hold Space, release to start.">
+        <Row title="Timer mode" description="Casual starts on your first turn. In Spacebar mode, hold Space or the timer, then release to start.">
           <Segmented
             label="Timer mode"
             value={settings.timerMode}

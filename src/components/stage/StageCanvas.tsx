@@ -53,7 +53,7 @@ function framing(width: number, height: number, { transportOpen, zen }: FramingC
   let side: number;
   let top: number;
   let bottom: number;
-  if (zen) {
+  if (zen && width >= 1100) {
     // Only the clock remains, centred at the top.
     side = 32;
     top = width >= 1100 ? 170 : Math.min(150, height * 0.24);
@@ -66,12 +66,13 @@ function framing(width: number, height: number, { transportOpen, zen }: FramingC
     // The solution transport floats bottom-centre on wide layouts; keep the cube clear of it.
     bottom = transportOpen ? 210 : 72;
   } else {
-    side = 14;
-    top = Math.min(150, height * 0.28);
-    bottom = 58;
+    // Mobile reserves the timer and tools in layout, outside the interaction canvas.
+    side = 16;
+    top = 12;
+    bottom = 16;
   }
-  const availW = Math.max(180, width - side * 2);
-  const availH = Math.max(180, height - top - bottom);
+  const availW = Math.max(width >= 1100 ? 180 : 80, width - side * 2);
+  const availH = Math.max(width >= 1100 ? 180 : 80, height - top - bottom);
   // Target: the bounding sphere spans ~94% of the smaller free dimension.
   const targetRadiusPx = 0.47 * Math.min(availW, availH);
   const distance = (CUBE_RADIUS * (height / 2)) / (Math.tan(((FOV / 2) * Math.PI) / 180) * targetRadiusPx);
@@ -447,8 +448,10 @@ function ReadySignal({ onReady }: { onReady: () => void }) {
 type Dpr = [number, number];
 
 /** Canvas resolution: lowest on the low tier, full on an explicit High. */
-function stageDpr(tier: RenderTier, highSetting: boolean): Dpr {
-  return tier === 'low' ? [1, 1.25] : highSetting ? [1, 2] : [1, 1.75];
+function stageDpr(tier: RenderTier, highSetting: boolean, coarse = false): Dpr {
+  // Auto on compact touch screens avoids 26.5% of the pixels of a 1.75 DPR canvas.
+  // Explicit High retains its existing full-resolution presentation.
+  return tier === 'low' ? [1, 1.25] : highSetting ? [1, 2] : [1, coarse ? 1.5 : 1.75];
 }
 
 export interface StageCanvasProps {
@@ -468,6 +471,9 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
   // tier — identical materials, no extra shadow passes. Sustained frame drops
   // step either down to low.
   const coarse = useMemo(() => window.matchMedia('(pointer: coarse)').matches, []);
+  // The App changes presentation at this breakpoint, remounting this canvas.
+  // Wide touch devices retain the desktop pixel budget as well.
+  const compactDpr = coarse && window.innerWidth < 1100;
   const quality: RenderTier =
     settings.quality === 'low' || (settings.quality === 'auto' && autoDegraded)
       ? 'low'
@@ -479,10 +485,10 @@ export default function StageCanvas({ registry, preview }: StageCanvasProps) {
   const requested = useMemo<StageLook>(() => ({ style: settings.cubeStyle, finish: 'gloss', tier: quality }), [settings.cubeStyle, quality]);
   const preparer = useMemo(() => new LookPreparer(), []);
   const [shown, setShown] = useState<{ look: StageLook; dpr: Dpr } | null>(null);
-  const onShow = useCallback((look: StageLook) => setShown({ look, dpr: stageDpr(look.tier, highSetting) }), [highSetting]);
+  const onShow = useCallback((look: StageLook) => setShown({ look, dpr: stageDpr(look.tier, highSetting, compactDpr) }), [highSetting, compactDpr]);
   const look = shown?.look ?? null;
   // The resolution changes with the look it belongs to.
-  const dpr = shown && !sameLook(shown.look, requested) ? shown.dpr : stageDpr(requested.tier, highSetting);
+  const dpr = shown && !sameLook(shown.look, requested) ? shown.dpr : stageDpr(requested.tier, highSetting, compactDpr);
 
   useEffect(() => rig.setSensitivity(settings.orbitSensitivity), [rig, settings.orbitSensitivity]);
 

@@ -346,3 +346,11 @@ history is per-browser; touch was verified with
 Chromium touch emulation (not physical devices); Firefox/WebKit are covered by a smoke test only.
 
 Both public cube styles use their approved Gloss appearance exclusively. Legacy saved finish preferences are ignored during settings loading; other preferences, cube sessions and solve history are preserved.
+
+### Mobile studio
+
+Below 1100px, the timer, interactive cube, gesture controls and compact Scramble / Solve / Tools dock occupy separate layout regions. Landscape places the timer beside the cube. Tools opens a native, dismissible sheet containing the Move Pad, session notation/statistics and secondary actions (undo, redo, reset and Zen). Desktop retains its existing three-column layout.
+
+In Spacebar timer mode, touch users tap the clock for inspection, hold until armed, then release to start. Solving stops the clock; tapping the running clock records a DNF. Timing uses the same state machine as the keyboard.
+
+Auto quality on coarse pointers caps canvas DPR at 1.5 (Low: 1.25); explicit High retains DPR up to 2. Cube geometry, materials, k2 lighting and shader preparation are unchanged. This reduces the Auto canvas pixel budget without altering the approved Gloss finish.

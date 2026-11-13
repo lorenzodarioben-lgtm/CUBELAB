@@ -13,7 +13,7 @@ test.describe('CUBELAB on a phone (390×844, touch)', () => {
     await expect(bar).toBeInViewport();
     const box = (await bar.boundingBox())!;
     expect(box.y + box.height).toBeLessThanOrEqual(844 + 1);
-    for (const name of ['New Scramble', 'Auto Solve', 'Reset']) {
+    for (const name of ['New Scramble', 'Auto Solve', 'Cube tools']) {
       const button = bar.getByRole('button', { name: new RegExp(name) });
       await expect(button).toBeVisible();
       const b = (await button.boundingBox())!;
@@ -53,12 +53,14 @@ test.describe('CUBELAB on a phone (390×844, touch)', () => {
     expect(await debug.version(page)).toBe(version);
     await page.getByRole('radio', { name: 'Twist' }).check();
 
-    // Move Pad is reachable by scrolling and works with taps.
+    // Move Pad is available on demand without occupying the main screen.
     await absorbEmulatedTap(page);
+    await page.getByRole('button', { name: 'Cube tools', exact: true }).click();
     const rPrime = page.getByRole('button', { name: /^R': turn red face/ });
     await rPrime.scrollIntoViewIfNeeded();
     await rPrime.tap();
     expect(await expectRenderMatchesModel(page)).toBe(SOLVED);
+    await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
 
     // Help and settings open as accessible sheets.
     await page.evaluate(() => window.scrollTo(0, 0));

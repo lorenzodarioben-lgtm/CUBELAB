@@ -47,9 +47,10 @@ function familyLabel(family: MoveFamily): string {
 
 const BANK_FAMILIES = { faces: FACE_BANK, slices: SLICE_BANK, rotations: ROTATION_BANK } as const;
 
-export function MovePad() {
+export function MovePad({ expanded = false }: { expanded?: boolean }) {
   const { studio } = useServices();
-  const open = useStudio((s) => s.settings.movePadOpen);
+  const savedOpen = useStudio((s) => s.settings.movePadOpen);
+  const open = expanded || savedOpen;
   const keyMap = useStudio((s) => s.settings.keyMap);
   const bank = useStudio((s) => s.settings.padLayers);
   const lastMove = useStudio((s) => s.lastMove);
@@ -66,7 +67,8 @@ export function MovePad() {
             className="collapse-toggle"
             aria-expanded={open}
             aria-controls="movepad-grid"
-            onClick={() => studio.updateSettings({ movePadOpen: !open })}
+            onClick={() => { if (!expanded) studio.updateSettings({ movePadOpen: !open }); }}
+            disabled={expanded}
           >
             Move pad
             <ChevronDown size={14} className="collapse-toggle__chevron" aria-hidden />

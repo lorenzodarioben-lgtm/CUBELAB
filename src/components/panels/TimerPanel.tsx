@@ -11,6 +11,7 @@ import type { TimerState } from '../../core/timing/timerMachine';
 import { formatTime, formatTps } from '../../core/stats/format';
 import { bestSingle, effectiveMs } from '../../core/stats/stats';
 import { cx } from '../ui/cx';
+import { useCompactLayout } from '../../hooks/useCompactLayout';
 
 type Tone = 'idle' | 'ready' | 'live' | 'hold' | 'armed' | 'inspect' | 'warn' | 'done' | 'muted' | 'busy';
 
@@ -38,7 +39,14 @@ function describe(timer: TimerState, scrambling: boolean): { label: string; tone
   }
 }
 
-function guidance(timer: TimerState, scrambling: boolean, solved: boolean): string {
+function guidance(timer: TimerState, scrambling: boolean, solved: boolean, compact = false): string {
+  if (compact) {
+    if (scrambling || timer.phase === 'scrambling') return 'Preparing your scramble…';
+    if (timer.phase === 'idle') return solved ? 'Scramble to start a timed solve.' : 'Free play · scramble for a timed solve.';
+    if (timer.phase === 'ready') return timer.mode === 'casual' ? 'Turn a face to start.' : timer.inspection ? 'Tap the timer to inspect.' : 'Hold the timer, then release to start.';
+    if (timer.phase === 'inspecting') return 'Hold the timer, then release to start.';
+    if (timer.phase === 'running') return timer.mode === 'spacebar' ? 'Solve to finish · tap timer for DNF.' : 'Solve the cube to stop the clock.';
+  }
   if (scrambling || timer.phase === 'scrambling') return 'Applying a random-state scramble…';
   const spacebar = timer.mode === 'spacebar';
   switch (timer.phase) {
@@ -125,6 +133,7 @@ function TimerReadout({ timer }: { timer: TimerState }) {
 }
 
 export function TimerPanel() {
+  const compact = useCompactLayout();
   const { studio } = useServices();
   const timer = useStudio((s) => s.timer);
   const scrambleStatus = useStudio((s) => s.scramble.status);
@@ -132,6 +141,7 @@ export function TimerPanel() {
   const history = useStudio((s) => s.history);
   const celebration = useStudio((s) => s.celebration);
   const gestureHint = useUi((s) => s.gestureHint);
+  const hint = useStudio((s) => s.hint);
   const scrambling = scrambleStatus === 'generating' || scrambleStatus === 'applying';
   const status = describe(timer, scrambling);
   const spacebar = timer.mode === 'spacebar';
@@ -154,7 +164,7 @@ export function TimerPanel() {
           {status.label}
         </span>
         <span className="panel-timer__mode">
-          {spacebar ? `Spacebar${timer.inspection ? ' · 15 s inspection' : ''}` : 'Casual timer'}
+          {spacebar ? `${compact ? 'Touch timer' : 'Spacebar'}${timer.inspection ? ' · 15 s inspection' : ''}` : 'Casual timer'}
           {timer.penalty === '+2' && timer.phase !== 'idle' && <span className="tag tag--warn">+2</span>}
           {isPB && <span className="tag tag--accent">Personal best</span>}
         </span>
@@ -165,7 +175,7 @@ export function TimerPanel() {
           ? {
               role: 'button',
               tabIndex: 0,
-              'aria-label': timer.phase === 'running' ? 'Stop timer (records DNF)' : 'Hold to arm the timer, release to start',
+              'aria-label': timer.phase === 'running' ? 'Stop timer (records DNF)' : timer.phase === 'ready' && timer.inspection ? 'Begin inspection' : 'Hold to arm the timer, release to start',
               onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => {
                 e.preventDefault();
                 e.currentTarget.setPointerCapture(e.pointerId);
@@ -173,13 +183,20 @@ export function TimerPanel() {
               },
               onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => studio.spaceUp(e.timeStamp),
               onPointerCancel: () => studio.cancelArming(),
+              onLostPointerCapture: () => studio.cancelArming(),
+              onKeyDown: (e) => {
+                if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); e.stopPropagation(); studio.spaceDown(e.timeStamp); }
+              },
+              onKeyUp: (e) => {
+                if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); studio.spaceUp(e.timeStamp); }
+              },
             }
           : {})}
       >
         <TimerReadout timer={timer} />
       </div>
-      <p className="panel-timer__hint" aria-live="off">
-        {guidance(timer, scrambling, solved)}
+      <p className="panel-timer__hint" aria-live={compact ? 'polite' : 'off'} aria-atomic={compact || undefined}>
+        {compact && hint ? hint.text : guidance(timer, scrambling, solved, compact)}
       </p>
       {gestureHint && (
         <p className="panel-timer__gesture">

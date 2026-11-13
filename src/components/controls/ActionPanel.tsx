@@ -1,9 +1,9 @@
-import { Focus, Redo2, RotateCcw, Shuffle, Sparkles, Undo2 } from 'lucide-react';
+import { Focus, Redo2, RotateCcw, Shuffle, SlidersHorizontal, Sparkles, Undo2 } from 'lucide-react';
 import { useServices, useStudio } from '../../app/context';
 import { requestAutoSolve, requestNewScramble, requestReset } from '../../app/actions';
 import { Button, IconButton, Spinner } from '../ui/primitives';
 
-export function ActionPanel() {
+export function ActionPanel({ mobile = false, onOpenTools }: { mobile?: boolean; onOpenTools?: () => void }) {
   const services = useServices();
   const { studio, rig } = services;
   const scrambleStatus = useStudio((s) => s.scramble.status);
@@ -58,7 +58,7 @@ export function ActionPanel() {
             onClick={() => requestAutoSolve(services)}
           >
             {solving ? (
-              solveLabel
+              mobile ? 'Solving…' : solveLabel
             ) : (
               <>
                 <span className="narrow-hide">Auto </span>Solve
@@ -78,7 +78,7 @@ export function ActionPanel() {
           </Button>
         </div>
       </div>
-      <div className="panel-actions__secondary" role="group" aria-label="History and camera">
+      {mobile ? <IconButton className="mobile-tools-trigger" label="Cube tools" onClick={onOpenTools}><SlidersHorizontal size={20} /></IconButton> : <div className="panel-actions__secondary" role="group" aria-label="History and camera">
         <IconButton label="Undo (Ctrl+Z)" disabled={!canUndo || turnsBlocked} onClick={() => studio.undo()}>
           <Undo2 size={17} />
         </IconButton>
@@ -89,7 +89,7 @@ export function ActionPanel() {
         <IconButton label="Reset camera (C)" onClick={() => rig.reset()}>
           <Focus size={17} />
         </IconButton>
-      </div>
+      </div>}
     </section>
   );
 }

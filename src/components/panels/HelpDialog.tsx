@@ -57,6 +57,10 @@ export function HelpDialog() {
           <h3 className="eyebrow">Timer</h3>
           <ul className="help-list">
             <li>
+              <strong>Touch timer</strong> — in Spacebar mode, tap the timer to begin inspection, then hold it until green and release to start.
+              Solving stops the clock. Tap the running timer only to stop early and record a DNF.
+            </li>
+            <li>
               <strong>Casual</strong> (default): after New Scramble the clock starts on your first turn and stops on the turn that solves the cube.
             </li>
             <li>
