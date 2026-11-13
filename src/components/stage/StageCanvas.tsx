@@ -111,12 +111,12 @@ interface CameraRigProps {
  * and the shadow stays on the floor however the cube is held.
  */
 function CameraRig({ rig, reduced, transportOpen, zen, frame, floor }: CameraRigProps) {
-  const { studio } = useServices();
-  const mobileRotation = useMemo(() => new THREE.Quaternion(), []);
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const size = useThree((s) => s.size);
   const invalidate = useThree((s) => s.invalidate);
-  const target = useMemo(() => framing(size.width, size.height, { transportOpen, zen }), [size.width, size.height, transportOpen, zen]);
+  const target = useMemo(() => size.width < 1100
+    ? { distanceScale: mobileFitDistance(size.width, size.height, CUBE_HALF, FOV), shiftY: 0 }
+    : framing(size.width, size.height, { transportOpen, zen }), [size.width, size.height, transportOpen, zen]);
   // Rendered framing eases toward the target so panels opening never make the cube jump.
   const current = useRef<{ distanceScale: number; shiftY: number; w: number; h: number } | null>(null);
 
@@ -128,22 +128,18 @@ function CameraRig({ rig, reduced, transportOpen, zen, frame, floor }: CameraRig
 
   useFrame((_, delta) => {
     const moving = rig.step(Math.min(delta, 0.05), reduced);
-    const fit = size.width < 1100 ? {
-      distanceScale: mobileFitDistance(size.width, size.height, CUBE_HALF, FOV, rig.cubeQuaternion(mobileRotation), studio.engine.getVisualTurn()),
-      shiftY: 0,
-    } : target;
     const prev = current.current;
     let framingMoving = false;
-    let next = { ...fit, w: size.width, h: size.height };
+    let next = { ...target, w: size.width, h: size.height };
     if (prev && !reduced && prev.w === size.width && prev.h === size.height) {
       const k = 1 - Math.exp(-Math.min(delta, 0.05) * 9);
       next = {
         ...next,
-        distanceScale: size.width < 1100 && fit.distanceScale > prev.distanceScale ? fit.distanceScale : prev.distanceScale + (fit.distanceScale - prev.distanceScale) * k,
-        shiftY: prev.shiftY + (fit.shiftY - prev.shiftY) * k,
+        distanceScale: prev.distanceScale + (target.distanceScale - prev.distanceScale) * k,
+        shiftY: prev.shiftY + (target.shiftY - prev.shiftY) * k,
       };
-      framingMoving = Math.abs(next.distanceScale - fit.distanceScale) > 1e-3 || Math.abs(next.shiftY - fit.shiftY) > 0.2;
-      if (!framingMoving) next = { ...fit, w: size.width, h: size.height };
+      framingMoving = Math.abs(next.distanceScale - target.distanceScale) > 1e-3 || Math.abs(next.shiftY - target.shiftY) > 0.2;
+      if (!framingMoving) next = { ...target, w: size.width, h: size.height };
     }
     if (!prev || prev.shiftY !== next.shiftY || prev.w !== next.w || prev.h !== next.h) {
       // Shift the projection so the cube sits in the centre of the free area.
@@ -304,6 +300,7 @@ function DebugBridge({ registry, frame, engine }: { registry: StickerRegistry; f
     const api = (window as unknown as { __CUBELAB__?: Record<string, unknown> }).__CUBELAB__;
     if (!api) return;
     const v = new THREE.Vector3();
+    api.cameraMetrics = () => ({ distance: camera.position.length(), width: gl.domElement.clientWidth, height: gl.domElement.clientHeight });
     api.visualTurn = () => {
       const turn = engine.getVisualTurn();
       return turn ? { axis: turn.axis, layer: turn.layer, angle: turn.angle } : null;
@@ -355,6 +352,7 @@ function DebugBridge({ registry, frame, engine }: { registry: StickerRegistry; f
     api.renderedStyle = () => (scene.getObjectByName('cube')?.userData.style as string | undefined) ?? null;
     return () => {
       delete api.visualFacelets;
+      delete api.cameraMetrics;
       delete api.project;
       delete api.renderInfo;
       delete api.renderedStyle;

@@ -19,6 +19,8 @@ export interface DebugApi {
   idle(): boolean;
   /** The view relative to the cube; `up[1] < 0` means U is at the bottom of the screen. */
   camera(): { azimuth: number; polar: number; zoom: number; up: [number, number, number] };
+  /** Physical rendered camera distance and canvas size (not just the rig's zoom). */
+  cameraMetrics?: () => { distance: number; width: number; height: number };
   timer(): { phase: string; mode: string; startedAt: number | null; turns: number };
   historyCount(): number;
   scramble(): string | null;

@@ -17,23 +17,23 @@
   }
   .mobile-studio > .panel-timer {
     grid-column: 1; grid-row: 1;
-    position: static; transform: none; width: 100% !important; min-width: 0;
-    padding: 6px 16px 0; gap: 0; pointer-events: auto;
+    position: relative; inset: auto; transform: none; width: 100% !important; min-width: 0;
+    padding: 0 16px; gap: 0; pointer-events: auto;
   }
   .mobile-studio .panel-timer__meta { min-height: 20px; gap: 8px; flex-wrap: wrap; }
   .mobile-studio .panel-timer__mode { display: flex; font-size: 11px; color: var(--text-2); }
   .mobile-studio .panel-timer__mode:empty { display: none; }
-  .mobile-studio .readout { font-size: clamp(52px, 13vw, 70px); line-height: 1.05; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mobile-studio .readout { font-size: clamp(52px, 13vw, 70px); line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .mobile-studio .panel-timer__clock { min-height: 52px; display: grid; place-items: center; min-width: 0; touch-action: none; }
-  .mobile-studio .panel-timer__hint { color: var(--text-2); min-height: 0; max-width: none; font-size: 12px; line-height: 1.5; margin-top: 2px; }
+  .mobile-studio .panel-timer__hint { position: absolute; top: 100%; left: 12px; right: 12px; color: var(--text-2); min-height: 0; max-width: none; font-size: 12px; line-height: 1.5; margin-top: 2px; }
   .mobile-studio .panel-timer__gesture { display: none; }
   .mobile-studio > .studio__stage { grid-column: 1; grid-row: 2; position: relative; inset: auto; height: auto; width: 100%; min-width: 0; min-height: 230px; margin: 0; }
-  .mobile-studio .stage__canvas { bottom: 56px; }
+  .mobile-studio .stage__canvas { bottom: 52px; }
   .mobile-studio .stage__tools { display: flex; bottom: 4px; left: 16px; right: 16px; align-items: center; }
   .mobile-studio .touch-mode { padding: 3px; }
   .mobile-studio .touch-mode .segmented__option > span { min-height: 40px; min-width: 68px; display: grid; place-items: center; }
   .mobile-studio .stage__camera { width: 44px; height: 44px; }
-  /* Transient hints use the timer's reserved guidance line on mobile. */
+  /* Transient guidance does not resize the timer or the canvas. */
   .mobile-studio .stage-hint { display: none; }
   .mobile-studio .gesture-hint { display: none; }
   .mobile-studio > .panel-actions {
@@ -49,16 +49,16 @@
   .mobile-studio .panel-actions .btn { min-width: 0; height: 48px; padding: 0 8px; font-size: 14px; }
   .mobile-studio .panel-actions .narrow-hide { display: none; }
   .mobile-studio .mobile-tools-trigger { width: 48px; height: 48px; border: 1px solid var(--line-2); background: var(--surface-2); }
-  .mobile-playback { grid-column: 1; grid-row: 3; width: 100%; min-width: 0; padding: 0 16px; }
-  .mobile-playback:empty { display: none; }
+  /* A stable control row prevents solver transitions from resizing the canvas. */
+  .mobile-playback { grid-column: 1; grid-row: 3; width: 100%; height: 45px; min-width: 0; padding: 0 16px; }
   .mobile-playback .panel-playback { margin: 8px 0; padding: 12px; }
   .mobile-playback .transport { flex-wrap: wrap; gap: 10px; }
   .mobile-playback .transport__buttons { flex-wrap: wrap; }
   .mobile-playback .icon-btn { width: 44px; height: 44px; }
   .mobile-playback .panel-playback__header { flex-wrap: wrap; }
   .mobile-playback .panel-playback__status { overflow-wrap: anywhere; }
-  .mobile-solution { display: flex; align-items: center; gap: 4px; min-width: 0; padding: 4px 0; border-top: 1px solid var(--line); }
-  .mobile-solution__status { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-size: 13px; color: var(--text-2); }
+  .mobile-solution { display: flex; align-items: center; gap: 4px; height: 45px; min-width: 0; border-top: 1px solid var(--line); }
+  .mobile-solution__status { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-size: 13px; color: var(--text-2); white-space: nowrap; }
   .mobile-solution .icon-btn { width: 44px; height: 44px; flex-shrink: 0; }
   .mobile-solution .btn { min-height: 44px; padding-inline: 8px; }
   .playback-details .panel-playback { padding: 0; border: 0; box-shadow: none; background: none; animation: none; }
@@ -108,7 +108,7 @@
 @media (max-width: 1099px) and (max-height: 500px) and (orientation: landscape) {
   .mobile-studio { min-height: 290px; grid-template-columns: minmax(170px, .38fr) minmax(0, 1fr); grid-template-rows: minmax(220px, 1fr) auto auto; }
   .mobile-studio > .panel-timer { grid-column: 1; grid-row: 1; justify-content: center; padding: 8px 12px; }
-  .mobile-studio .panel-timer__hint { max-width: 26ch; }
+  .mobile-studio .panel-timer__hint { top: auto; bottom: 12px; max-width: 26ch; }
   .mobile-studio .panel-timer__meta { flex-direction: column; }
   .mobile-studio .readout { font-size: 58px; }
   .mobile-studio > .studio__stage { grid-column: 2; grid-row: 1; min-height: 220px; }

@@ -36,7 +36,8 @@ test('compact layouts reserve the timer, cube and controls at every requested si
       }
       if (width <= 430) {
         const cubeWidth = Math.max(...layout.points.map(p=>p.x))-Math.min(...layout.points.map(p=>p.x));
-        expect(cubeWidth).toBeGreaterThan(width === 320 ? 225 : width * .85);
+        // Fixed rotation-safe clearance replaces the old orientation-dependent peak fit.
+        expect(cubeWidth).toBeGreaterThan(width === 320 ? 210 : width * .8);
       }
       await page.screenshot({path:`artifacts/mobile-v21/after/${width}-normal.png`});
       for (const selector of ['.topbar .icon-btn','.panel-actions button','.stage__camera']) {
