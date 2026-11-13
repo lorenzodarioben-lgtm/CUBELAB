@@ -46,7 +46,7 @@ async function stable(page:Page, distance:number) {
 }
 
 for(const [width,height,cubeStyle] of [[320,568,'stickered'],[390,844,'stickerless']] as const) {
-  test(`${width}px ${cubeStyle}: precision, sequential noise, pinch and mixed gestures`,async({browser,baseURL})=>{
+  test(`${width}px ${cubeStyle}: normal-speed translation, sequential noise, pinch and mixed gestures`,async({browser,baseURL})=>{
     test.setTimeout(120_000);
     const context=await browser.newContext({baseURL,viewport:{width,height},hasTouch:true});
     try {
@@ -60,7 +60,7 @@ for(const [width,height,cubeStyle] of [[320,568,'stickered'],[390,844,'stickerle
       const normal=angle(home,await debug.camera(page));expect(normal).toBeGreaterThan(.1);
       await reset(page);await page.getByRole('radio',{name:'Twist',exact:true}).check();
       await trace(page);await dragPair(cdp,page,start,40,0);
-      const precise=angle(home,await debug.camera(page));expect(precise/normal).toBeCloseTo(.4,2);
+      const precise=angle(home,await debug.camera(page));expect(precise/normal).toBeCloseTo(1,2);
       await stable(page,distance);expect(await debug.version(page)).toBe(0);
       await reset(page);await trace(page);await dragPair(cdp,page,start,20,12,0,true);
       await stable(page,distance);expect((await debug.camera(page)).zoom).toBe(1);
@@ -108,7 +108,17 @@ test('second finger cancels a twist; cancel/capture loss leave fresh touches usa
     const moved={x:a.x,y:a.y-35,id:1};await send(cdp,'touchMove',[moved]);
     await page.waitForFunction(()=>!!window.__CUBELAB__.visualTurn?.());
     await send(cdp,'touchStart',[moved,{...b,id:2}]);
-    await send(cdp,'touchMove',[{...moved,x:moved.x+15},{...b,x:b.x+15,id:2}]);await frames(page);
+    await expectRenderMatchesModel(page); // Cancelled layer settles while both contacts remain down.
+    const midpoint={x:(moved.x+b.x)/2,y:(moved.y+b.y)/2};
+    const rolledContacts=[moved,{...b,id:2}].map(p=>{
+      const x=p.x-midpoint.x,y=p.y-midpoint.y,c=Math.cos(Math.PI/4),s=Math.sin(Math.PI/4);
+      return {...p,x:midpoint.x+x*c-y*s,y:midpoint.y+x*s+y*c};
+    });
+    await send(cdp,'touchMove',rolledContacts);await frames(page);await settle(page);
+    await send(cdp,'touchEnd',[rolledContacts[0]!]);await settle(page);
+    const releasePose=await debug.camera(page);
+    await send(cdp,'touchMove',[{...rolledContacts[1]!,x:rolledContacts[1]!.x+20}]);await frames(page);await settle(page);
+    expect(await debug.camera(page)).toEqual(releasePose);
     await send(cdp,'touchEnd',[]);await expectRenderMatchesModel(page);
     expect(await debug.version(page)).toBe(0);expect(await debug.moveLog(page)).toBe('');expect(await debug.historyCount(page)).toBe(0);
     await reset(page);const centre=await debug.project(page,[0,0,0]),contacts=pair(centre.x,centre.y);
@@ -130,7 +140,7 @@ test('second finger cancels a twist; cancel/capture loss leave fresh touches usa
   } finally {await context.close();}
 });
 
-test('desktop mouse orbit and reset retain normal behavior; Help describes precision',async({page})=>{
+test('desktop mouse orbit and reset retain normal behavior; Help describes three-axis manipulation',async({page})=>{
   const errors=trackErrors(page);await page.setViewportSize({width:1440,height:900});
   await openStudio(page,{settings:{sound:false}});
   const p=await debug.project(page,[1,0,1.5]),home=await debug.camera(page);
@@ -139,6 +149,6 @@ test('desktop mouse orbit and reset retain normal behavior; Help describes preci
   expect(angle(home,await debug.camera(page))).toBeGreaterThan(.1);expect(await debug.version(page)).toBe(0);
   await page.keyboard.press('c');await settle(page);expect(angle(home,await debug.camera(page))).toBeLessThan(.001);
   await page.getByRole('button',{name:'Help & shortcuts (?)',exact:true}).click();
-  await expect(page.getByRole('dialog')).toContainText('Two-finger drag — precision orbit. Pinch — zoom.');
+  await expect(page.getByRole('dialog')).toContainText('Two-finger drag: Rotate the cube. Two-finger twist: Roll the cube freely. Pinch: Zoom in or out.');
   expect(errors()).toEqual([]);
 });

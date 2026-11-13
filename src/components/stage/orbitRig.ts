@@ -91,9 +91,17 @@ export class OrbitRig {
   }
 
   /** Drag in pixels → rotation; `viewport` is the stage height for scale invariance. */
-  rotateBy(dx: number, dy: number, viewport: number, sensitivityMultiplier = 1): void {
-    const k = (Math.PI / Math.max(320, viewport)) * 1.15 * this.#sensitivity * sensitivityMultiplier;
+  rotateBy(dx: number, dy: number, viewport: number): void {
+    const k = (Math.PI / Math.max(320, viewport)) * 1.15 * this.#sensitivity;
     this.#rotateLocal(-dx * k, -dy * k);
+  }
+
+  /** Positive radians roll the displayed cube clockwise in screen coordinates.
+   * Q is camera-to-cube, so postmultiplying local +Z gives Rz(-angle) Q⁻¹
+   * in the rendered view. This stays screen-facing after any yaw/pitch/roll. */
+  rollBy(angleRadians: number): void {
+    this.#target.multiply(this.#step.setFromAxisAngle(AXIS_Z, angleRadians)).normalize();
+    this.#emit();
   }
 
   /**

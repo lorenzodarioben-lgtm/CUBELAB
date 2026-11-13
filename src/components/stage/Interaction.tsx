@@ -6,7 +6,7 @@
  *     orbit modifier is held, and the interaction mode allows twisting.
  *   - Orbit: everything else — background drags, right/middle button,
  *     Shift/Alt/Ctrl-drag, or "Orbit" touch mode. A second finger converts any
- *     gesture into pinch-zoom + orbit (cancelling an unfinished twist).
+ *     gesture into orbit + roll + pinch zoom (cancelling an unfinished twist).
  *
  * View gestures go to the OrbitRig only; twists go to the engine's drag API.
  * All state is cleared on pointerup, pointercancel and lostpointercapture.
@@ -25,7 +25,7 @@ import { intersectCube, previewFamily, previewLabel, resolveTwist, snapTwist, tw
 import type { CubeHit, ScreenPoint, TwistResolution } from '../cube/gestures';
 import type { HoverState } from '../cube/hoverState';
 import type { OrbitRig } from './orbitRig';
-import { PRECISION_ORBIT_MULTIPLIER, TwoFingerMotion } from './twoFingerMotion';
+import { TwoFingerMotion } from './twoFingerMotion';
 
 type TwistInfo = Extract<TwistResolution, { kind: 'twist' }>;
 
@@ -120,7 +120,8 @@ export function Interaction({ studio, rig, frame, touchMode, preview, hover, onF
       if (gesture.kind !== 'pinch') return;
       const delta = gesture.motion.flush(final);
       if (!delta) return;
-      rig.rotateBy(delta.dx, delta.dy, rect.height, PRECISION_ORBIT_MULTIPLIER);
+      rig.rotateBy(delta.dx, delta.dy, rect.height);
+      if (delta.roll !== 0) rig.rollBy(delta.roll);
       if (delta.zoom !== 1) rig.zoomBy(delta.zoom);
       onFirstGesture();
       invalidate();

@@ -27,7 +27,7 @@ export function HelpDialog() {
               <Kbd>C</Kbd> brings the view home.
             </li>
             <li>
-              <strong>Two-finger drag</strong> — precision orbit. <strong>Pinch</strong> — zoom. Scroll also zooms. On phones, the Twist / Orbit switch makes
+              <strong>Two-finger drag:</strong> Rotate the cube. <strong>Two-finger twist:</strong> Roll the cube freely. <strong>Pinch:</strong> Zoom in or out. Scroll also zooms. On phones, the Twist / Orbit switch makes
               single-finger drags unambiguous.
             </li>
           </ul>
