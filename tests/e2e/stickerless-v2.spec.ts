@@ -1,9 +1,9 @@
 /**
- * Experimental Stickerless v2 (`?stickerless=v2`) in the real browser: its
+ * Default Premium Stickerless v2 in the real browser: its
  * shaders compile and draw the puzzle state (pixel colours on screen match the
  * model after face, slice and rotation moves, and during a held turn), it
  * survives quality changes without leaking GPU resources, Classic Stickered
- * renders identically whether or not the flag is present, Settings previews
+ * renders identically with or without legacy parameters, Settings previews
  * Premium Stickerless as the renderer in use, and the build ignores the
  * development branch's diagnostic and review parameters.
  */
@@ -64,6 +64,14 @@ async function setQuality(page: Page, name: 'Auto' | 'High' | 'Low') {
   await page.getByRole('dialog').getByRole('radio', { name, exact: true }).check();
   await page.keyboard.press('Escape');
 }
+
+test('Premium Stickerless renders v2 by default, and legacy v1 query cannot select the old renderer', async ({ page }) => {
+  await openStudio(page, { settings: STICKERLESS, path: '/' });
+  expect(await page.evaluate(() => window.__CUBELAB__.stickerlessRenderer!())).toBe('v2');
+  await page.goto('/?stickerless=v1');
+  await page.waitForFunction(() => window.__CUBELAB__?.renderedStyle?.() === 'stickerless' && !window.__CUBELAB__?.lookPending?.());
+  expect(await page.evaluate(() => window.__CUBELAB__.stickerlessRenderer!())).toBe('v2');
+});
 
 test('v2 compiles and draws the puzzle state after face, slice and rotation moves', async ({ page }) => {
   const errors = trackErrors(page);
@@ -170,7 +178,7 @@ test('Classic Stickered draws the same pixels with or without the v2 flag', asyn
   expect(differing).toBe(0);
 });
 
-test('Settings previews Premium Stickerless as the renderer this page draws it', async ({ browser, baseURL }) => {
+test('Settings previews the approved Premium Stickerless v2 with or without a legacy flag', async ({ browser, baseURL }) => {
   const previews = async (path: string) => {
     const context = await browser.newContext({ baseURL, viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
@@ -187,7 +195,7 @@ test('Settings previews Premium Stickerless as the renderer this page draws it',
   };
   const [classic, stickerless] = await previews('/');
   const [classicFlagged, stickerlessFlagged] = await previews(V2);
-  expect(stickerless).toMatch(/^stickerless-[\w-]{8}\.webp$/);
+  expect(stickerless).toMatch(/^stickerless-v2-[\w-]{8}\.webp$/);
   expect(stickerlessFlagged).toMatch(/^stickerless-v2-[\w-]{8}\.webp$/);
   expect(classicFlagged).toBe(classic);
 });
@@ -196,7 +204,7 @@ test('the lighting review exists only on the dev server: production ignores ?v2r
   const errors = trackErrors(page);
   await openStudio(page, { settings: STICKERLESS, path: '/?v2review' });
   await waitIdle(page);
-  expect(await page.evaluate(() => window.__CUBELAB__.stickerlessRenderer!())).toBe('v1');
+  expect(await page.evaluate(() => window.__CUBELAB__.stickerlessRenderer!())).toBe('v2');
   await expect(page.getByRole('complementary', { name: 'Lighting review' })).toHaveCount(0);
   expect(await page.evaluate(() => (window.__CUBELAB__ as unknown as Record<string, unknown>).v2StudioMaps)).toBeUndefined();
   expect(await page.evaluate(() => document.querySelector('.app')!.classList.contains('is-zen'))).toBe(false);

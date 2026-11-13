@@ -1,5 +1,7 @@
 # CUBELAB — Handoff
 
+Current release: Classic Stickered remains the initial style. Premium Stickerless now uses the approved V2 renderer with k2 lighting by default, with no URL flag; legacy V1 is no longer selectable. Older development history below is preserved for reference.
+
 Status (2026-10-13): turn audio now uses [CC0 recordings of a real cube](src/assets/audio/README.md),
 replacing the procedural sources described in the historical eighth-pass notes below. The current
 listening demo is `artifacts/audio/turn-demo.wav`; the old spectrogram is retained with a `-before` suffix.
@@ -25,8 +27,8 @@ about what was and was not verified.
     (`git checkout main && git merge premium-slices-upgrade`).
 - `.gitattributes` normalises line endings to LF.
 - Screenshots: `artifacts/before/` (v1), `artifacts/after/` (current default style) and
-  `artifacts/styles/` (Classic, Stickerless v1 and the opt-in Stickerless v2 side by side, selector,
-  live switch).
+  `artifacts/styles/` (Classic and the current Premium Stickerless V2 captures, selector,
+  live switch; historical V1 captures remain for reference).
 
 ## Eighth pass — photoreal stickerless plastic + speedcube turn audio
 

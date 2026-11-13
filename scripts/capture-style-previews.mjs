@@ -1,7 +1,5 @@
-// Renders the Settings previews of the cube styles from the real 3D model:
-// Classic Stickered, Premium Stickerless as drawn by default (v1) and as drawn
-// with ?stickerless=v2 (Candidate Y with the k2 lighting), which the picker shows instead while that
-// renderer is active.
+// Renders the Settings previews of the two public cube styles from the real 3D model:
+// Classic Stickered and Premium Stickerless (the approved v2 renderer with k2 lighting).
 // Usage: npm run build && npm run preview (port 4317) in another shell, then:
 //        node scripts/capture-style-previews.mjs
 // Each style is shown solved at the home view on High; everything but the
@@ -18,8 +16,7 @@ const OUT = 'src/assets/cube-styles';
 const SIZE = 432;
 const PREVIEWS = [
   { file: 'stickered', cubeStyle: 'stickered', query: '', renderer: null },
-  { file: 'stickerless', cubeStyle: 'stickerless', query: '', renderer: 'v1' },
-  { file: 'stickerless-v2', cubeStyle: 'stickerless', query: '?stickerless=v2', renderer: 'v2' },
+  { file: 'stickerless-v2', cubeStyle: 'stickerless', query: '', renderer: 'v2' },
 ];
 mkdirSync(OUT, { recursive: true });
 const args = process.platform === 'win32' ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'];

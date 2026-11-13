@@ -1,5 +1,5 @@
 /**
- * Experimental Stickerless v2 (`src/components/cube/stickerless2/`): opt-in
+ * Premium Stickerless v2 (`src/components/cube/stickerless2/`): default
  * selection; production anchoring (geometry, centre, finish, white);
  * material programs, turn state and GPU resource ownership; and isolation
  * from v1 and Classic Stickered.
@@ -36,11 +36,11 @@ describe('Stickerless v2 selection', () => {
     delete (globalThis as Record<string, unknown>).document;
   });
 
-  it('is opt-in: v1 stays the renderer without the URL parameter', () => {
-    expect(STICKERLESS_RENDERER).toBe('v1');
+  it('uses the approved v2 renderer by default', () => {
+    expect(STICKERLESS_RENDERER).toBe('v2');
     const visuals = new CubeVisuals('low', 'gloss');
-    expect(visuals.stickerlessRenderer).toBe('v1');
-    expect(visuals.stickerless.setTurn).toBeUndefined();
+    expect(visuals.stickerlessRenderer).toBe('v2');
+    expect(typeof visuals.stickerless.setTurn).toBe('function');
     visuals.dispose();
   });
 

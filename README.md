@@ -17,8 +17,9 @@ bundle, puzzle definitions, fonts, audio, and scramble worker are cached for off
 | --- | --- | --- |
 | ![Macro](artifacts/after/cube-macro.png) | ![M slice mid-turn](artifacts/after/cube-midturn-M.png) | ![Phone](artifacts/after/mobile-390-scrambled.png) |
 
-The studio opens with Classic Stickered, shown above. Premium Stickerless is one setting away, drawn by
-its v1 renderer; its v2 renderer (Candidate Y with the k2 lighting) is opt-in with `?stickerless=v2` (see [Rendering](#rendering)).
+The studio opens with Classic Stickered, shown above. Select Premium Stickerless in Settings for
+the approved V2 renderer, featuring k2 studio lighting, refined centre caps and stable seams.
+No URL parameter is needed (see [Rendering](#rendering)).
 
 ## Quick start
 
@@ -59,8 +60,8 @@ npm run test:e2e     # Playwright against the production build (builds + preview
 | `npm run test:e2e`    | Playwright: Chromium desktop 1440×900, Chromium phone 390×844 (touch), Firefox and WebKit smoke |
 | `npm run test:all`    | Everything above, in order                                                      |
 | `npm run screenshots` | Re-capture `artifacts/after/*.png` (needs `npm run preview` running)             |
-| `node scripts/capture-style-matrix.mjs` | Classic, Stickerless v1 and Stickerless v2 side by side → `artifacts/styles/` (needs preview) |
-| `node scripts/capture-style-previews.mjs` | Re-render the Settings previews (Classic, Stickerless v1 and v2) in `src/assets/cube-styles/` (needs preview) |
+| `node scripts/capture-style-matrix.mjs` | Classic Stickered and Premium Stickerless side by side → `artifacts/styles/` (needs preview) |
+| `node scripts/capture-style-previews.mjs` | Re-render the two Settings previews (Classic and Premium Stickerless) in `src/assets/cube-styles/` (needs preview) |
 | `node scripts/render-audio-demo.mjs` | Render the turn-sound demonstration to `artifacts/audio/turn-demo.wav` (needs preview) |
 
 First Playwright run on a new machine: `npx playwright install chromium firefox webkit`.
@@ -267,26 +268,23 @@ facelet read-back all work in cube coordinates, so twists behave identically ups
 Two cube styles share everything except the physical model (Settings → Cube style). Classic
 Stickered is the default:
 
-| | Classic Stickered (default) | Premium Stickerless (v1 renderer) |
+| | Classic Stickered (default) | Premium Stickerless (approved V2) |
 | --- | --- | --- |
-| Pieces | Glossy black moulded bodies from the same SDF mesher (flat faces, rounded outer edges, honeycomb interior seen mid-turn) | Solid moulded parts from signed distance fields (`pieceGeometry.ts`), each face a gentle dome that rolls softly into its seams |
-| Colour | Thin vinyl stickers shaped like their piece (round centres, D-shaped edges, square corners) with a black border, four print batches per colour | The plastic itself: a shader (`pieceMaterial.ts`) gives each face a coloured cap over black mechanism, meeting on the cube edges' 45° lines, with a drawn parting line; satin sheen under a clear coat, its own reflector-card reflections, per-piece finish variation |
-| Signature | Black frame around every tile | GAN-style cuts where pieces meet the face centre: round centre caps and rounded edge ends, crisp near-square inner corners on the corner pieces, black openings at the diagonals |
+| Pieces | Glossy black moulded bodies with shaped stickers | Solid, gently pillowed coloured-plastic cubies with a finely refined Gloss centre cap |
+| Colour | Raised vinyl-style coloured stickers, black borders | Moulded coloured plastic, controlled k2 studio reflections, realistic depth and near-field bounce |
+| Signature | Black frame around each tile | Moulded internal scales, assembly grooves and consistent shading around turning-layer cuts |
 
-| Classic Stickered (default) | Premium Stickerless, v1 (default renderer) | Premium Stickerless, v2: Candidate Y, k2 lighting (opt-in) |
-| --- | --- | --- |
-| ![Classic Stickered](artifacts/styles/stickered/scrambled.png) | ![Premium Stickerless v1](artifacts/styles/stickerless/scrambled.png) | ![Premium Stickerless v2, Candidate Y with the k2 lighting](artifacts/styles/stickerless-v2/scrambled.png) |
+| Classic Stickered (default) | Premium Stickerless (V2, default Stickerless renderer) |
+| --- | --- |
+| ![Classic Stickered](artifacts/styles/stickered/scrambled.png) | ![Premium Stickerless](artifacts/styles/stickerless-v2/scrambled.png) |
 
-**Two Stickerless renderers.** Premium Stickerless is drawn by **v1** (`pieceMaterial.ts`,
-`stickerlessResources.ts`) unless the address carries `?stickerless=v2`; that parameter selects
-**v2, Candidate Y with the k2 lighting** (`src/components/cube/stickerless2/`) for that page load only. v2 is not the
-default and nothing saves it: without the parameter Premium Stickerless is v1 again. v2 keeps v1's
-piece shapes (pillowed faces, rounded cube edges, the Gloss centre cap), its exterior finish and its
-white, and changes what light and a turn reveal: its own product studio (key softbox and reflection
-panels), plastic coloured all the way through each piece, moulded scale grooves on the corner
-pieces' internal faces, analytic shading in the seams and gaps, and, while a layer is turning,
-reflections and shadows of the other layers on the surfaces it opens. Settings previews Premium
-Stickerless as the renderer in use. These are captures of v2:
+**Premium Stickerless now uses V2 automatically.** Select it normally in Settings: neither
+`?stickerless=v2` nor any other renderer flag is needed. The former V1 implementation
+is no longer selectable in the public UI or via its old URL flag. V2 uses the approved
+Candidate Y geometry and the k2 lighting studio, with the minute centre-cap refinement,
+coloured plastic all the way through, moulded scale grooves inside the corner pieces,
+and seam shading that stays stable away from the real cuts while a layer turns.
+Settings displays a capture of this exact renderer.
 
 | v2 close-up | v2 mid-turn R | v2 on a phone (Auto → Medium) |
 | --- | --- | --- |

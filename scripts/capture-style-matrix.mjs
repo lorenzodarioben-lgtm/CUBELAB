@@ -1,9 +1,8 @@
-// Side-by-side captures of the cube styles in identical conditions: Classic
-// Stickered, Premium Stickerless as drawn by default (v1) and as drawn with
-// ?stickerless=v2 (Candidate Y with the k2 lighting, opt-in).
+// Side-by-side captures of the two public cube styles: Classic Stickered
+// and Premium Stickerless with the approved v2 renderer and k2 lighting.
 // Usage: npm run build && npm run preview (port 4317) in another shell, then:
 //        node scripts/capture-style-matrix.mjs [outDir]
-// Writes <outDir>/{stickered,stickerless,stickerless-v2}/*.png plus selector and switching shots.
+// Writes <outDir>/{stickered,stickerless-v2}/*.png plus selector and switching shots.
 import { mkdirSync } from 'node:fs';
 import { chromium, devices } from '@playwright/test';
 
@@ -17,8 +16,7 @@ const errors = [];
 
 const STYLES = [
   { dir: 'stickered', cubeStyle: 'stickered', flag: '', renderer: null },
-  { dir: 'stickerless', cubeStyle: 'stickerless', flag: '', renderer: 'v1' },
-  { dir: 'stickerless-v2', cubeStyle: 'stickerless', flag: 'stickerless=v2', renderer: 'v2' },
+  { dir: 'stickerless-v2', cubeStyle: 'stickerless', flag: '', renderer: 'v2' },
 ];
 /** A query string from the given parameters (empty ones skipped). */
 const query = (...params) => (params.some(Boolean) ? '?' + params.filter(Boolean).join('&') : '');
@@ -115,7 +113,7 @@ for (const { dir: name, cubeStyle, flag, renderer } of STYLES) {
   }
 }
 
-// Selector, each selection state (and the v2 preview), desktop and phone.
+// Selector, each public selection state, desktop and phone.
 for (const [label, mobile] of [
   ['desktop', false],
   ['mobile', true],
