@@ -32,7 +32,7 @@ function expectVisibleRoll(before:Point[],after:Point[],angle:number,tolerance=1
 }
 
 for(const [width,height,cubeStyle] of [[320,568,'stickered'],[390,844,'stickerless']] as const) {
-  test(`${width}px ${cubeStyle}: visible clockwise roll, reversal, precision, angle wrapping and combined manipulation`,async({browser,baseURL})=>{
+  test(`${width}px ${cubeStyle}: double-sensitivity visible roll, reversal, precision, angle wrapping and combined manipulation`,async({browser,baseURL})=>{
     test.setTimeout(120_000);
     const context=await browser.newContext({baseURL,viewport:{width,height},hasTouch:true});
     try {
@@ -43,21 +43,21 @@ for(const [width,height,cubeStyle] of [[320,568,'stickered'],[390,844,'stickerle
       const distance=await page.evaluate(()=>window.__CUBELAB__.cameraMetrics!().distance);
       await send(cdp,'touchStart',contacts(centre,0));
       await move(cdp,page,centre,0,Math.PI/2);
-      expectVisibleRoll(initial,await projection(page),Math.PI/2);
+      expectVisibleRoll(initial,await projection(page),Math.PI);
       const rolled=await debug.camera(page);
       expect(rolled.azimuth).toBeCloseTo(home.azimuth,4);expect(rolled.polar).toBeCloseTo(home.polar,4);expect(rolled.zoom).toBe(1);
       expect(await page.evaluate(()=>window.__CUBELAB__.cameraMetrics!().distance)).toBe(distance);
       await move(cdp,page,centre,Math.PI/2,0);
       expectVisibleRoll(initial,await projection(page),0);
       await move(cdp,page,centre,0,radians(2));
-      expectVisibleRoll(initial,await projection(page),radians(2),1);
+      expectVisibleRoll(initial,await projection(page),radians(4),1);
       // A 170° -> 190° move crosses atan2's branch cut while the displayed
-      // object continues clockwise by 20°, with constant radius and distance.
+      // object continues clockwise by 40°, with constant radius and distance.
       await move(cdp,page,centre,radians(2),radians(170));
       const at170=await projection(page);
-      expectVisibleRoll(initial,at170,radians(170));
+      expectVisibleRoll(initial,at170,radians(340));
       await move(cdp,page,centre,radians(170),radians(190));
-      expectVisibleRoll(at170,await projection(page),radians(20));
+      expectVisibleRoll(at170,await projection(page),radians(40));
       await move(cdp,page,centre,radians(190),Math.PI*2);
       expectVisibleRoll(initial,await projection(page),0);
       expect((await debug.camera(page)).zoom).toBe(1);
@@ -72,9 +72,9 @@ for(const [width,height,cubeStyle] of [[320,568,'stickered'],[390,844,'stickerle
       expect(tiltedPose.zoom).toBeLessThan(1);
       const forwardDot=Math.cos(tiltedPose.polar)*Math.cos(home.polar)+Math.sin(tiltedPose.polar)*Math.sin(home.polar)*Math.cos(tiltedPose.azimuth-home.azimuth);
       expect(Math.acos(Math.max(-1,Math.min(1,forwardDot)))).toBeGreaterThan(.03);
-      // Roll still means a 2D screen rotation after arbitrary yaw/pitch/roll.
+      // The doubled roll gain remains screen-facing after arbitrary tilt.
       await move(cdp,page,target,radians(60),radians(150),120);
-      expectVisibleRoll(tilted,await projection(page),Math.PI/2,1.5);
+      expectVisibleRoll(tilted,await projection(page),Math.PI,1.5);
       expect((await debug.camera(page)).zoom).toBeCloseTo(tiltedPose.zoom,6);
       const retained=await projection(page);
       // CDP partial touchEnd lists the contacts being released.
@@ -89,7 +89,7 @@ for(const [width,height,cubeStyle] of [[320,568,'stickered'],[390,844,'stickerle
       await page.setViewportSize({width:844,height:390});await settle(page);
       const landCentre=await debug.project(page,[0,0,0]),land=await projection(page);
       await send(cdp,'touchStart',contacts(landCentre,0));await move(cdp,page,landCentre,0,-Math.PI/2);await send(cdp,'touchEnd',[]);
-      expectVisibleRoll(land,await projection(page),-Math.PI/2);
+      expectVisibleRoll(land,await projection(page),-Math.PI);
       expect(await debug.version(page)).toBe(0);expect(errors()).toEqual([]);
     } finally {await context.close();}
   });

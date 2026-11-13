@@ -1,5 +1,7 @@
 import type { ScreenPoint } from '../cube/gestures';
 
+/** Additional gain for two-finger yaw/pitch and roll; pinch stays independent. */
+export const TWO_FINGER_ROTATION_SENSITIVITY = 2;
 const PINCH_SLOP_PX = 3;
 const MIN_ROLL_SPAN_PX = 8;
 

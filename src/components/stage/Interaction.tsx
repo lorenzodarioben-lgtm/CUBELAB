@@ -25,7 +25,7 @@ import { intersectCube, previewFamily, previewLabel, resolveTwist, snapTwist, tw
 import type { CubeHit, ScreenPoint, TwistResolution } from '../cube/gestures';
 import type { HoverState } from '../cube/hoverState';
 import type { OrbitRig } from './orbitRig';
-import { TwoFingerMotion } from './twoFingerMotion';
+import { TWO_FINGER_ROTATION_SENSITIVITY, TwoFingerMotion } from './twoFingerMotion';
 
 type TwistInfo = Extract<TwistResolution, { kind: 'twist' }>;
 
@@ -120,8 +120,8 @@ export function Interaction({ studio, rig, frame, touchMode, preview, hover, onF
       if (gesture.kind !== 'pinch') return;
       const delta = gesture.motion.flush(final);
       if (!delta) return;
-      rig.rotateBy(delta.dx, delta.dy, rect.height);
-      if (delta.roll !== 0) rig.rollBy(delta.roll);
+      rig.rotateBy(delta.dx * TWO_FINGER_ROTATION_SENSITIVITY, delta.dy * TWO_FINGER_ROTATION_SENSITIVITY, rect.height);
+      if (delta.roll !== 0) rig.rollBy(delta.roll * TWO_FINGER_ROTATION_SENSITIVITY);
       if (delta.zoom !== 1) rig.zoomBy(delta.zoom);
       onFirstGesture();
       invalidate();

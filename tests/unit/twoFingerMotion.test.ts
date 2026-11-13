@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Quaternion } from 'three';
 import { OrbitRig } from '../../src/components/stage/orbitRig';
-import { TwoFingerMotion } from '../../src/components/stage/twoFingerMotion';
+import { TWO_FINGER_ROTATION_SENSITIVITY, TwoFingerMotion } from '../../src/components/stage/twoFingerMotion';
 
 describe('two-finger motion', () => {
   it('pairs sequential pointer events, even across a frame, without a false pinch', () => {
@@ -50,18 +50,18 @@ describe('two-finger motion', () => {
   });
 });
 
-describe('two-finger translation uses normal trackball sensitivity', () => {
-  it.each([0.4,1,1.7,2])('rotates at normal speed with base sensitivity %s', sensitivity => {
+describe('two-finger rotation gain respects trackball sensitivity', () => {
+  it.each([0.4,1,1.7,2])('rotates at double speed with base sensitivity %s', sensitivity => {
     for (const [dx,dy] of [[40,0],[0,40]]) {
       const normal = new OrbitRig(), precise = new OrbitRig();
       normal.setSensitivity(sensitivity); precise.setSensitivity(sensitivity);
       const motion = new TwoFingerMotion({x:0,y:0},{x:100,y:0});
       motion.move(0,{x:dx!,y:dy!}); motion.move(1,{x:100+dx!,y:dy!});
       const delta=motion.flush()!;
-      normal.rotateBy(dx!,dy!,500); precise.rotateBy(delta.dx,delta.dy,500); precise.rollBy(delta.roll);
+      normal.rotateBy(dx!,dy!,500); precise.rotateBy(delta.dx*TWO_FINGER_ROTATION_SENSITIVITY,delta.dy*TWO_FINGER_ROTATION_SENSITIVITY,500);
       normal.step(0,true); precise.step(0,true);
       const angle = (rig: OrbitRig) => rig.cubeQuaternion(new Quaternion()).angleTo(new Quaternion());
-      expect(angle(precise)/angle(normal)).toBeCloseTo(1,9);
+      expect(angle(precise)/angle(normal)).toBeCloseTo(2,9);
       expect(precise.current.zoom).toBe(1);
     }
   });
