@@ -46,7 +46,7 @@ async function stable(page:Page, distance:number) {
 }
 
 for(const [width,height,cubeStyle] of [[320,568,'stickered'],[390,844,'stickerless']] as const) {
-  test(`${width}px ${cubeStyle}: double-speed translation, sequential noise, pinch and mixed gestures`,async({browser,baseURL})=>{
+  test(`${width}px ${cubeStyle}: 1.7x translation, sequential noise, pinch and mixed gestures`,async({browser,baseURL})=>{
     test.setTimeout(120_000);
     const context=await browser.newContext({baseURL,viewport:{width,height},hasTouch:true});
     try {
@@ -60,7 +60,7 @@ for(const [width,height,cubeStyle] of [[320,568,'stickered'],[390,844,'stickerle
       const normal=angle(home,await debug.camera(page));expect(normal).toBeGreaterThan(.1);
       await reset(page);await page.getByRole('radio',{name:'Twist',exact:true}).check();
       await trace(page);await dragPair(cdp,page,start,40,0);
-      const precise=angle(home,await debug.camera(page));expect(precise/normal).toBeCloseTo(2,2);
+      const precise=angle(home,await debug.camera(page));expect(precise/normal).toBeCloseTo(1.7,2);
       await stable(page,distance);expect(await debug.version(page)).toBe(0);
       await reset(page);await trace(page);await dragPair(cdp,page,start,20,12,0,true);
       await stable(page,distance);expect((await debug.camera(page)).zoom).toBe(1);

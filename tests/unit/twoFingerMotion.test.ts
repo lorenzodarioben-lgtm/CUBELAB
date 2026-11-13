@@ -51,7 +51,7 @@ describe('two-finger motion', () => {
 });
 
 describe('two-finger rotation gain respects trackball sensitivity', () => {
-  it.each([0.4,1,1.7,2])('rotates at double speed with base sensitivity %s', sensitivity => {
+  it.each([0.4,1,1.7,2])('rotates at 1.7x speed with base sensitivity %s', sensitivity => {
     for (const [dx,dy] of [[40,0],[0,40]]) {
       const normal = new OrbitRig(), precise = new OrbitRig();
       normal.setSensitivity(sensitivity); precise.setSensitivity(sensitivity);
@@ -61,7 +61,7 @@ describe('two-finger rotation gain respects trackball sensitivity', () => {
       normal.rotateBy(dx!,dy!,500); precise.rotateBy(delta.dx*TWO_FINGER_ROTATION_SENSITIVITY,delta.dy*TWO_FINGER_ROTATION_SENSITIVITY,500);
       normal.step(0,true); precise.step(0,true);
       const angle = (rig: OrbitRig) => rig.cubeQuaternion(new Quaternion()).angleTo(new Quaternion());
-      expect(angle(precise)/angle(normal)).toBeCloseTo(2,9);
+      expect(angle(precise)/angle(normal)).toBeCloseTo(1.7,9);
       expect(precise.current.zoom).toBe(1);
     }
   });
